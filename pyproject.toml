@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "ecotech"
+version = "1.0.0"
+description = "Sistema de Gerenciamento de Descarte de Lixo Eletrônico"
+authors = [
+    "Abner Levi <abnerlevi@example.com>",
+    "Maria Antônia <mariastrajano@example.com>",
+    "Matheus Nogueira <mathNS@example.com>"
+]
+readme = "README.md"
+packages = [{include = "ecotech"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.0.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+black = "^23.12.0"
+flake8 = "^6.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

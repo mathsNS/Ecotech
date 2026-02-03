@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EcoTech - Sistema de Descarte de Lixo Eletrônico{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/Ecotech logo completa.png') }}" alt="EcoTech" style="height: 60px;">
+            </div>
+            
+            {% if usuario %}
+            <div class="nav-menu">
+                <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('pontos_coleta') }}" class="nav-link">Pontos de Coleta</a>
+                <a href="{{ url_for('perfil') }}" class="nav-link">
+                    <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil" style="width: 32px; height: 32px; border-radius: 50%;">
+                </a>
+                <a href="{{ url_for('logout') }}" class="nav-link">Sair</a>
+            </div>
+            {% else %}
+            <div class="nav-menu">
+                <a href="{{ url_for('login') }}" class="btn-link">Entrar</a>
+                <a href="{{ url_for('criar_conta') }}" class="btn btn-primary">Criar Conta</a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alerts">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <img src="{{ url_for('static', filename='images/ecotech nome.png') }}" alt="EcoTech" style="height: 30px; margin-bottom: 10px;">
+                    <p>85% dos brasileiros guardam aqueles sem uso. A Ecotech é um incentivo para você descartar corretamente.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links Rápidos</h4>
+                    <ul>
+                        <li><a href="{{ url_for('index') }}">Início</a></li>
+                        <li><a href="{{ url_for('pontos_coleta') }}">Pontos de Coleta</a></li>
+                        <li><a href="{{ url_for('criar_conta') }}">Criar Conta</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <p>&copy; 2026 EcoTech. Todos os direitos reservados.</p>
+                    <p>Desenvolvido por: Abner Levi, Maria Antônia, Matheus Nogueira</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

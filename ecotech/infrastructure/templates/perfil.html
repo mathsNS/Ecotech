@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil - EcoTech{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+    <div class="container">
+        <div class="profile-card">
+            <!-- header perfil -->
+            <div class="profile-header-centered">
+                <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil" class="profile-photo">
+                <h1 class="profile-name">{{ usuario.nome }}</h1>
+                <p class="profile-type">{{ usuario.tipo }}</p>
+            </div>
+
+            <!-- stats inline -->
+            <div class="profile-stats-inline">
+                <div class="stat-inline">
+                    <img src="{{ url_for('static', filename='images/medalha.png') }}" alt="Tier" class="stat-icon-small">
+                    <span class="stat-value">2º</span>
+                </div>
+                <div class="stat-inline">
+                    <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Pontos" class="stat-icon-small">
+                    <span class="stat-value">{{ pontos }}</span>
+                </div>
+            </div>
+
+            <!-- tier e progresso -->
+            <div class="tier-section">
+                <div class="tier-badge">
+                    <span class="tier-number">1</span>
+                    <span class="tier-name">Tier prata</span>
+                </div>
+                <div class="tier-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 84%;"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span>126/150</span>
+                        <span class="next-tier">Próximo tier: Ouro</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- conquistas -->
+            <div class="conquistas-section">
+                <h3>Conquistas</h3>
+                <div class="conquistas-badges">
+                    <div class="conquista-circle active">
+                        <img src="{{ url_for('static', filename='images/medalha.png') }}" alt="5 pontos">
+                        <span class="conquista-number">5</span>
+                    </div>
+                    <div class="conquista-circle active">
+                        <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="10 pontos">
+                        <span class="conquista-number">10</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- placar amigos -->
+            <div class="leaderboard-section">
+                <h3>Placar dos Amigos</h3>
+                <div class="leaderboard-list">
+                    <div class="leaderboard-item-new highlight">
+                        <span class="rank-number">1</span>
+                        <div class="player-info">
+                            <strong>Você</strong>
+                            <span class="points-small">{{ pontos }} pontos</span>
+                        </div>
+                    </div>
+                    <div class="leaderboard-item-new">
+                        <span class="rank-number">2</span>
+                        <div class="player-info">
+                            <strong>Pedro Santos</strong>
+                            <span class="points-small">200 pontos</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- botoes -->
+            <div class="profile-actions-new">
+                <button class="btn btn-collect">Coletar pontos</button>
+                <a href="{{ url_for('logout') }}" class="btn btn-logout">Sair da conta</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

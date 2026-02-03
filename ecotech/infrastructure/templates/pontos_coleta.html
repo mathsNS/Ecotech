@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Pontos de Coleta - EcoTech{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Pontos de Coleta</h1>
+        <p>Encontre o ponto de coleta mais próximo de você</p>
+    </div>
+
+    <div class="map-container">
+        <div id="map" class="map-placeholder">
+            <p>Mapa interativo dos pontos de coleta</p>
+            <p class="small">Futura integração com API de mapas</p>
+        </div>
+    </div>
+
+    <div class="points-list">
+        <h2>Pontos Disponíveis</h2>
+        
+        {% for ponto in pontos %}
+        <div class="point-card">
+            <div class="point-header">
+                <h3>{{ ponto.nome }}</h3>
+                <span class="point-status {% if ponto.ativo %}active{% else %}inactive{% endif %}">
+                    {{ 'Ativo' if ponto.ativo else 'Inativo' }}
+                </span>
+            </div>
+            
+            <div class="point-info">
+                <div class="info-item">
+                    <svg width="16" height="16" fill="currentColor">
+                        <path d="M8 0C5.24 0 3 2.24 3 5c0 3.38 5 11 5 11s5-7.62 5-11c0-2.76-2.24-5-5-5zm0 7.5c-1.38 0-2.5-1.12-2.5-2.5S6.62 2.5 8 2.5s2.5 1.12 2.5 2.5S9.38 7.5 8 7.5z"/>
+                    </svg>
+                    <span>{{ ponto.endereco }}</span>
+                </div>
+                
+                <div class="info-item">
+                    <svg width="16" height="16" fill="currentColor">
+                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm1 10H7v-2h2v2zm0-3H7V4h2v4z"/>
+                    </svg>
+                    <span>Capacidade: {{ ponto.calcular_disponibilidade_percentual() }}% disponível</span>
+                </div>
+                
+                <div class="info-item">
+                    <svg width="16" height="16" fill="currentColor">
+                        <path d="M4 6h8v1H4zm0 3h8v1H4zm10-8H2a1 1 0 00-1 1v11a1 1 0 001 1h12a1 1 0 001-1V2a1 1 0 00-1-1z"/>
+                    </svg>
+                    <span>{{ ponto.ocupacao_atual_kg|round(1) }}kg / {{ ponto.capacidade_kg|round(0) }}kg</span>
+                </div>
+            </div>
+            
+            {% if usuario %}
+            <div class="point-actions">
+                <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary btn-sm">
+                    Selecionar este ponto
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

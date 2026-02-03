@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1>Seu eletrônico parado vale mais do que você imagina.</h1>
+                <p class="subtitle">Ajude o planeta. Ganhe por isso.</p>
+                <p class="description">
+                    85% dos brasileiros guardam aqueles sem uso. A Ecotech é um incentivo 
+                    para você descartar corretamente: coletas sem sair de casa, 
+                    recompensas e um futuro mais sustentável.
+                </p>
+                <div class="hero-buttons">
+                    {% if not usuario %}
+                    <a href="{{ url_for('criar_conta') }}" class="btn btn-primary btn-lg">Criar conta e começar</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-secondary btn-lg">Já tenho conta</a>
+                    {% else %}
+                    <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary btn-lg">Agendar coleta domiciliar</a>
+                    <a href="{{ url_for('pontos_coleta') }}" class="btn btn-secondary btn-lg">Buscar um ponto fixo de coleta</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="hero-image">
+                <img src="{{ url_for('static', filename='images/apresentacoes.png') }}" alt="Descarte eletrônico" style="max-width: 100%; height: auto;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <div class="container">
+        <h2 class="section-title">Como funciona a Ecotech</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <img src="{{ url_for('static', filename='images/localizacao.png') }}" alt="Localização" style="width: 48px; height: 48px;">
+                </div>
+                <h3>1. Localize um ponto de coleta no app</h3>
+                <p>Encontre pontos de coleta próximos a você ou agende uma coleta domiciliar.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <img src="{{ url_for('static', filename='images/coleta.png') }}" alt="Coleta" style="width: 48px; height: 48px;">
+                </div>
+                <h3>2. Leve seu equipamento ou agende a retirada</h3>
+                <p>Escolha a opção mais conveniente: entregue ou aguarde a coleta em casa.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 48px; height: 48px;">
+                </div>
+                <h3>3. Ganhe crédito pelas peças descartadas</h3>
+                <p>Receba pontos e recompensas financeiras pelo descarte correto.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="about-section">
+    <div class="container">
+        <div class="about-content">
+            <div class="about-text">
+                <h2>O que são as doações?</h2>
+                <p>
+                    Doações das empresas 100% para centros de reciclagem, dividido igualmente 
+                    entre todas as instituições cadastradas.
+                </p>
+                <p>
+                    Ao doar, você contribuirá para um futuro mais sustentável e ainda ganha 
+                    benefícios pela sua ação consciente.
+                </p>
+            </div>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>10.000+</h3>
+                    <p>Dispositivos reciclados</p>
+                </div>
+                <div class="stat-card">
+                    <h3>5.000+</h3>
+                    <p>Usuários ativos</p>
+                </div>
+                <div class="stat-card">
+                    <h3>50+</h3>
+                    <p>Pontos de coleta</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

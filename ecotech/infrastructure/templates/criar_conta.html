@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Conta - EcoTech{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Criar conta</h2>
+            <p>Selecione o tipo de conta para começar</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('criar_conta') }}">
+            <div class="form-group">
+                <label>Tipo de conta</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="tipo" value="cidadao" checked>
+                        <span>Cidadão</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="tipo" value="empresa">
+                        <span>Empresa</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Criar conta</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Já tem uma conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

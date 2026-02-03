@@ -1,6 +1,6 @@
 # A- modulo de dispositivos eletronicos
 # responsavel por gerenciar diferentes tipos de dispositivos
-# demonstra heranca e polimorfismo
+# importante rpra herança e polimorfismo
 
 from abc import ABC, abstractmethod
 
@@ -60,7 +60,7 @@ class Celular(DispositivoEletronico):
         return "Celular"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- celulares tem impacto fixo de 5.0 por kg (simples e direto)
+        # A- celular tem impacto fixo de 5.0 por kg
         return self._peso_kg * 5.0
 
 
@@ -74,7 +74,7 @@ class Computador(DispositivoEletronico):
         return "Computador"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- computadores tem maior impacto: 15.0 por kg
+        # A- computadores tem impacto de 15.0 por kg (maior que celular)
         return self._peso_kg * 15.0
 
 
@@ -88,5 +88,5 @@ class Eletrodomestico(DispositivoEletronico):
         return "Eletrodomestico"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- eletrodomesticos tem impacto medio: 8.0 por kg
+        # A- eletrodomesticos tem impacto medio de 8.0 por kg
         return self._peso_kg * 8.0

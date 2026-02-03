@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Solicitação - EcoTech{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Nova Solicitação de Descarte</h1>
+        <p>Preencha as informações sobre o dispositivo que deseja descartar</p>
+    </div>
+
+    <form method="POST" class="solicitation-form">
+        <div class="form-section">
+            <h3>Informações do Dispositivo</h3>
+            
+            <div class="form-group">
+                <label for="tipo_dispositivo">Tipo de Dispositivo</label>
+                <select id="tipo_dispositivo" name="tipo_dispositivo" class="form-control" required>
+                    <option value="celular">Celular/Smartphone</option>
+                    <option value="computador">Computador</option>
+                    <option value="eletrodomestico">Eletrodoméstico</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="nome">Modelo/Nome</label>
+                <input type="text" id="nome" name="nome" class="form-control" 
+                       placeholder="Ex: iPhone 11, Samsung Galaxy S20" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="peso_kg">Peso aproximado (kg)</label>
+                    <input type="number" id="peso_kg" name="peso_kg" class="form-control" 
+                           step="0.1" min="0.1" value="1.0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="ano_fabricacao">Ano de Fabricação</label>
+                    <input type="number" id="ano_fabricacao" name="ano_fabricacao" class="form-control" 
+                           min="1990" max="2026" value="2020" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="quantidade">Quantidade</label>
+                    <input type="number" id="quantidade" name="quantidade" class="form-control" 
+                           min="1" value="1" required>
+                </div>
+            </div>
+
+            <div id="computador-fields" class="conditional-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="tipo_computador">Tipo de Computador</label>
+                    <select id="tipo_computador" name="tipo_computador" class="form-control">
+                        <option value="desktop">Desktop</option>
+                        <option value="notebook">Notebook</option>
+                        <option value="servidor">Servidor</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="eletrodomestico-fields" class="conditional-fields" style="display: none;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria">Categoria</label>
+                        <select id="categoria" name="categoria" class="form-control">
+                            <option value="geladeira">Geladeira</option>
+                            <option value="tv">TV</option>
+                            <option value="micro-ondas">Micro-ondas</option>
+                            <option value="ar-condicionado">Ar Condicionado</option>
+                            <option value="lavadora">Lavadora</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tem_gas">Possui gás refrigerante?</label>
+                        <select id="tem_gas" name="tem_gas" class="form-control">
+                            <option value="nao">Não</option>
+                            <option value="sim">Sim</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Ponto de Coleta</h3>
+            
+            <div class="form-group">
+                <label for="ponto_coleta">Selecione um ponto de coleta</label>
+                <select id="ponto_coleta" name="ponto_coleta" class="form-control">
+                    <option value="">Escolher depois</option>
+                    {% for ponto in pontos %}
+                    <option value="{{ ponto.id }}">
+                        {{ ponto.nome }} - {{ ponto.endereco }}
+                        ({{ ponto.calcular_disponibilidade_percentual() }}% disponível)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Criar Solicitação</button>
+        </div>
+    </form>
+</div>
+
+<script>
+const tipoDispositivo = document.getElementById('tipo_dispositivo');
+const computadorFields = document.getElementById('computador-fields');
+const eletrodomesticoFields = document.getElementById('eletrodomestico-fields');
+
+tipoDispositivo.addEventListener('change', function() {
+    computadorFields.style.display = this.value === 'computador' ? 'block' : 'none';
+    eletrodomesticoFields.style.display = this.value === 'eletrodomestico' ? 'block' : 'none';
+});
+</script>
+{% endblock %}

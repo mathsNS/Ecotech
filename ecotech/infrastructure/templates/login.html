@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Login - EcoTech{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Entrar no sistema</h2>
+            <p>Selecione o tipo de conta para acessar</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label>Tipo de conta</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="tipo" value="cidadao" checked>
+                        <span>Cidadão</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="tipo" value="empresa">
+                        <span>Empresa</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Entrar</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Não tem uma conta? <a href="{{ url_for('criar_conta') }}">Criar conta</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

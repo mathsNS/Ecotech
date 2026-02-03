@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - EcoTech{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="container">
+        <div class="dashboard-header">
+            <div>
+                <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
+                <p>Você já descartou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
+            </div>
+            <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">
+                Iniciar novo descarte
+            </a>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>R$ {{ (total_descartado * 5.5)|round(2) }}</h3>
+                    <p>Valor acumulado</p>
+                </div>
+            </div>
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ pontos_acumulados }}</h3>
+                    <p>Pontos acumulados</p>
+                </div>
+            </div>
+            <div class="stat-card-dash eco">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ impacto_evitado|round(1) }}</h3>
+                    <p>Impacto evitado</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Últimas entregas</h2>
+                    <a href="{{ url_for('notificacoes') }}">Ver todas</a>
+                </div>
+                
+                {% if solicitacoes %}
+                <div class="deliveries-list">
+                    {% for sol in solicitacoes %}
+                    <div class="delivery-card">
+                        <div class="delivery-icon">
+                            <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega" style="width: 32px; height: 32px;">
+                        </div>
+                        <div class="delivery-info">
+                            <h4>Incentivo por coleta</h4>
+                            <p>{{ sol.obter_resumo()['tipo_usuario'] }} - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                            <span class="delivery-id">ID: {{ sol.id[:12] }}</span>
+                        </div>
+                        <div class="delivery-status">
+                            <span class="status-badge status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
+                                {{ sol.estado.obter_nome() }}
+                            </span>
+                            <span class="delivery-value">R$ {{ (sol.calcular_peso_total() * 5.5)|round(2) }}</span>
+                            <span class="delivery-date">{{ sol.data_criacao.strftime('%d/%m/%Y') }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <p>Você ainda não fez nenhuma solicitação de descarte.</p>
+                    <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2>Você deseja:</h2>
+                </div>
+                <div class="actions-grid">
+                    <a href="{{ url_for('nova_solicitacao') }}" class="action-card">
+                        <div class="action-icon">
+                            <img src="{{ url_for('static', filename='images/calendario.png') }}" alt="Agendar" style="width: 32px; height: 32px;">
+                        </div>
+                        <h3>Agendar coleta domiciliar</h3>
+                        <p>Agende e aguarde a coleta em casa</p>
+                    </a>
+                    <a href="{{ url_for('pontos_coleta') }}" class="action-card">
+                        <div class="action-icon">
+                            <img src="{{ url_for('static', filename='images/localizacao.png') }}" alt="Localização" style="width: 32px; height: 32px;">
+                        </div>
+                        <h3>Buscar um ponto fixo de coleta</h3>
+                        <p>Encontre pontos próximos a você</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
