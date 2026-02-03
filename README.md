@@ -135,9 +135,3 @@ pytest --cov=ecotech
 - Flask (framework web)
 - Poetry (gerenciamento de dependências)
 - Pytest (testes automatizados)
-
-## Licença
-
-Este projeto está sob a licença MIT.
-
-## Contato
