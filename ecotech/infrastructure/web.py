@@ -191,6 +191,64 @@ def criar_app() -> Flask:
             notificacoes=notificacoes
         )
     
+    @app.route('/ultimas-entregas')
+    def ultimas_entregas():
+        """Página de últimas entregas (histórico completo)."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        
+        usuario = dados_usuario()
+        
+        # dados de exemplo das entregas (talvez alterar dps)
+        entregas = [
+            {
+                'valor': 13.95,
+                'empresa': 'Ecotech - Reciclagem Cariri',
+                'id': '56492574920',
+                'data': '13 Set 2025',
+                'hora': '13:02',
+                'status': 'finalizado'
+            },
+            {
+                'valor': 8.19,
+                'empresa': 'Ecotech - Reciclagem Cariri',
+                'id': '58293049159',
+                'data': '10 Set 2025',
+                'hora': '08:55',
+                'status': 'finalizado'
+            },
+            {
+                'valor': 6.41,
+                'empresa': 'Ecotech - Reciclagem Cariri',
+                'id': '98358259431',
+                'data': '08 Set 2025',
+                'hora': '15:31',
+                'status': 'cancelado'
+            },
+            {
+                'valor': 27.65,
+                'empresa': 'Ecotech - Reciclagem Cariri',
+                'id': '47389088043',
+                'data': '03 Set 2025',
+                'hora': '16:44',
+                'status': 'finalizado'
+            },
+            {
+                'valor': 12.53,
+                'empresa': 'Ecotech - Reciclagem Cariri',
+                'id': '57463968973',
+                'data': '02 Set 2025',
+                'hora': '08:21',
+                'status': 'finalizado'
+            }
+        ]
+        
+        return render_template(
+            'ultimas_entregas.html',
+            usuario=usuario,
+            entregas=entregas
+        )
+    
     @app.route('/perfil')
     def perfil():
         """Página de perfil do usuário."""

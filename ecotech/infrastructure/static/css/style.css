@@ -1,4 +1,4 @@
-/* Reset e Variáveis */
+/* reset e variaveis basicas */
 * {
     margin: 0;
     padding: 0;
@@ -42,7 +42,7 @@ body {
     padding: 0 20px;
 }
 
-/* Navbar */
+/* barra de navegacao */
 .navbar {
     background: white;
     border-bottom: 1px solid var(--border-color);
@@ -87,7 +87,7 @@ body {
     color: var(--primary-color);
 }
 
-/* Botões */
+/* botoes principais */
 .btn {
     display: inline-block;
     padding: 12px 24px;
@@ -142,7 +142,7 @@ body {
     color: white;
 }
 
-/* Hero Section */
+/* secao principal hero */
 .hero-section {
     padding: 80px 0;
     background: linear-gradient(135deg, var(--secondary-color) 0%, white 100%);
@@ -182,7 +182,7 @@ body {
     flex-wrap: wrap;
 }
 
-/* Features Section */
+/* secao de features */
 .features-section {
     padding: 80px 0;
     background: white;
@@ -230,7 +230,7 @@ body {
     line-height: 1.6;
 }
 
-/* Stats */
+/* estatisticas */
 .stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -255,7 +255,7 @@ body {
     color: var(--text-light);
 }
 
-/* Auth Pages */
+/* paginas de autenticacao */
 .auth-container {
     min-height: calc(100vh - 200px);
     display: flex;
@@ -343,7 +343,7 @@ body {
     text-decoration: none;
 }
 
-/* Dashboard */
+/* painel principal do usuario */
 .dashboard-container {
     padding: 40px 0;
     min-height: calc(100vh - 200px);
@@ -403,7 +403,7 @@ body {
     font-size: 14px;
 }
 
-/* Deliveries List */
+/* lista de entregas */
 .deliveries-list {
     display: flex;
     flex-direction: column;
@@ -504,7 +504,7 @@ body {
     color: var(--text-light);
 }
 
-/* Actions Grid */
+/* grade de acoes */
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -541,7 +541,7 @@ body {
     color: var(--text-light);
 }
 
-/* Sections */
+/* secoes da pagina */
 .section {
     margin-bottom: 48px;
 }
@@ -564,7 +564,7 @@ body {
     font-weight: 600;
 }
 
-/* Alerts */
+/* alertas do sistema */
 .alerts {
     position: fixed;
     top: 80px;
@@ -610,7 +610,7 @@ body {
     }
 }
 
-/* Footer */
+/* rodape */
 .footer {
     background: var(--text-dark);
     color: white;
@@ -647,7 +647,7 @@ body {
     color: white;
 }
 
-/* Form Layouts */
+/* layouts de formulario */
 .form-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -661,7 +661,7 @@ body {
     margin-top: 32px;
 }
 
-/* Page Header */
+/* cabecalho da pagina */
 .page-header {
     margin-bottom: 40px;
 }
@@ -685,7 +685,7 @@ body {
     font-weight: 600;
 }
 
-/* Responsive */
+/* responsivo pra mobile */
 @media (max-width: 768px) {
     .hero-content {
         grid-template-columns: 1fr;
@@ -710,7 +710,7 @@ body {
     }
 }
 
-/* Empty State */
+/* estado vazio */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -724,7 +724,7 @@ body {
     font-size: 18px;
 }
 
-/* Profile Page - Redesign */
+/* pagina de perfil redesenhada */
 .profile-page {
     background: var(--background-alt);
     min-height: 100vh;
@@ -992,7 +992,7 @@ body {
     color: white;
 }
 
-/* Old Profile Styles - Keep for backward compatibility */
+/* estilos antigos de perfil - manter compatibilidade */
 .profile-avatar {
     text-align: center;
     margin-bottom: 24px;
@@ -1020,7 +1020,7 @@ body {
     color: var(--text-light);
 }
 
-/* Map */
+/* mapa de pontos */
 .map-container {
     margin-bottom: 40px;
 }
@@ -1037,7 +1037,7 @@ body {
     border: 2px dashed var(--border-color);
 }
 
-/* Point Card */
+/* card de ponto de coleta */
 .point-card {
     background: white;
     border: 2px solid var(--border-color);
@@ -1076,4 +1076,12 @@ body {
     align-items: center;
     gap: 8px;
     color: var(--text-light);
+}
+
+/* link dentro das notificacoes */
+.notification-link {
+    color: #10b981;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
 }

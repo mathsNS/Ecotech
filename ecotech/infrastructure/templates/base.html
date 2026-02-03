@@ -18,6 +18,9 @@
             <div class="nav-menu">
                 <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
                 <a href="{{ url_for('pontos_coleta') }}" class="nav-link">Pontos de Coleta</a>
+                <a href="{{ url_for('notificacoes') }}" class="nav-link" title="Notificações">
+                    <img src="{{ url_for('static', filename='images/sino.png') }}" alt="Notificações" style="width: 24px; height: 24px;">
+                </a>
                 <a href="{{ url_for('perfil') }}" class="nav-link">
                     <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil" style="width: 32px; height: 32px; border-radius: 50%;">
                 </a>

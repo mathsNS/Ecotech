@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Últimas Entregas - EcoTech{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Últimas Entregas</h1>
+        <p class="subtitle">Histórico completo de suas coletas</p>
+    </div>
+
+    <!-- lista de entregas completa -->
+    <div class="entregas-container">
+        {% for entrega in entregas %}
+        <div class="entrega-card">
+            <div class="entrega-icon {{ entrega.status }}">
+                <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Coleta">
+            </div>
+            <div class="entrega-info">
+                <h3>Incentivo por coleta</h3>
+                <p class="empresa">{{ entrega.empresa }}</p>
+                <span class="entrega-id">ID da transação<br>{{ entrega.id }}</span>
+            </div>
+            <div class="entrega-detalhes">
+                <span class="valor-entrega {{ entrega.status }}">R$ {{ "%.2f"|format(entrega.valor) }}</span>
+                <span class="status-badge {{ entrega.status }}">{{ entrega.status }}</span>
+                <span class="data-entrega">{{ entrega.data }}</span>
+                <span class="hora-entrega">{{ entrega.hora }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* container principal das entregas */
+.entregas-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 0;
+}
+
+/* card de cada entrega */
+.entrega-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+}
+
+.entrega-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+/* icone circular da entrega */
+.entrega-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.entrega-icon.finalizado {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+}
+
+.entrega-icon.cancelado {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.entrega-icon img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+/* informacoes da entrega */
+.entrega-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.entrega-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 6px 0;
+}
+
+.entrega-info .empresa {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 8px 0;
+}
+
+.entrega-id {
+    font-size: 12px;
+    color: #9ca3af;
+    line-height: 1.4;
+}
+
+/* detalhes da entrega na direita */
+.entrega-detalhes {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    min-width: 120px;
+}
+
+.valor-entrega {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.valor-entrega.finalizado {
+    color: #10b981;
+}
+
+.valor-entrega.cancelado {
+    color: #ef4444;
+}
+
+.status-badge {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+.status-badge.finalizado {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.cancelado {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.data-entrega {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.hora-entrega {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+/* responsivo pra mobile */
+@media (max-width: 768px) {
+    .entregas-container {
+        padding: 12px 0;
+    }
+    
+    .entrega-card {
+        padding: 16px;
+        gap: 12px;
+    }
+    
+    .entrega-icon {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .entrega-icon img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .entrega-info h3 {
+        font-size: 15px;
+    }
+    
+    .entrega-detalhes {
+        min-width: 100px;
+    }
+    
+    .valor-entrega {
+        font-size: 16px;
+    }
+}
+</style>
+{% endblock %}

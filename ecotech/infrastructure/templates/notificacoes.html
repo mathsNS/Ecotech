@@ -10,20 +10,28 @@
     </div>
 
     <div class="notifications-container">
-        <!-- credito finalizado -->
-        <div class="notification-card notification-success">
-            <div class="notification-badge success">
-                <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Crédito">
-            </div>
-            <div class="notification-body">
-                <div class="notification-header">
-                    <h3>Sua coleta foi finalizada e você recebeu R$ 13,95!</h3>
-                    <span class="notification-dot unread"></span>
-                </div>
-                <p class="notification-message">Mais detalhes em "Últimas entregas"</p>
-                <span class="notification-timestamp">13:02</span>
-            </div>
+<!-- credito finalizado -->
+<div class="notification-card notification-success">
+    <div class="notification-badge success">
+        <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Crédito">
+    </div>
+
+    <div class="notification-body">
+        <div class="notification-header">
+            <h3>Sua coleta foi finalizada e você recebeu R$ 13,95!</h3>
+            <span class="notification-dot unread"></span>
         </div>
+
+        <p class="notification-message">
+            Mais detalhes em
+            <a href="{{ url_for('ultimas_entregas') }}" class="notification-link">
+                últimas entregas
+            </a>
+        </p>
+
+        <span class="notification-timestamp">13:02</span>
+    </div>
+</div>
 
         <!-- saque via pix -->
         <div class="notification-card notification-success">
