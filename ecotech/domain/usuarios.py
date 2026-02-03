@@ -1,22 +1,31 @@
+# M- modulo de usuarios
+# gerencia diferentes tipos de usuarios do sistema (cidadao, empresa, administrador)
+# usa heranca para criar hierarquia com permissoes e comportamentos distintos
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 import re
 
-# TODO: adicionar sistema de notificacoes
-# TODO: implementar historico de acoes
+# M- TODO: adicionar sistema de notificacoes
+# M- TODO: implementar historico de acoes
 
 class Usuario(ABC):
+    # M- classe abstrata base pra todos os usuarios
+    # define interface comum e validacoes compartilhadas
     
     def __init__(self, id: str, nome: str, email: str):
+        # M- valida dados antes de criar o usuario
         self._validar_nome(nome)
         self._validar_email(email)
         
+        # M- atributos privados (encapsulamento)
         self._id = id
         self._nome = nome
         self._email = email
-        self._data_cadastro = datetime.now()
-        self._ativo = True
+        self._data_cadastro = datetime.now()  # registra quando o usuario foi criado
+        self._ativo = True  # usuarios comecam ativos
 
+    # M- properties pra acesso controlado com validacao
     @property
     def id(self) -> str:
         return self._id
@@ -53,6 +62,7 @@ class Usuario(ABC):
     def desativar(self):
         self._ativo = False
 
+    # M- validacoes estaticas para reutilizacao
     @staticmethod
     def _validar_nome(nome: str):
         if not nome or len(nome.strip()) < 3:
@@ -60,10 +70,13 @@ class Usuario(ABC):
 
     @staticmethod
     def _validar_email(email: str):
+        # M- usa regex para validar formato do email
         padrao = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(padrao, email):
             raise ValueError("email invalido")
 
+    # M- metodos abstratos para polimorfismo
+    # cada tipo de usuario implementa suas proprias regras
     @abstractmethod
     def pode_solicitar_descarte(self) -> bool:
         pass
@@ -77,14 +90,16 @@ class Usuario(ABC):
 
 
 class Cidadao(Usuario):
+    # M- implementacao para cidadaos comuns
+    # tem limite de solicitacoes ativas e sistema de pontos
     
-    MAX_SOLICITACOES_ATIVAS = 5
+    MAX_SOLICITACOES_ATIVAS = 5  # constante que define o limite
 
     def __init__(self, id: str, nome: str, email: str, cpf: str):
         super().__init__(id, nome, email)
         self._cpf = cpf
-        self._solicitacoes_ativas = 0
-        self._pontos_acumulados = 0
+        self._solicitacoes_ativas = 0  # controla quantas solicitacoes estao em andamento
+        self._pontos_acumulados = 0  # sistema de gamificacao
 
     @property
     def cpf(self) -> str:
@@ -106,6 +121,7 @@ class Cidadao(Usuario):
             self._solicitacoes_ativas -= 1
 
     def pode_solicitar_descarte(self) -> bool:
+        # M- cidadao pode solicitar se estiver ativo e nao atingiu o limite (nao testei)
         return (
             self.ativo 
             and self._solicitacoes_ativas < self.MAX_SOLICITACOES_ATIVAS
@@ -116,6 +132,8 @@ class Cidadao(Usuario):
 
 
 class Empresa(Usuario):
+    # M- implementacao para empresas
+    # tem controle de limite mensal de descarte em kg
     
     def __init__(
         self, 
@@ -128,8 +146,8 @@ class Empresa(Usuario):
         super().__init__(id, nome, email)
         self._cnpj = cnpj
         self._razao_social = razao_social
-        self._limite_mensal_kg = 1000.0
-        self._descartado_mes_atual = 0.0
+        self._limite_mensal_kg = 1000.0  # limite padrao de 1 tonelada por mes
+        self._descartado_mes_atual = 0.0  # rastreamento do mes corrente
 
     @property
     def cnpj(self) -> str:
@@ -151,9 +169,11 @@ class Empresa(Usuario):
         self._descartado_mes_atual += peso
 
     def resetar_contador_mensal(self):
+        # M- deve ser chamado no inicio de cada mes
         self._descartado_mes_atual = 0.0
 
     def pode_solicitar_descarte(self) -> bool:
+        # M- empresa pode solicitar se estiver ativa e nao excedeu limite mensal
         return self.ativo and self._descartado_mes_atual < self._limite_mensal_kg
 
     def obter_tipo(self) -> str:
@@ -161,6 +181,8 @@ class Empresa(Usuario):
 
 
 class Administrador(Usuario):
+    # M- implementacao para administradores do sistema
+    # tem niveis de acesso (1, 2 ou 3) com permissoes diferentes
     
     def __init__(
         self, 
@@ -170,8 +192,8 @@ class Administrador(Usuario):
         nivel_acesso: int = 1
     ):
         super().__init__(id, nome, email)
-        self._nivel_acesso = max(1, min(nivel_acesso, 3))
-        self._pode_gerenciar_usuarios = nivel_acesso >= 2
+        self._nivel_acesso = max(1, min(nivel_acesso, 3))  # garante nivel entre 1 e 3
+        self._pode_gerenciar_usuarios = nivel_acesso >= 2  # nivel 2+ pode gerenciar
 
     @property
     def nivel_acesso(self) -> int:
@@ -182,6 +204,7 @@ class Administrador(Usuario):
         return self._pode_gerenciar_usuarios
 
     def pode_solicitar_descarte(self) -> bool:
+        # M- administradores nao fazem solicitacoes, apenas gerenciam o sistema
         return False
 
     def obter_tipo(self) -> str:

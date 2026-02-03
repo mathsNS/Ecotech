@@ -1,17 +1,23 @@
+# M- modulo de relatorios ambientais
+# gera estatisticas sobre descarte, reciclagem e impacto ambiental
+# calcula metricas de sustentabilidade do sistema
+
 from typing import List, Dict
 from datetime import datetime
 from .descarte import SolicitacaoDescarte
 from .estados import Reciclado, Reutilizado, Descartado
 
-# em desenvolvimento - falta exportar para pdf
-# adicionar graficos de impacto
+# M- em desenvolvimento - falta exportar para pdf (se der tempo e vcs quiserem, existe uma api que facilita isso)
+# M- adicionar graficos de impacto (opcional tbm)
 
 class RelatorioAmbiental:
+    # M- classe para consolidar dados e gerar relatorios de impacto
+    # agrupa solicitacoes e calcula metricas ambientais
     
     def __init__(self, titulo: str):
         self._titulo = titulo
-        self._solicitacoes: List[SolicitacaoDescarte] = []
-        self._data_geracao = datetime.now()
+        self._solicitacoes: List[SolicitacaoDescarte] = []  # lista de solicitacoes para analise
+        self._data_geracao = datetime.now()  # timestamp de quando foi criado
 
     @property
     def titulo(self) -> str:
@@ -24,7 +30,9 @@ class RelatorioAmbiental:
     def adicionar_solicitacao(self, solicitacao: SolicitacaoDescarte):
         self._solicitacoes.append(solicitacao)
 
+    # M- calcula totais por tipo de tratamento final
     def calcular_total_peso_reciclado(self) -> float:
+        # M- soma peso de todas as solicitacoes que foram recicladas
         total = 0.0
         for sol in self._solicitacoes:
             if isinstance(sol.estado, Reciclado):
@@ -46,6 +54,8 @@ class RelatorioAmbiental:
         return round(total, 2)
 
     def calcular_impacto_evitado(self) -> float:
+        # M- calcula quanto de impacto ambiental foi evitado pelos metodos de tratamento
+        # cada metodo tem uma porcentagem de reducao de impacto
         impacto_total = 0.0
         
         for sol in self._solicitacoes:
@@ -58,6 +68,8 @@ class RelatorioAmbiental:
         return round(impacto_total, 2)
 
     def gerar_relatorio(self) -> Dict:
+        # M- retorna um dicionario com todas as metricas consolidadas
+        # pode ser usado para exibir no sistema ou exportar para outros formatos
         return {
             "titulo": self._titulo,
             "data_geracao": self._data_geracao.isoformat(),

@@ -6,6 +6,8 @@ from .dispositivos import DispositivoEletronico
 # TODO: criar relatorio de impacto por metodo
 
 class MetodoTratamento(ABC):
+    # classe abstrata pra metodos de tratamento (padrao strategy)
+    # permite trocar algoritmo de tratamento em tempo de execucao
     
     def __init__(self, custo_base_por_kg: float, reducao_impacto_percentual: float):
         self._custo_base_por_kg = custo_base_por_kg
@@ -39,6 +41,7 @@ class MetodoTratamento(ABC):
 
 
 class Reciclagem(MetodoTratamento):
+    # metodo de reciclagem (desmonta e recupera os materiais que ainda tem utilidade) dai reduz impacto ambiental
     
     def __init__(self):
         super().__init__(custo_base_por_kg=15.0, reducao_impacto_percentual=80.0)
@@ -47,37 +50,22 @@ class Reciclagem(MetodoTratamento):
         return "Reciclagem"
 
     def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
-        custo_total = 0.0
-        
-        for dispositivo in dispositivos:
-            peso = dispositivo.peso_kg
-            custo_base = peso * self._custo_base_por_kg
-            
-            tipo = dispositivo.obter_tipo()
-            if "Celular" in tipo:
-                custo_base *= 1.3
-            elif "Computador" in tipo:
-                custo_base *= 1.2
-                
-            custo_total += custo_base
-            
-        return round(custo_total, 2)
+        # custo baseado no peso total * custo por kg
+        peso_total = sum(d.peso_kg for d in dispositivos)
+        return round(peso_total * self._custo_base_por_kg, 2)
 
     def calcular_impacto_ambiental(
         self, 
         dispositivos: List[DispositivoEletronico]
     ) -> float:
-        impacto_total = 0.0
-        
-        for dispositivo in dispositivos:
-            impacto_original = dispositivo.calcular_impacto_ambiental()
-            impacto_liquido = impacto_original * (1 - self._reducao_impacto_percentual / 100)
-            impacto_total += impacto_liquido
-            
-        return round(impacto_total, 2)
+        # calcula impacto reduzido pela reciclagem
+        impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
+        impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
+        return round(impacto_liquido, 2)
 
 
 class Reuso(MetodoTratamento):
+    # metodo de reuso (recondiciona pra usar novamente)
     
     def __init__(self):
         super().__init__(custo_base_por_kg=8.0, reducao_impacto_percentual=95.0)
@@ -86,37 +74,22 @@ class Reuso(MetodoTratamento):
         return "Reuso"
 
     def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
-        custo_total = 0.0
-        
-        for dispositivo in dispositivos:
-            peso = dispositivo.peso_kg
-            custo_base = peso * self._custo_base_por_kg
-            
-            idade = 2026 - dispositivo.ano_fabricacao
-            if idade < 3:
-                custo_base *= 1.5
-            elif idade < 5:
-                custo_base *= 1.2
-                
-            custo_total += custo_base
-            
-        return round(custo_total, 2)
+        # reuso é mais barato que reciclagem
+        peso_total = sum(d.peso_kg for d in dispositivos)
+        return round(peso_total * self._custo_base_por_kg, 2)
 
     def calcular_impacto_ambiental(
         self, 
         dispositivos: List[DispositivoEletronico]
     ) -> float:
-        impacto_total = 0.0
-        
-        for dispositivo in dispositivos:
-            impacto_original = dispositivo.calcular_impacto_ambiental()
-            impacto_liquido = impacto_original * (1 - self._reducao_impacto_percentual / 100)
-            impacto_total += impacto_liquido
-            
-        return round(impacto_total, 2)
+        # reuso reduz mais o impacto (95%)
+        impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
+        impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
+        return round(impacto_liquido, 2)
 
 
 class DescarteControlado(MetodoTratamento):
+    # metodo de descarte controlado (vai pra um aterro especializado, diferente de um lixao etc)
     
     def __init__(self):
         super().__init__(custo_base_por_kg=25.0, reducao_impacto_percentual=40.0)
@@ -125,28 +98,15 @@ class DescarteControlado(MetodoTratamento):
         return "Descarte Controlado"
 
     def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
-        custo_total = 0.0
-        
-        for dispositivo in dispositivos:
-            peso = dispositivo.peso_kg
-            custo_base = peso * self._custo_base_por_kg
-            
-            periculosidade = dispositivo.categoria_periculosidade.value
-            custo_base *= (1 + periculosidade * 0.2)
-            
-            custo_total += custo_base
-            
-        return round(custo_total, 2)
+        # descarte controlado é mais caro que os outros
+        peso_total = sum(d.peso_kg for d in dispositivos)
+        return round(peso_total * self._custo_base_por_kg, 2)
 
     def calcular_impacto_ambiental(
         self, 
         dispositivos: List[DispositivoEletronico]
     ) -> float:
-        impacto_total = 0.0
-        
-        for dispositivo in dispositivos:
-            impacto_original = dispositivo.calcular_impacto_ambiental()
-            impacto_liquido = impacto_original * (1 - self._reducao_impacto_percentual / 100)
-            impacto_total += impacto_liquido
-            
-        return round(impacto_total, 2)
+        # descarte controlado reduz menos o impacto (40%)
+        impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
+        impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
+        return round(impacto_liquido, 2)

@@ -1,3 +1,7 @@
+# modulo central de descarte
+# contem as classes principais para gerenciar solicitacoes de descarte
+# usa composicao para relacionar usuarios, dispositivos e pontos de coleta
+
 from datetime import datetime
 from typing import List, Optional, Dict
 from .dispositivos import DispositivoEletronico
@@ -9,6 +13,8 @@ from .tratamento import MetodoTratamento
 # adicionar rastreamento de entrega
 
 class ItemDescarte:
+    # A- representa um item individual de descarte (composicao com DispositivoEletronico)
+    # um item e um dispositivo + quantidade + observacoes
     
     def __init__(
         self,
@@ -42,9 +48,11 @@ class ItemDescarte:
         return self._observacoes
 
     def calcular_peso_total(self) -> float:
+        # A- peso total = peso unitario * quantidade
         return self._dispositivo.peso_kg * self._quantidade
 
     def calcular_impacto_total(self) -> float:
+        # A- impacto total = impacto unitario * quantidade
         return self._dispositivo.calcular_impacto_ambiental() * self._quantidade
 
     def __str__(self) -> str:
@@ -52,6 +60,8 @@ class ItemDescarte:
 
 
 class PontoColeta:
+    # M- representa um ponto de coleta fisico
+    # tem capacidade limitada e pode ser ativado/desativado
     
     def __init__(
         self,
@@ -65,11 +75,11 @@ class PontoColeta:
         self._id = id
         self._nome = nome
         self._endereco = endereco
-        self._latitude = latitude
+        self._latitude = latitude  # coordenadas para localizacao no mapa
         self._longitude = longitude
         self._ativo = True
-        self._capacidade_kg = capacidade_kg
-        self._ocupacao_atual_kg = 0.0
+        self._capacidade_kg = capacidade_kg  # capacidade maxima em kg
+        self._ocupacao_atual_kg = 0.0  # quanto ja esta ocupado
 
     @property
     def id(self) -> str:
@@ -96,6 +106,7 @@ class PontoColeta:
         return self._ocupacao_atual_kg
 
     def pode_receber(self, peso_kg: float) -> bool:
+        # M- verifica se ponto tem espaco disponivel para receber o peso
         return self._ativo and (self._ocupacao_atual_kg + peso_kg) <= self._capacidade_kg
 
     def adicionar_ocupacao(self, peso_kg: float):
@@ -114,6 +125,9 @@ class PontoColeta:
 
 
 class SolicitacaoDescarte:
+    # classe central que representa uma solicitacao de descarte
+    # agrega varios itens, tem um estado, ponto de coleta e metodo de tratamento
+    # M- usa padrao State para gerenciar ciclo de vida da solicitacao
     
     def __init__(
         self,
@@ -122,13 +136,13 @@ class SolicitacaoDescarte:
         ponto_coleta: Optional[PontoColeta] = None
     ):
         self._id = id
-        self._usuario = usuario
-        self._ponto_coleta = ponto_coleta
-        self._itens: List[ItemDescarte] = []
-        self._estado: EstadoDescarte = Solicitado()
-        self._metodo_tratamento: Optional[MetodoTratamento] = None
+        self._usuario = usuario  # M- quem fez a solicitacao
+        self._ponto_coleta = ponto_coleta  # M- onde sera entregue
+        self._itens: List[ItemDescarte] = []  # A- lista de itens a descartar
+        self._estado: EstadoDescarte = Solicitado()  # estado inicial
+        self._metodo_tratamento: Optional[MetodoTratamento] = None  # definido depois
         self._data_criacao = datetime.now()
-        self._data_agendamento: Optional[datetime] = None
+        self._data_agendamento: Optional[datetime] = None  # quando sera coletado
 
     @property
     def id(self) -> str:
@@ -175,6 +189,7 @@ class SolicitacaoDescarte:
         self._data_agendamento = valor
 
     def adicionar_item(self, item: ItemDescarte):
+        # A- adiciona um dispositivo a solicitacao
         self._itens.append(item)
 
     def remover_item(self, item: ItemDescarte):
@@ -182,12 +197,15 @@ class SolicitacaoDescarte:
             self._itens.remove(item)
 
     def calcular_peso_total(self) -> float:
+        # A- soma o peso de todos os itens
         return sum(item.calcular_peso_total() for item in self._itens)
 
     def calcular_impacto_total(self) -> float:
+        # A- soma o impacto ambiental de todos os itens
         return sum(item.calcular_impacto_total() for item in self._itens)
 
     def avancar_estado(self):
+        # usa o padrao State para transicionar entre estados
         self._estado = self._estado.avancar(self)
 
     def cancelar(self, motivo: str = ""):
