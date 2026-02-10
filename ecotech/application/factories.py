@@ -16,12 +16,13 @@ from ..domain.tratamento import (
     Reuso,
     DescarteControlado
 )
+from ..domain.descarte import PontoColeta  # abner 10/2
 
 
 class DispositivoFactory:
-    # A- factory para criar dispositivos 
+    # A- factory para criar dispositivos
     # centraliza a criacao e facilita manutencao
-    
+
     @staticmethod
     def criar_celular(id: str, nome: str, peso_kg: float) -> Celular:
         return Celular(id, nome, peso_kg)
@@ -37,7 +38,8 @@ class DispositivoFactory:
     @staticmethod
     def criar_dispositivo(tipo: str, dados: Dict[str, Any]) -> DispositivoEletronico:
         # A- metodo que escolhe qual tipo criar baseado no parametro
-        tipo_lower = tipo.lower()        # print(f"[DEBUG] criando dispositivo tipo: {tipo_lower}")        
+        tipo_lower = tipo.lower()
+        print(f"[DEBUG] criando dispositivo tipo: {tipo_lower}")
         if tipo_lower == "celular":
             return DispositivoFactory.criar_celular(**dados)
         elif tipo_lower == "computador":
@@ -50,7 +52,7 @@ class DispositivoFactory:
 
 class UsuarioFactory:
     # M- factory para criar usuarios
-    
+
     @staticmethod
     def criar_cidadao(id: str, nome: str, email: str, cpf: str) -> Cidadao:
         return Cidadao(id, nome, email, cpf)
@@ -78,7 +80,7 @@ class UsuarioFactory:
     def criar_usuario(tipo: str, dados: Dict[str, Any]) -> Usuario:
         # M- metodo que escolhe qual tipo criar (genericao)
         tipo_lower = tipo.lower()
-        
+
         if tipo_lower == "cidadao":
             return UsuarioFactory.criar_cidadao(**dados)
         elif tipo_lower == "empresa":
@@ -91,7 +93,7 @@ class UsuarioFactory:
 
 class MetodoTratamentoFactory:
     # factory para metodos de tratamento padrao strategy
-    
+
     @staticmethod
     def criar_reciclagem() -> Reciclagem:
         return Reciclagem()
@@ -107,7 +109,7 @@ class MetodoTratamentoFactory:
     @staticmethod
     def criar_metodo(tipo: str) -> MetodoTratamento:
         tipo_lower = tipo.lower()
-        
+
         if tipo_lower == "reciclagem":
             return MetodoTratamentoFactory.criar_reciclagem()
         elif tipo_lower == "reuso":
@@ -116,3 +118,24 @@ class MetodoTratamentoFactory:
             return MetodoTratamentoFactory.criar_descarte_controlado()
         else:
             raise ValueError(f"tipo de metodo invalido: {tipo}")
+
+
+class PontoColetaFactory:  # abner 10/02
+    # A- factory para criar pontos de coleta
+    # centraliza a criacao e facilita manutencao
+
+    @staticmethod
+    def criar_ponto_coleta(
+        id: str,
+        nome: str,
+        endereco: str,
+        latitude: float,
+        longitude: float,
+        capacidade_kg: float = 1000.0
+    ) -> PontoColeta:
+        return PontoColeta(id, nome, endereco, latitude, longitude, capacidade_kg)
+
+    @staticmethod
+    def criar_ponto(dados: Dict[str, Any]) -> PontoColeta:
+        # A- metodo generico que cria ponto de coleta a partir de dicionario
+        return PontoColetaFactory.criar_ponto_coleta(**dados)
