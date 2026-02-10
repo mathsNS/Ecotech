@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Saque - EcoTech{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="saque-header">
+        <div class="header-left">
+            <a href="{{ url_for('dashboard') }}" class="btn-back">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M12 16L6 10L12 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+            <div class="header-text">
+                <h1>Saque</h1>
+            </div>
+        </div>
+    </div>
+
+    <div class="saque-layout">
+        <!-- coluna esquerda - saldo e metodos -->
+        <div class="saque-left">
+            <div class="saldo-card">
+                <p class="saldo-label">Saldo disponível</p>
+                <h2 class="saldo-valor">R$ 11,05</h2>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Escolha um cartão/conta</label>
+                    <input type="text" class="form-control" placeholder="Selecione uma forma de pagamento" readonly>
+                </div>
+
+                <div class="payment-methods">
+                    <p class="label-text">Escolha o método</p>
+                    <div class="methods-grid">
+                        <button class="method-card active">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <span>Cartão de crédito</span>
+                        </button>
+                        <button class="method-card">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>Transferência via pix</span>
+                        </button>
+                        <button class="method-card">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+                                <line x1="7" y1="10" x2="7" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="12" y1="10" x2="12" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <span>Transferir para conta</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- coluna direita - doacao e formulario -->
+        <div class="saque-right">
+            <div class="donation-section">
+                <div class="donation-header">
+                    <p class="label-text">Doação (opcional)</p>
+                    <button class="info-btn" onclick="toggleDonationInfo()">?</button>
+                </div>
+                
+                <div class="donation-orgs">
+                    <button class="org-card">
+                        <div class="org-add">+</div>
+                    </button>
+                    <button class="org-card">
+                        <img src="{{ url_for('static', filename='images/org-recicla.png') }}" alt="Recicla Kariri">
+                        <span>Recicla Kariri</span>
+                    </button>
+                    <button class="org-card">
+                        <img src="{{ url_for('static', filename='images/org-biorecicle.png') }}" alt="Biorecicle">
+                        <span>Biorecicle</span>
+                    </button>
+                </div>
+
+                <div class="donation-info-box" id="donationInfoBox" style="display: none;">
+                    <p>
+                        Você pode optar por doar parte do valor diretamente para empresas de reciclagem 
+                        e coletores independentes. 100% vai para quem trabalha com tratamento de resíduos.
+                    </p>
+                    <p class="info-note">
+                        * Doações são opcionais e externas ao sistema principal da Ecotech.
+                    </p>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Nome*</label>
+                    <input type="text" class="form-control" placeholder="Seu nome completo">
+                </div>
+
+                <div class="form-group">
+                    <label>CPF*</label>
+                    <input type="text" class="form-control" placeholder="000.000.000-00">
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" placeholder="seu@email.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Valor do saque*</label>
+                    <input type="text" class="form-control" value="R$ 11,05" readonly>
+                </div>
+
+                <div class="form-check">
+                    <input type="checkbox" id="saveInfo">
+                    <label for="saveInfo">Salvar informações para saques futuros</label>
+                </div>
+
+                <button class="btn btn-primary btn-lg btn-block">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* header da pagina de saque */
+.saque-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-back {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-back:hover {
+    background: var(--primary-dark);
+    transform: scale(1.05);
+}
+
+.header-text h1 {
+    font-size: 28px;
+    margin: 0;
+    color: var(--text-dark);
+}
+
+.header-text .subtitle {
+    font-size: 14px;
+    color: var(--text-light);
+    margin: 4px 0 0 0;
+}
+
+.header-logo {
+    height: 50px;
+}
+
+/* layout em duas colunas */
+.saque-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.saque-left,
+.saque-right {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* card de saldo */
+.saldo-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 32px;
+    border-radius: var(--radius-md);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.saldo-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.saldo-valor {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* secoes do formulario */
+.form-section {
+    background: white;
+    padding: 24px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.label-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+}
+
+/* metodos de pagamento */
+.payment-methods {
+    margin-bottom: 24px;
+}
+
+.methods-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.method-card {
+    background: var(--background-alt);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-dark);
+}
+
+.method-card:hover {
+    border-color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.method-card.active {
+    border-color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.method-card svg {
+    color: var(--primary-color);
+}
+
+.method-card span {
+    font-size: 13px;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* secao de doacao */
+.donation-section {
+    padding: 20px;
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.donation-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.info-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--text-light);
+    background: transparent;
+    color: var(--text-light);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.info-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.donation-orgs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.org-card {
+    flex: 1;
+    min-width: 80px;
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.org-card:hover {
+    border-color: var(--primary-color);
+}
+
+.org-card img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.org-add {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--secondary-color);
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 300;
+}
+
+.org-card span {
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-dark);
+}
+
+.donation-info-box {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dark);
+}
+
+.info-note {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 8px;
+    font-style: italic;
+    margin-bottom: 0;
+}
+
+.btn-block {
+    width: 100%;
+    margin-top: 20px;
+}
+
+/* responsivo */
+@media (max-width: 968px) {
+    .saque-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-logo {
+        height: 40px;
+    }
+    
+    .saque-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    
+    .methods-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function toggleDonationInfo() {
+    const box = document.getElementById('donationInfoBox');
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+// interatividade dos metodos de pagamento
+document.addEventListener('DOMContentLoaded', function() {
+    const methods = document.querySelectorAll('.method-card');
+    methods.forEach(method => {
+        method.addEventListener('click', function() {
+            methods.forEach(m => m.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+});
+</script>
+{% endblock %}

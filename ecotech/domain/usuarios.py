@@ -10,7 +10,7 @@ import re
 # M- TODO: implementar historico de acoes
 
 class Usuario(ABC):
-    # M- classe abstrata base para todos os usuarios
+    # M- classe abstrata base pra todos os usuarios
     # define interface comum e validacoes compartilhadas
     
     def __init__(self, id: str, nome: str, email: str):
@@ -25,7 +25,7 @@ class Usuario(ABC):
         self._data_cadastro = datetime.now()  # registra quando o usuario foi criado
         self._ativo = True  # usuarios comecam ativos
 
-    # M- properties para acesso controlado com validacao
+    # M- properties pra acesso controlado com validacao
     @property
     def id(self) -> str:
         return self._id
@@ -121,7 +121,7 @@ class Cidadao(Usuario):
             self._solicitacoes_ativas -= 1
 
     def pode_solicitar_descarte(self) -> bool:
-        # M- cidadao pode solicitar se estiver ativo e nao atingiu o limite
+        # M- cidadao pode solicitar se estiver ativo e nao atingiu o limite (nao testei)
         return (
             self.ativo 
             and self._solicitacoes_ativas < self.MAX_SOLICITACOES_ATIVAS

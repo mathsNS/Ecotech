@@ -50,7 +50,7 @@ class DispositivoEletronico(ABC):
 
 
 class Celular(DispositivoEletronico):
-    # A- implementacao concreta para celulares
+    # A- implementacao celulares
     # herda de DispositivoEletronico
     
     def __init__(self, id: str, nome: str, peso_kg: float):
@@ -60,12 +60,12 @@ class Celular(DispositivoEletronico):
         return "Celular"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- celular tem impacto fixo de 5.0 por kg
+        # A- celular imapacto fixo de 5.0
         return self._peso_kg * 5.0
 
 
 class Computador(DispositivoEletronico):
-    # A- implementacao para computadores
+    # A- implementacao computadores
     
     def __init__(self, id: str, nome: str, peso_kg: float):
         super().__init__(id, nome, peso_kg)
@@ -74,12 +74,12 @@ class Computador(DispositivoEletronico):
         return "Computador"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- computadores tem impacto de 15.0 por kg (maior que celular)
+        # A- computadores impacto 15 por kg (maior)
         return self._peso_kg * 15.0
 
 
 class Eletrodomestico(DispositivoEletronico):
-    # A- implementacao para eletrodomesticos
+    # A- implementacao eletrodomesticos
     
     def __init__(self, id: str, nome: str, peso_kg: float):
         super().__init__(id, nome, peso_kg)
@@ -88,5 +88,5 @@ class Eletrodomestico(DispositivoEletronico):
         return "Eletrodomestico"
 
     def calcular_impacto_ambiental(self) -> float:
-        # A- eletrodomesticos tem impacto medio de 8.0 por kg
+        # A- eletro impacto medio de 8 
         return self._peso_kg * 8.0

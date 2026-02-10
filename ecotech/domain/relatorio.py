@@ -64,7 +64,6 @@ class RelatorioAmbiental:
                 reducao = sol.metodo_tratamento.reducao_impacto_percentual
                 impacto_evitado = impacto_original * (reducao / 100)
                 impacto_total += impacto_evitado
-                # print(f"[DEBUG] impacto evitado: {impacto_evitado}")
                 
         return round(impacto_total, 2)
 

@@ -206,7 +206,6 @@ class SolicitacaoDescarte:
 
     def avancar_estado(self):
         # usa o padrao State para transicionar entre estados
-        # print(f"[DEBUG] avancando estado de {self._estado.__class__.__name__}")
         self._estado = self._estado.avancar(self)
 
     def cancelar(self, motivo: str = ""):

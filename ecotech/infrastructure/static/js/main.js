@@ -1,4 +1,4 @@
-// JavaScript principal do EcoTech
+// JavaScript para funcionalidades adicionais, como auto-hide de alertas (apenas estetico)
 document.addEventListener('DOMContentLoaded', function() {
     // Auto-hide alerts após 5 segundos
     const alerts = document.querySelectorAll('.alert');
@@ -9,6 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 });
+
+// toggle do bloco de doacoes
+function toggleDonation() {
+    const donationInfo = document.getElementById('donationInfo');
+    if (donationInfo.style.display === 'none' || donationInfo.style.display === '') {
+        donationInfo.style.display = 'block';
+    } else {
+        donationInfo.style.display = 'none';
+    }
+}
 
 // Animação de slide out para alerts
 const style = document.createElement('style');

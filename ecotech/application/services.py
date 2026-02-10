@@ -31,7 +31,6 @@ class ServicoDescarte:
         id_solicitacao = str(uuid.uuid4())
         solicitacao = SolicitacaoDescarte(id_solicitacao, usuario, ponto_coleta)
         self._solicitacoes[id_solicitacao] = solicitacao
-        # print(f"[DEBUG] solicitacao criada: {id_solicitacao}")
         return solicitacao
 
     def adicionar_item_solicitacao(

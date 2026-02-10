@@ -141,21 +141,6 @@ def criar_app() -> Flask:
         pontos = servico_ponto.listar_pontos()
         return render_template('nova_solicitacao.html', usuario=usuario, pontos=pontos)
     
-    @app.route('/solicitacao/<id>')
-    def detalhes_solicitacao(id):
-        """Detalhes de uma solicitação."""
-        if not usuario_logado():
-            return redirect(url_for('login'))
-        
-        usuario = dados_usuario()
-        solicitacao = None
-        
-        return render_template(
-            'detalhes_solicitacao.html',
-            usuario=usuario,
-            solicitacao=solicitacao
-        )
-    
     @app.route('/pontos-coleta')
     def pontos_coleta():
         """Mapa de pontos de coleta."""
@@ -247,6 +232,19 @@ def criar_app() -> Flask:
             'ultimas_entregas.html',
             usuario=usuario,
             entregas=entregas
+        )
+    
+    @app.route('/saque')
+    def saque():
+        """Página de saque/carteira."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        
+        usuario = dados_usuario()
+        
+        return render_template(
+            'saque.html',
+            usuario=usuario
         )
     
     @app.route('/perfil')

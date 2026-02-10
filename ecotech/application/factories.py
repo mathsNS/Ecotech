@@ -37,7 +37,8 @@ class DispositivoFactory:
     @staticmethod
     def criar_dispositivo(tipo: str, dados: Dict[str, Any]) -> DispositivoEletronico:
         # A- metodo que escolhe qual tipo criar baseado no parametro
-        tipo_lower = tipo.lower()        # print(f"[DEBUG] criando dispositivo tipo: {tipo_lower}")        
+        tipo_lower = tipo.lower()
+        
         if tipo_lower == "celular":
             return DispositivoFactory.criar_celular(**dados)
         elif tipo_lower == "computador":

@@ -1,4 +1,4 @@
-/* reset e variaveis basicas */
+/* reset e variaveis */
 * {
     margin: 0;
     padding: 0;
@@ -42,7 +42,7 @@ body {
     padding: 0 20px;
 }
 
-/* barra de navegacao */
+/* navbar */
 .navbar {
     background: white;
     border-bottom: 1px solid var(--border-color);
@@ -182,7 +182,7 @@ body {
     flex-wrap: wrap;
 }
 
-/* secao de features */
+/* features */
 .features-section {
     padding: 80px 0;
     background: white;
@@ -230,7 +230,7 @@ body {
     line-height: 1.6;
 }
 
-/* estatisticas */
+/* stats */
 .stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -255,7 +255,7 @@ body {
     color: var(--text-light);
 }
 
-/* paginas de autenticacao */
+/* auth pages */
 .auth-container {
     min-height: calc(100vh - 200px);
     display: flex;
@@ -343,7 +343,7 @@ body {
     text-decoration: none;
 }
 
-/* painel principal do usuario */
+/* dashboard */
 .dashboard-container {
     padding: 40px 0;
     min-height: calc(100vh - 200px);
@@ -403,7 +403,7 @@ body {
     font-size: 14px;
 }
 
-/* lista de entregas */
+/* delivery */
 .deliveries-list {
     display: flex;
     flex-direction: column;
@@ -504,7 +504,7 @@ body {
     color: var(--text-light);
 }
 
-/* grade de acoes */
+/* grid */
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -541,7 +541,7 @@ body {
     color: var(--text-light);
 }
 
-/* secoes da pagina */
+/* sections */
 .section {
     margin-bottom: 48px;
 }
@@ -563,8 +563,7 @@ body {
     text-decoration: none;
     font-weight: 600;
 }
-
-/* alertas do sistema */
+/* alertas */
 .alerts {
     position: fixed;
     top: 80px;
@@ -610,7 +609,7 @@ body {
     }
 }
 
-/* rodape */
+/* footer */
 .footer {
     background: var(--text-dark);
     color: white;
@@ -647,7 +646,7 @@ body {
     color: white;
 }
 
-/* layouts de formulario */
+/* formularios */
 .form-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -661,7 +660,7 @@ body {
     margin-top: 32px;
 }
 
-/* cabecalho da pagina */
+/* header */
 .page-header {
     margin-bottom: 40px;
 }
@@ -685,7 +684,7 @@ body {
     font-weight: 600;
 }
 
-/* responsivo pra mobile */
+/* responsividade */
 @media (max-width: 768px) {
     .hero-content {
         grid-template-columns: 1fr;
@@ -710,7 +709,7 @@ body {
     }
 }
 
-/* estado vazio */
+/* empty */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -724,7 +723,7 @@ body {
     font-size: 18px;
 }
 
-/* pagina de perfil redesenhada */
+/* pagina nova de perfil (revisado) */
 .profile-page {
     background: var(--background-alt);
     min-height: 100vh;
@@ -992,7 +991,7 @@ body {
     color: white;
 }
 
-/* estilos antigos de perfil - manter compatibilidade */
+/* estilo antigo de perfil (talvez seja util para referencia) */
 .profile-avatar {
     text-align: center;
     margin-bottom: 24px;
@@ -1020,7 +1019,7 @@ body {
     color: var(--text-light);
 }
 
-/* mapa de pontos */
+/* mapa */
 .map-container {
     margin-bottom: 40px;
 }
@@ -1078,10 +1077,93 @@ body {
     color: var(--text-light);
 }
 
-/* link dentro das notificacoes */
+/* link nas notifs */
 .notification-link {
     color: #10b981;
     font-weight: 600;
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* botao pra expandir info de doacao */
+.donation-toggle {
+    background: white;
+    border: 1.5px solid var(--border-color);
+    color: var(--text-dark);
+    padding: 14px 20px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.donation-toggle:hover {
+    border-color: var(--primary-color);
+    background: var(--secondary-color);
+    box-shadow: 0 2px 6px rgba(45, 117, 89, 0.15);
+    transform: translateY(-1px);
+}
+
+.donation-toggle:active {
+    transform: translateY(0);
+}
+
+.toggle-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.arrow-icon {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+    color: var(--text-light);
+}
+
+.donation-toggle:hover .arrow-icon {
+    color: var(--primary-color);
+}
+
+/* bloco de infos de doacao */
+.donation-info {
+    background: var(--secondary-color);
+    border-left: 4px solid var(--primary-color);
+    padding: 20px;
+    border-radius: var(--radius-md);
+    margin-top: 16px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.donation-answer {
+    font-size: 14px;
+    color: var(--text-dark);
+    line-height: 1.6;
+    margin: 0 0 12px 0;
+}
+
+.donation-footnote {
+    font-size: 11px;
+    color: var(--text-light);
+    line-height: 1.5;
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+    font-style: italic;
 }
