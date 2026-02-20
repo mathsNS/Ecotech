@@ -42,49 +42,115 @@ body {
     padding: 0 20px;
 }
 
-/* navbar */
+/* navbar redesign */
 .navbar {
-    background: white;
-    border-bottom: 1px solid var(--border-color);
-    padding: 16px 0;
+    background: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
-.navbar .container {
+.navbar-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 32px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.logo {
+/* bloco esquerdo logo */
+.navbar-logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
+}
+
+.logo-icon {
+    height: 50px;
+    width: auto;
 }
 
 .logo-text {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--primary-color);
+    font-size: 26px;
+    font-weight: 600;
+    color: #2D7559;
 }
 
-.nav-menu {
+/* bloco central menu */
+.navbar-menu {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 40px;
 }
 
-.nav-link {
-    color: var(--text-dark);
-    text-decoration: none;
+.nav-item {
+    position: relative;
+    padding: 20px 0;
+    color: #4B5563;
+    font-size: 15px;
     font-weight: 500;
-    transition: color 0.2s;
+    text-decoration: none;
+    transition: color 0.2s ease;
 }
 
-.nav-link:hover {
-    color: var(--primary-color);
+.nav-item:hover {
+    color: #2D7559;
+}
+
+/* indicador item ativo */
+.nav-item.active {
+    color: #1F5242;
+}
+
+.nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #52A382;
+}
+
+/* bloco direito icones */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+}
+
+.nav-icon:hover {
+    opacity: 0.7;
+}
+
+.nav-icon img {
+    width: 24px;
+    height: 24px;
+}
+
+.nav-avatar {
+    display: block;
+}
+
+.nav-avatar img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #E5E7EB;
+    transition: border-color 0.2s ease;
+}
+
+.nav-avatar:hover img {
+    border-color: #52A382;
 }
 
 /* botoes principais */
