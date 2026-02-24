@@ -4,8 +4,8 @@
 
 from abc import ABC, abstractmethod
 
-# A- TODO: adicionar validacao de marca e modelo
-# A- TODO: implementar calculo de valor de revenda
+# A- Validacoes de marca e modelo implementadas no __init__  # ABNER 24/02
+# A- Calculo de valor de revenda implementado em cada subclasse  # ABNER 24/02
 
 
 class DispositivoEletronico(ABC):
@@ -16,10 +16,25 @@ class DispositivoEletronico(ABC):
         # A- validacoes basicas dos parametros
         if peso_kg <= 0:
             raise ValueError("peso deve ser positivo")
-        if marca and not isinstance(marca, str):  # abner 10/02
-            raise ValueError("marca deve ser uma string")
-        if modelo and not isinstance(modelo, str):  # abner 10/02
-            raise ValueError("modelo deve ser uma string")
+
+        # A- Validacoes de marca e modelo  # ABNER 24/02
+        if not isinstance(marca, str):
+            raise ValueError("marca deve ser uma string")  # ABNER 24/02
+        if marca and len(marca.strip()) == 0:
+            raise ValueError(
+                "marca nao pode conter apenas espacos")  # ABNER 24/02
+        if len(marca) > 100:
+            raise ValueError(
+                "marca nao pode ter mais de 100 caracteres")  # ABNER 24/02
+
+        if not isinstance(modelo, str):
+            raise ValueError("modelo deve ser uma string")  # ABNER 24/02
+        if modelo and len(modelo.strip()) == 0:
+            raise ValueError(
+                "modelo nao pode conter apenas espacos")  # ABNER 24/02
+        if len(modelo) > 100:
+            raise ValueError(
+                "modelo nao pode ter mais de 100 caracteres")  # ABNER 24/02
 
         # A- atributos privados (encapsulamento)
         self._id = id
