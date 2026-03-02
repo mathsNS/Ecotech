@@ -22,7 +22,7 @@ class TestEstados:
         assert isinstance(proximo, Coletado)
     
     def test_fluxo_solicitacao(self):
-        cidadao = Cidadao("1", "João", "joao@test.com", "123")
+        cidadao = Cidadao("1", "João", "joao@test.com", "12345678901")
         solicitacao = SolicitacaoDescarte("1", cidadao)
         
         assert isinstance(solicitacao.estado, Solicitado)
