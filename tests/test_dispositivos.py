@@ -4,8 +4,13 @@
 import pytest
 from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico
 
+<<<<<<< Updated upstream
 # A- TODO: adicionar mais testes de validacao
 # A- TODO: testar excecoes
+=======
+# Testes de validacoes implementadas - ABNER 24/02
+
+>>>>>>> Stashed changes
 
 class TestDispositivos:
     # A- testa criacao e comportamento dos dispositivos
