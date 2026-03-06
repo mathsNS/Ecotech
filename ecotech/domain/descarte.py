@@ -1,6 +1,8 @@
-# modulo central de descarte
-# contem as classes principais para gerenciar solicitacoes de descarte
-# usa composicao para relacionar usuarios, dispositivos e pontos de coleta
+"""
+Módulo central de descarte.
+Contem as classes principais para gerenciar solicitacoes de descarte.
+Usa composicao para relacionar usuarios, dispositivos e pontos de coleta.
+"""
 
 from datetime import datetime
 from typing import List, Optional, Dict
@@ -9,12 +11,18 @@ from .usuarios import Usuario
 from .estados import EstadoDescarte, Solicitado, Cancelado
 from .tratamento import MetodoTratamento
 
-# precisa implementar validacoes de ponto de coleta
-# adicionar rastreamento de entrega
+class RastreamentoEntrega:
+    """Registra o status e histórico de movimentação de uma solicitação."""
+    def __init__(self, id_rastreio: str):
+        self.id_rastreio = id_rastreio
+        self.historico: List[str] = ["Solicitação iniciada"]
+
+    def atualizar_status(self, mensagem: str):
+        self.historico.append(f"{datetime.now()}: {mensagem}")
+
 
 class ItemDescarte:
-    # A- representa um item individual de descarte (composicao com DispositivoEletronico)
-    # um item e um dispositivo + quantidade + observacoes
+    """Representa um item individual de descarte."""
     
     def __init__(
         self,
@@ -22,12 +30,17 @@ class ItemDescarte:
         quantidade: int = 1,
         observacoes: str = ""
     ):
+        """Inicializa um item de descarte."""
         if quantidade <= 0:
             raise ValueError("quantidade deve ser positiva")
             
         self._dispositivo = dispositivo
         self._quantidade = quantidade
         self._observacoes = observacoes
+
+    # -------------------
+    # PROPERTIES
+    # -------------------
 
     @property
     def dispositivo(self) -> DispositivoEletronico:
@@ -48,20 +61,23 @@ class ItemDescarte:
         return self._observacoes
 
     def calcular_peso_total(self) -> float:
-        # A- peso total = peso unitario * quantidade
+        """Retorna peso total (peso unitário * quantidade)."""
         return self._dispositivo.peso_kg * self._quantidade
 
     def calcular_impacto_total(self) -> float:
-        # A- impacto total = impacto unitario * quantidade
+        """Retorna impacto total (impacto unitário * quantidade)."""
         return self._dispositivo.calcular_impacto_ambiental() * self._quantidade
 
+    # ---------------
+    # REPRESENTAÇÃO
+    # ---------------
+    
     def __str__(self) -> str:
         return f"{self._quantidade}x {self._dispositivo.nome}"
 
 
 class PontoColeta:
-    # M- representa um ponto de coleta fisico
-    # tem capacidade limitada e pode ser ativado/desativado
+    """Representa um ponto de coleta fisico com capacidade controlada."""
     
     def __init__(
         self,
@@ -75,11 +91,15 @@ class PontoColeta:
         self._id = id
         self._nome = nome
         self._endereco = endereco
-        self._latitude = latitude  # coordenadas para localizacao no mapa
+        self._latitude = latitude
         self._longitude = longitude
         self._ativo = True
-        self._capacidade_kg = capacidade_kg  # capacidade maxima em kg
-        self._ocupacao_atual_kg = 0.0  # quanto ja esta ocupado
+        self._capacidade_kg = capacidade_kg
+        self._ocupacao_atual_kg = 0.0
+
+    # -------------------
+    # PROPERTIES
+    # -------------------
 
     @property
     def id(self) -> str:
@@ -105,13 +125,17 @@ class PontoColeta:
     def ocupacao_atual_kg(self) -> float:
         return self._ocupacao_atual_kg
 
+    def validar_e_receber(self, peso_kg: float):
+        """Valida se o ponto pode receber e incrementa a ocupação."""
+        if not self.pode_receber(peso_kg):
+            raise ValueError("Ponto de coleta excederia a capacidade máxima.")
+        self.adicionar_ocupacao(peso_kg)
+
     def pode_receber(self, peso_kg: float) -> bool:
-        # M- verifica se ponto tem espaco disponivel para receber o peso
+        """Verifica capacidade disponível e status ativo."""
         return self._ativo and (self._ocupacao_atual_kg + peso_kg) <= self._capacidade_kg
 
     def adicionar_ocupacao(self, peso_kg: float):
-        if not self.pode_receber(peso_kg):
-            raise ValueError("ponto de coleta sem capacidade")
         self._ocupacao_atual_kg += peso_kg
     
     def calcular_disponibilidade_percentual(self) -> float:
@@ -120,14 +144,16 @@ class PontoColeta:
         ocupacao_percentual = (self._ocupacao_atual_kg / self._capacidade_kg) * 100
         return round(100 - ocupacao_percentual, 1)
 
+    # ---------------
+    # REPRESENTAÇÃO
+    # ---------------
+    
     def __str__(self) -> str:
         return f"{self._nome} - {self._endereco}"
 
 
 class SolicitacaoDescarte:
-    # classe central que representa uma solicitacao de descarte
-    # agrega varios itens, tem um estado, ponto de coleta e metodo de tratamento
-    # M- usa padrao State para gerenciar ciclo de vida da solicitacao
+    """Classe central que gerencia o ciclo de vida da solicitação de descarte."""
     
     def __init__(
         self,
@@ -136,13 +162,18 @@ class SolicitacaoDescarte:
         ponto_coleta: Optional[PontoColeta] = None
     ):
         self._id = id
-        self._usuario = usuario  # M- quem fez a solicitacao
-        self._ponto_coleta = ponto_coleta  # M- onde sera entregue
-        self._itens: List[ItemDescarte] = []  # A- lista de itens a descartar
-        self._estado: EstadoDescarte = Solicitado()  # estado inicial
-        self._metodo_tratamento: Optional[MetodoTratamento] = None  # definido depois
+        self._usuario = usuario
+        self._ponto_coleta = ponto_coleta
+        self._itens: List[ItemDescarte] = []
+        self._estado: EstadoDescarte = Solicitado()
+        self._metodo_tratamento: Optional[MetodoTratamento] = None
         self._data_criacao = datetime.now()
-        self._data_agendamento: Optional[datetime] = None  # quando sera coletado
+        self._data_agendamento: Optional[datetime] = None
+        self.rastreamento = RastreamentoEntrega(f"R-{id}")
+
+    # -------------------
+    # PROPERTIES
+    # -------------------
 
     @property
     def id(self) -> str:
@@ -176,20 +207,7 @@ class SolicitacaoDescarte:
     def metodo_tratamento(self, valor: MetodoTratamento):
         self._metodo_tratamento = valor
 
-    @property
-    def data_criacao(self) -> datetime:
-        return self._data_criacao
-
-    @property
-    def data_agendamento(self) -> Optional[datetime]:
-        return self._data_agendamento
-
-    @data_agendamento.setter
-    def data_agendamento(self, valor: datetime):
-        self._data_agendamento = valor
-
     def adicionar_item(self, item: ItemDescarte):
-        # A- adiciona um dispositivo a solicitacao
         self._itens.append(item)
 
     def remover_item(self, item: ItemDescarte):
@@ -197,32 +215,34 @@ class SolicitacaoDescarte:
             self._itens.remove(item)
 
     def calcular_peso_total(self) -> float:
-        # A- soma o peso de todos os itens
         return sum(item.calcular_peso_total() for item in self._itens)
 
     def calcular_impacto_total(self) -> float:
-        # A- soma o impacto ambiental de todos os itens
         return sum(item.calcular_impacto_total() for item in self._itens)
 
     def avancar_estado(self):
-        # usa o padrao State para transicionar entre estados
+        """Transiciona para o próximo estado e registra no rastreamento."""
         self._estado = self._estado.avancar(self)
+        self.rastreamento.atualizar_status(f"Estado mudado para {self._estado.obter_nome()}")
 
     def cancelar(self, motivo: str = ""):
         if not self._estado.pode_cancelar():
-            raise ValueError("nao e possivel cancelar neste estado")
+            raise ValueError("Não é possível cancelar neste estado")
         self._estado = Cancelado(motivo)
+        self.rastreamento.atualizar_status(f"Cancelado: {motivo}")
 
     def obter_resumo(self) -> Dict:
         return {
             "id": self._id,
             "usuario": self._usuario.nome,
             "estado": self._estado.obter_nome(),
-            "total_itens": len(self._itens),
             "peso_total_kg": self.calcular_peso_total(),
-            "impacto_total": self.calcular_impacto_total(),
             "data_criacao": self._data_criacao.isoformat()
         }
+    
+    # ---------------
+    # REPRESENTAÇÃO
+    # ---------------
 
     def __str__(self) -> str:
-        return f"Solicitacao {self._id} - {self._estado.obter_nome()}"
+        return f"Solicitação {self._id} - {self._estado.obter_nome()}"
