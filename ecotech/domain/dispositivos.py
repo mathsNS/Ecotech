@@ -43,6 +43,10 @@ class DispositivoEletronico(ABC):
         self._marca = marca
         self._modelo = modelo
 
+    # -------------------
+    # PROPERTIES
+    # -------------------
+    
     @property
     def id(self) -> str:
         return self._id
@@ -63,6 +67,10 @@ class DispositivoEletronico(ABC):
     def modelo(self) -> str:
         return self._modelo
 
+    # ------------------
+    # MÉTODOS ABSTRATOS
+    # ------------------
+    
     @abstractmethod
     def obter_tipo(self) -> str:
         """Retorna o tipo do dispositivo."""
@@ -70,7 +78,7 @@ class DispositivoEletronico(ABC):
 
     @abstractmethod
     def calcular_impacto_ambiental(self) -> float:
-        """Calcula o impacto ambiental do dispositivo."""
+        """Calcula o impacto ambiental do dispositivo por kg."""
         pass
 
     @abstractmethod
@@ -78,14 +86,18 @@ class DispositivoEletronico(ABC):
         """Calcula o valor de revenda estimado."""
         pass
 
+    # ---------------
+    # REPRESENTAÇÃO
+    # ---------------
+
     def __str__(self) -> str:
         return f"{self.obter_tipo()}: {self._nome} ({self._peso_kg}kg)"
-
 
 class Celular(DispositivoEletronico):
     """Implementação para dispositivos do tipo Celular."""
 
-    def obter_tipo(self) -> str: return "Celular"
+    def obter_tipo(self) -> str:
+        return "Celular"
 
     def calcular_impacto_ambiental(self) -> float:
         return self._peso_kg * 5.0
@@ -93,18 +105,17 @@ class Celular(DispositivoEletronico):
     def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 10.0
 
-
 class Computador(DispositivoEletronico):
     """Implementação para dispositivos do tipo Computador."""
 
-    def obter_tipo(self) -> str: return "Computador"
+    def obter_tipo(self) -> str:
+        return "Computador"
 
     def calcular_impacto_ambiental(self) -> float:
         return self._peso_kg * 15.0
 
     def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 25.0
-
 
 class Eletrodomestico(DispositivoEletronico):
     """Implementação para dispositivos do tipo Eletrodoméstico."""
