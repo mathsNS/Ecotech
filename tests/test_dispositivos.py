@@ -5,8 +5,6 @@ import pytest
 from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico
 
 # Testes de validacoes implementadas - ABNER 24/02
-# Testes de excecoes implementados - ABNER 24/02
-
 
 class TestDispositivos:
     # A- testa criacao e comportamento dos dispositivos
