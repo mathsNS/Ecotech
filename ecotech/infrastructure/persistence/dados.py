@@ -14,8 +14,7 @@ class Dados:
         # Tabelas de Usuários
         c.execute("""
         CREATE TABLE IF NOT EXISTS usuario (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT,
+            id TEXT PRIMARY KEY,
             nome TEXT,
             email TEXT,
             data_cadastro TEXT,
@@ -26,7 +25,7 @@ class Dados:
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS cidadao (
-            id_usuario INTEGER PRIMARY KEY,
+            id_usuario TEXT PRIMARY KEY,
             cpf TEXT,
             solicitacoes_ativas INTEGER,
             pontos INTEGER,
@@ -36,7 +35,7 @@ class Dados:
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS empresa (
-            id_usuario INTEGER PRIMARY KEY,
+            id_usuario TEXT PRIMARY KEY,
             cnpj TEXT,
             razao_social TEXT,
             limite_mensal REAL,
@@ -47,7 +46,7 @@ class Dados:
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS administrador (
-            id_usuario INTEGER PRIMARY KEY,
+            id_usuario TEXT PRIMARY KEY,
             nivel INTEGER,
             FOREIGN KEY(id_usuario) REFERENCES usuario(id)
         )
@@ -57,7 +56,7 @@ class Dados:
         c.execute("""
         CREATE TABLE IF NOT EXISTS notificacao (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_usuario INTEGER,
+            id_usuario TEXT,
             timestamp TEXT,
             mensagem TEXT,
             FOREIGN KEY(id_usuario) REFERENCES usuario(id)   
@@ -67,7 +66,7 @@ class Dados:
         # Tabela de Dispositivos
         c.execute("""
         CREATE TABLE IF NOT EXISTS dispositivo (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             nome TEXT,
             peso_kg REAL,
             marca TEXT,
@@ -78,7 +77,7 @@ class Dados:
         # Tabela de Ponto de Coleta
         c.execute("""
         CREATE TABLE IF NOT EXISTS ponto_coleta (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             nome TEXT,
             endereco TEXT,
             latitude REAL,
@@ -92,9 +91,9 @@ class Dados:
         # Tabelas de Descarte
         c.execute("""
         CREATE TABLE IF NOT EXISTS solicitacao_descarte (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_usuario INTEGER,
-            id_ponto_coleta INTEGER,
+            id TEXT PRIMARY KEY,
+            id_usuario TEXT,
+            id_ponto_coleta TEXT,
             estado TEXT,
             metodo_tratamento TEXT,
             data_criacao TEXT,
@@ -107,8 +106,8 @@ class Dados:
         c.execute("""
         CREATE TABLE IF NOT EXISTS item_descarte (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_dispositivo INTEGER,
-            id_solicitacao INTEGER,
+            id_dispositivo TEXT,
+            id_solicitacao TEXT,
             quantidade INTEGER,
             observacoes TEXT,
             FOREIGN KEY(id_dispositivo) REFERENCES dispositivo(id),
@@ -119,7 +118,7 @@ class Dados:
         c.execute("""
         CREATE TABLE IF NOT EXISTS historico_rastreamento (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_solicitacao INTEGER,
+            id_solicitacao TEXT,
             timestamp TEXT,
             mensagem TEXT,
             FOREIGN KEY(id_solicitacao) REFERENCES solicitacao_descarte(id) 
@@ -135,43 +134,107 @@ class Dados:
     def salvar_cidadao(self, cidadao):
         c = self.conn.cursor()
 
-        c.execute("""
-        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (cidadao.id, cidadao.nome, cidadao.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, "cidadao"))
-        
-        id_usuario = c.lastrowid
+        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        c.execute("INSERT INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (id_usuario, cidadao.cpf, 0, 0))
+        c.execute("""
+        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "CIDADAO"))
+
+        c.execute("INSERT INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (cidadao.id, cidadao.cpf, 0, 0))
 
         self.conn.commit()
 
     def salvar_empresa(self, empresa):
         c = self.conn.cursor()
 
-        c.execute("""
-        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (empresa.id, empresa.nome, empresa.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, 'empresa'))
-        
-        id_usuario = c.lastrowid
+        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        c.execute("INSERT INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (id_usuario, empresa.cnpj, empresa.razao_social, 0, 0))
+        c.execute("""
+        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'EMPRESA'))
+
+        c.execute("INSERT INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (empresa.id, empresa.cnpj, empresa.razao_social, 0, 0))
 
         self.conn.commit()
 
     def salvar_administrador(self, administrador):
         c = self.conn.cursor()
 
-        c.execute("""
-        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (administrador.id, administrador.nome, administrador.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, "cidadao"))
-        
-        id_usuario = c.lastrowid
+        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        c.execute("INSERT INTO administrador (id_usuario, nivel) VALUES (?, ?, ?, ?)", (id_usuario, administrador.nivel))
+        c.execute("""
+        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "ADMINISTRADOR"))
+
+        c.execute("INSERT INTO administrador (id_usuario, nivel) VALUES (?, ?)", (administrador.id, administrador.nivel))
 
         self.conn.commit()
 
-d = Dados()
+    def salvar_notificacao(self, id_usuario, mensagem):
+        c = self.conn.cursor()
+        
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        c.execute("""
+        INSERT INTO notificacao (id_usuario, timestamp, mensagem)
+        VALUES (?, ?, ?)
+        """, (id_usuario, timestamp, mensagem))
+            
+        self.conn.commit()
+
+    def salvar_dispositivo(self, dispositivo):
+        c = self.conn.cursor()
+
+        c.execute("""
+        INSERT INTO dispositivo (id, nome, peso_kg, marca, modelo)
+        VALUES (?, ?, ?, ?)
+        """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo))
+
+        self.conn.commit()
+
+    def salvar_ponto(self, ponto_coleta):
+        c = self.conn.cursor()
+
+        c.execute("""
+        INSERT INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (ponto_coleta.id, ponto_coleta.nome, ponto_coleta.endereco, ponto_coleta.latitude, ponto_coleta.longitude, 1, ponto_coleta.capacidade_kg, 0.0))
+
+        self.conn.commit()
+
+    def salvar_solicitacao(self, solicitacao_descarte):
+        c = self.conn.cursor()
+
+        data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+        c.execute("""
+        INSERT INTO solicitacao_descarte (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        """, (solicitacao_descarte.id, solicitacao_descarte.usuario.id, solicitacao_descarte.ponto_coleta.id, 'SOLICITADO', None, data_criacao, None))
+
+        self.conn.commit()
+
+    def salvar_itens_descarte(self, id_solicitacao, itens):
+        c = self.conn.cursor()
+
+        for item in itens:
+            c.execute("""
+            INSERT INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
+            VALUES (?, ?, ?, ?)
+            """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
+        
+        self.conn.commit()
+
+    def salvar_historico_rastreamento(self, id_solicitacao, mensagem):
+        c = self.conn.cursor()
+        
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        c.execute("""
+        INSERT INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
+        VALUES (?, ?, ?)
+        """, (id_solicitacao, timestamp, mensagem))
+            
+        self.conn.commit()
