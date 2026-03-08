@@ -1,208 +1,130 @@
-# A- modulo de dispositivos eletronicos
-# responsavel por gerenciar diferentes tipos de dispositivos
-# importante rpra herança e polimorfismo
+"""
+Modulo de dispositivos eletronicos.
+
+Este modulo define a hierarquia de classes para dispositivos, utilizando
+heranca e polimorfismo para gerenciar atributos, impacto ambiental e
+valor de revenda.
+"""
 
 from abc import ABC, abstractmethod
 
-# A- Validacoes de marca e modelo implementadas no __init__  # ABNER 24/02
-# A- Calculo de valor de revenda implementado em cada subclasse  # ABNER 24/02
-
-
 class DispositivoEletronico(ABC):
-    """Classe abstrata base para dispositivos eletrônicos.
+    """
+    Classe abstrata base para dispositivos eletrônicos.
 
     Define a interface comum que todas as subclasses devem implementar.
-    Fornece validações básicas no construtor e propriedades de acesso
-    aos atributos.
+    Fornece validações básicas no construtor e propriedades de acesso aos atributos.
     """
 
-    # A- classe abstrata base para todos os dispositivos
-    # define interface comum que todas as subclasses devem implementar
-
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):  # abner 10/02
-        """Inicializa o dispositivo eletrônico.
+    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):
+        """
+        Inicializa um dispositivo eletrônico.
 
         Args:
-        ----------
-        id : str
-            Identificador único do dispositivo.
-        nome : str
-            Nome descritivo do dispositivo.
-        peso_kg : float
-            Peso em quilos (deve ser positivo).
-        marca : str, opcional
-            Nome da marca (padrão vazio).
-        modelo : str, opcional
-            Designação do modelo (padrão vazio).
+            id: Identificador único.
+            nome: Nome descritivo.
+            peso_kg: Peso em kg (> 0).
+            marca: Nome do fabricante.
+            modelo: Designação do modelo.
 
-        ------
         Raises:
-        ------
-
-            ValueError: Se o peso for menor ou igual a zero.
-            ValueError: Se marca ou modelo não forem strings válidas
-                        ou ultrapassarem 100 caracteres.
+            ValueError: Se o peso <= 0 ou marca/modelo forem inválidos.
         """
-        # A- validacoes basicas dos parametros
         if peso_kg <= 0:
-            raise ValueError("peso deve ser positivo")
+            raise ValueError("O peso deve ser um valor positivo.")
+        
+        for valor, nome_campo in [(marca, "marca"), (modelo, "modelo")]:
+            if not isinstance(valor, str) or len(valor) > 100:
+                raise ValueError(f"{nome_campo} deve ser uma string com até 100 caracteres.")
 
-        # A- Validacoes de marca e modelo  # ABNER 24/02
-        if not isinstance(marca, str):
-            raise ValueError("marca deve ser uma string")  # ABNER 24/02
-        if marca and len(marca.strip()) == 0:
-            raise ValueError(
-                "marca nao pode conter apenas espacos")  # ABNER 24/02
-        if len(marca) > 100:
-            raise ValueError(
-                "marca nao pode ter mais de 100 caracteres")  # ABNER 24/02
-
-        if not isinstance(modelo, str):
-            raise ValueError("modelo deve ser uma string")  # ABNER 24/02
-        if modelo and len(modelo.strip()) == 0:
-            raise ValueError(
-                "modelo nao pode conter apenas espacos")  # ABNER 24/02
-        if len(modelo) > 100:
-            raise ValueError(
-                "modelo nao pode ter mais de 100 caracteres")  # ABNER 24/02
-
-        # A- atributos privados (encapsulamento)
         self._id = id
         self._nome = nome
         self._peso_kg = peso_kg
-        self._marca = marca  # abner 10/02
-        self._modelo = modelo  # abner 10/02
+        self._marca = marca
+        self._modelo = modelo
 
-    # A- properties para acesso controlado aos atributos
+    # -------------------
+    # PROPERTIES
+    # -------------------
+    
     @property
     def id(self) -> str:
-        """Retorna o identificador único do dispositivo."""
         return self._id
 
     @property
     def nome(self) -> str:
-        """Retorna o nome do dispositivo."""
         return self._nome
 
     @property
     def peso_kg(self) -> float:
-        """Retorna o peso do dispositivo em quilogramas."""
         return self._peso_kg
 
     @property
-    def marca(self) -> str:  # abner 10/02
-        """Retorna o nome da marca do dispositivo."""
+    def marca(self) -> str:
         return self._marca
 
     @property
-    def modelo(self) -> str:  # abner 10/02
-        """Retorna a designação do modelo do dispositivo."""
+    def modelo(self) -> str:
         return self._modelo
 
-    # A- metodo abstrato que cada tipo deve implementar (polimorfismo)
+    # ------------------
+    # MÉTODOS ABSTRATOS
+    # ------------------
+    
     @abstractmethod
     def obter_tipo(self) -> str:
-        """Retorna o nome do tipo do dispositivo para apresentação.
-
-        Cada subclasse deve implementar isto com seu próprio tipo
-        (por exemplo, "Celular", "Computador").
-        """
+        """Retorna o tipo do dispositivo."""
         pass
 
     @abstractmethod
     def calcular_impacto_ambiental(self) -> float:
-        """Calcula e retorna o impacto ambiental do dispositivo.
-
-        A implementação é específica de cada tipo, geralmente baseada no
-        peso ou outras características.
-        """
-        # A- cada tipo de dispositivo tem seu proprio impacto
+        """Calcula o impacto ambiental do dispositivo por kg."""
         pass
 
     @abstractmethod
-    def calcular_valor_revenda(self) -> float:  # abner 10/02
-        """Calcula e retorna o valor de revenda do dispositivo.
-
-        A fórmula é determinada pela subclasse concreta e pode considerar
-        peso, tipo e condição.
-        """
-        # A- calcula o valor de revenda baseado no tipo e condicao do dispositivo
+    def calcular_valor_revenda(self) -> float:
+        """Calcula o valor de revenda estimado."""
         pass
 
+    # ---------------
+    # REPRESENTAÇÃO
+    # ---------------
+
     def __str__(self) -> str:
-        """Retorna uma representação legível do dispositivo."""
         return f"{self.obter_tipo()}: {self._nome} ({self._peso_kg}kg)"
 
-
 class Celular(DispositivoEletronico):
-    """Implementação concreta de dispositivo representando um celular.
-
-    Herda de :class:`DispositivoEletronico` e provê comportamento específico
-    para impacto e valor de revenda.
-    """
-
-    # A- implementacao concreta para celulares
-    # herda de DispositivoEletronico
-
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):  # abner 10/02
-        super().__init__(id, nome, peso_kg, marca, modelo)
+    """Implementação para dispositivos do tipo Celular."""
 
     def obter_tipo(self) -> str:
-        """Retorna a string "Celular" como tipo do dispositivo."""
         return "Celular"
 
     def calcular_impacto_ambiental(self) -> float:
-        """Calcula impacto ambiental do celular: 5.0 por kg."""
-        # A- celular tem impacto fixo de 5.0 por kg
         return self._peso_kg * 5.0
 
-    def calcular_valor_revenda(self) -> float:  # abner 10/02
-        """Calcula valor de revenda do celular: 10% do peso."""
-        # A- valor de revenda para celular: 10% do peso em kg
+    def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 10.0
 
-
 class Computador(DispositivoEletronico):
-    """Implementação concreta de dispositivo representando um computador."""
-
-    # A- implementacao para computadores
-
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):  # abner 10/02
-        super().__init__(id, nome, peso_kg, marca, modelo)
+    """Implementação para dispositivos do tipo Computador."""
 
     def obter_tipo(self) -> str:
-        """Retorna a string "Computador" como tipo."""
         return "Computador"
 
     def calcular_impacto_ambiental(self) -> float:
-        """Calcula impacto ambiental do computador: 15.0 por kg."""
-        # A- computadores tem impacto de 15.0 por kg (maior que celular)
         return self._peso_kg * 15.0
 
-    def calcular_valor_revenda(self) -> float:  # abner 10/02
-        """Calcula valor de revenda do computador: 25% do peso."""
-        # A- valor de revenda para computador: 25% do peso em kg (maior valor agregado)
+    def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 25.0
 
-
 class Eletrodomestico(DispositivoEletronico):
-    """Implementação concreta de dispositivo para eletrodomésticos."""
-
-    # A- implementacao para eletrodomesticos
-
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):  # abner 10/02
-        super().__init__(id, nome, peso_kg, marca, modelo)
+    """Implementação para dispositivos do tipo Eletrodoméstico."""
 
     def obter_tipo(self) -> str:
-        """Retorna a string "Eletrodomestico" como tipo."""
         return "Eletrodomestico"
 
     def calcular_impacto_ambiental(self) -> float:
-        """Calcula impacto ambiental do eletrodoméstico: 8.0 por kg."""
-        # A- eletrodomesticos tem impacto medio de 8.0 por kg
         return self._peso_kg * 8.0
 
-    def calcular_valor_revenda(self) -> float:  # abner 10/02
-        """Calcula valor de revenda do eletrodoméstico: 15% do peso."""
-        # A- valor de revenda para eletrodomestico: 15% do peso em kg
+    def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 15.0
