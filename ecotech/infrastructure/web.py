@@ -262,6 +262,33 @@ def criar_app() -> Flask:
             pontos=1250
         )
     
+    @app.route('/operacoes')
+    def operacoes():
+        """Página de operações (placeholder)."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        
+        usuario = dados_usuario()
+        return render_template('operacoes.html', usuario=usuario)
+    
+    @app.route('/relatorios')
+    def relatorios():
+        """Página de relatórios (placeholder)."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        
+        usuario = dados_usuario()
+        return render_template('relatorios.html', usuario=usuario)
+    
+    @app.route('/usuarios')
+    def usuarios():
+        """Página de usuários (placeholder)."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        
+        usuario = dados_usuario()
+        return render_template('usuarios.html', usuario=usuario)
+    
     @app.route('/api/solicitacoes')
     def api_solicitacoes():
         """API para listar solicitações."""
@@ -280,14 +307,14 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto):
         'id': 'user-1',
         'nome': 'João Silva',
         'email': 'joao@example.com',
-        'cpf': '123.456.789-00'
+        'cpf': '12345678900'
     })
     
     servico_usuario.criar_usuario('empresa', {
         'id': 'user-2',
         'nome': 'EcoTech Recicláveis',
         'email': 'contato@ecotech.com',
-        'cnpj': '12.345.678/0001-99',
+        'cnpj': '12345678000199',
         'razao_social': 'EcoTech Recicláveis LTDA'
     })
     

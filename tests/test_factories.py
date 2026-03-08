@@ -15,7 +15,7 @@ class TestFactories:
     
     def test_factory_usuario(self):
         # M- testa criacao de usuario via factory
-        cidadao = UsuarioFactory.criar_cidadao("1", "João", "joao@test.com", "123")
+        cidadao = UsuarioFactory.criar_cidadao("1", "João", "joao@test.com", "12345678901")
         assert cidadao.nome == "João"
 
 
@@ -30,7 +30,7 @@ class TestServicos:
     
     def test_listar_solicitacoes(self):
         servico = ServicoDescarte()
-        cidadao = Cidadao("1", "João", "joao@test.com", "123")
+        cidadao = Cidadao("1", "João", "joao@test.com", "12345678901")
         
         servico.criar_solicitacao(cidadao)
         servico.criar_solicitacao(cidadao)

@@ -3,31 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}EcoTech - Sistema de Descarte de Lixo Eletrônico{% endblock %}</title>
+    <title>{% block title %}Ecotech - Sistema de Descarte de Lixo Eletrônico{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
 </head>
 <body>
+    <!-- teste navbar-->
+    <!-- navbar redesign -->
     <nav class="navbar">
-        <div class="container">
-            <div class="logo">
-                <img src="{{ url_for('static', filename='images/Ecotech logo completa.png') }}" alt="EcoTech" style="height: 60px;">
+        <div class="navbar-container">
+            <!-- bloco esquerdo logo -->
+            <div class="navbar-logo">
+                <img src="{{ url_for('static', filename='images/ecotech navbar.png') }}" alt="" class="logo-icon">
             </div>
             
             {% if usuario %}
-            <div class="nav-menu">
-                <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('pontos_coleta') }}" class="nav-link">Pontos de Coleta</a>
-                <a href="{{ url_for('notificacoes') }}" class="nav-link" title="Notificações">
-                    <img src="{{ url_for('static', filename='images/sino.png') }}" alt="Notificações" style="width: 24px; height: 24px;">
+            <!-- bloco central menu -->
+            <div class="navbar-menu">
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="{{ url_for('operacoes') }}" class="nav-item {% if request.endpoint == 'operacoes' %}active{% endif %}">Operações</a>
+                <a href="{{ url_for('relatorios') }}" class="nav-item {% if request.endpoint == 'relatorios' %}active{% endif %}">Relatórios</a>
+                <a href="{{ url_for('usuarios') }}" class="nav-item {% if request.endpoint == 'usuarios' %}active{% endif %}">Usuários</a>
+            </div>
+            
+            <!-- bloco direito icones -->
+            <div class="navbar-actions">
+                <a href="{{ url_for('notificacoes') }}" class="nav-icon">
+                    <img src="{{ url_for('static', filename='images/sino.png') }}" alt="Notificações">
                 </a>
-                <a href="{{ url_for('perfil') }}" class="nav-link">
-                    <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil" style="width: 32px; height: 32px; border-radius: 50%;">
+                <a href="{{ url_for('perfil') }}" class="nav-avatar">
+                    <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil">
                 </a>
-                <a href="{{ url_for('logout') }}" class="nav-link">Sair</a>
             </div>
             {% else %}
-            <div class="nav-menu">
+            <!-- menu publico -->
+            <div class="navbar-menu">
+                <a href="{{ url_for('index') }}" class="nav-item">Início</a>
+            </div>
+            <div class="navbar-actions">
                 <a href="{{ url_for('login') }}" class="btn-link">Entrar</a>
                 <a href="{{ url_for('criar_conta') }}" class="btn btn-primary">Criar Conta</a>
             </div>
@@ -66,7 +79,7 @@
                 </div>
                 <div class="footer-section">
                     <p>&copy; 2026 Ecotech. Todos os direitos reservados.</p>
-                    <p>Desenvolvido por: Abner Levi, Maria Antônia, Matheus Nogueira</p>
+               <p>Desenvolvido por: Abner Levi, Maria Antônia, Matheus Nogueira</p>
                 </div>
             </div>
         </div>
