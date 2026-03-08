@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 
 class Dados:
 
@@ -14,6 +15,7 @@ class Dados:
         c.execute("""
         CREATE TABLE IF NOT EXISTS usuario (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT,
             nome TEXT,
             email TEXT,
             data_cadastro TEXT,
@@ -123,6 +125,52 @@ class Dados:
             FOREIGN KEY(id_solicitacao) REFERENCES solicitacao_descarte(id) 
         )
         """)
+
+        self.conn.commit()
+
+    # -------------------
+    # SALVAR
+    # -------------------
+
+    def salvar_cidadao(self, cidadao):
+        c = self.conn.cursor()
+
+        c.execute("""
+        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (cidadao.id, cidadao.nome, cidadao.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, "cidadao"))
+        
+        id_usuario = c.lastrowid
+
+        c.execute("INSERT INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (id_usuario, cidadao.cpf, 0, 0))
+
+        self.conn.commit()
+
+    def salvar_empresa(self, empresa):
+        c = self.conn.cursor()
+
+        c.execute("""
+        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (empresa.id, empresa.nome, empresa.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, 'empresa'))
+        
+        id_usuario = c.lastrowid
+
+        c.execute("INSERT INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (id_usuario, empresa.cnpj, empresa.razao_social, 0, 0))
+
+        self.conn.commit()
+
+    def salvar_administrador(self, administrador):
+        c = self.conn.cursor()
+
+        c.execute("""
+        INSERT INTO usuario (codigo, nome, email, data_cadastro, ativo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (administrador.id, administrador.nome, administrador.email, datetime.now().strftime("%d/%m/%Y %H:%M"), True, "cidadao"))
+        
+        id_usuario = c.lastrowid
+
+        c.execute("INSERT INTO administrador (id_usuario, nivel) VALUES (?, ?, ?, ?)", (id_usuario, administrador.nivel))
 
         self.conn.commit()
 
