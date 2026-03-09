@@ -23,6 +23,7 @@ from ..application.factories import (
     MetodoTratamentoFactory
 )
 from ..domain.usuarios import Usuario
+from ..infrastructure.persistence.dados import Dados
 
 
 def criar_app() -> Flask:
@@ -35,14 +36,20 @@ def criar_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = "ecotech-secret-key-2026"
     
-    # servicos
-    servico_descarte = ServicoDescarte()
+    # instancia unica de dados compartilhada por todos os servicos
+    dados = Dados()
+    
+    # servicos com persistencia
+    servico_usuario = ServicoUsuario(dados)
+    servico_ponto = ServicoPontoColeta(dados)
+    servico_descarte = ServicoDescarte(dados)
     servico_relatorio = ServicoRelatorio()
-    servico_ponto = ServicoPontoColeta()
-    servico_usuario = ServicoUsuario()
+    
+    # configura dependencias entre servicos
+    servico_descarte.set_servicos(servico_usuario, servico_ponto)
     
     # dados exemplo
-    _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte)
+    _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
     
     # verifica login
     def usuario_logado():
@@ -73,15 +80,19 @@ def criar_app() -> Flask:
         if request.method == 'POST':
             tipo = request.form.get('tipo', 'cidadao')
             
-            # usa usuarios reais do sistema
+            # 3 perfis fixos: João Silva (cidadão), Recicla Kariri (empresa) e Admin
             if tipo == 'cidadao':
                 session['user_id'] = 'user-1'
                 session['user_nome'] = 'João Silva'
                 session['user_tipo'] = 'cidadao'
-            else:
+            elif tipo == 'empresa':
                 session['user_id'] = 'user-3'
-                session['user_nome'] = 'EcoTech Recicláveis'
+                session['user_nome'] = 'Recicla Kariri'
                 session['user_tipo'] = 'empresa'
+            elif tipo == 'admin':
+                session['user_id'] = 'USR-ADM-001'
+                session['user_nome'] = 'Admin Ecotech'
+                session['user_tipo'] = 'administrador'
             
             return redirect(url_for('dashboard'))
         
@@ -93,15 +104,19 @@ def criar_app() -> Flask:
         if request.method == 'POST':
             tipo = request.form.get('tipo', 'cidadao')
             
-            # usa usuarios reais do sistema
+            # 3 perfis fixos: João Silva (cidadão), Recicla Kariri (empresa) e Admin
             if tipo == 'cidadao':
                 session['user_id'] = 'user-1'
                 session['user_nome'] = 'João Silva'
                 session['user_tipo'] = 'cidadao'
-            else:
+            elif tipo == 'empresa':
                 session['user_id'] = 'user-3'
-                session['user_nome'] = 'EcoTech Recicláveis'
+                session['user_nome'] = 'Recicla Kariri'
                 session['user_tipo'] = 'empresa'
+            elif tipo == 'admin':
+                session['user_id'] = 'USR-ADM-001'
+                session['user_nome'] = 'Admin Ecotech'
+                session['user_tipo'] = 'administrador'
             
             return redirect(url_for('dashboard'))
         
@@ -115,14 +130,35 @@ def criar_app() -> Flask:
     
     @app.route('/dashboard')
     def dashboard():
-        """Dashboard principal."""
+        """Dashboard principal - versões diferentes para cidadão, empresa e admin."""
         if not usuario_logado():
             return redirect(url_for('login'))
         
         usuario = dados_usuario()
         
-        # busca solicitacoes do usuario logado
+        # busca solicitacoes
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        
+        """" dashboard para administrador - visão geral do sistema """
+        if usuario['tipo'] == 'administrador':
+            total_sistema = sum(s.calcular_peso_total() for s in todas_solicitacoes)
+            total_processadas = len([s for s in todas_solicitacoes if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']])
+            impacto_total = sum(s.calcular_impacto_total() for s in todas_solicitacoes)
+            
+            return render_template(
+                'dashboard.html',
+                usuario=usuario,
+                solicitacoes=todas_solicitacoes[:10],  # mostra últimas 10
+                total_descartado=total_sistema,
+                impacto_evitado=impacto_total,
+                pontos_acumulados=0,
+                total_sistema=total_sistema,
+                total_processadas=total_processadas,
+                is_empresa=False,
+                is_admin=True
+            )
+        
+        # solicitacoes do usuario
         solicitacoes_usuario = [
             s for s in todas_solicitacoes 
             if s.usuario.id == usuario['id']
@@ -133,13 +169,35 @@ def criar_app() -> Flask:
         impacto_evitado = sum(s.calcular_impacto_total() for s in solicitacoes_usuario)
         pontos_acumulados = int(total_descartado * 10)  # 10 pontos por kg
         
+        # dashboard diferente para empresa
+        if usuario['tipo'] == 'empresa':
+            # metricas gerais do sistema para empresa
+            total_sistema = sum(s.calcular_peso_total() for s in todas_solicitacoes)
+            total_processadas = len([s for s in todas_solicitacoes if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']])
+            
+            return render_template(
+                'dashboard.html',
+                usuario=usuario,
+                solicitacoes=solicitacoes_usuario,
+                total_descartado=total_descartado,
+                impacto_evitado=impacto_evitado,
+                pontos_acumulados=pontos_acumulados,
+                total_sistema=total_sistema,
+                total_processadas=total_processadas,
+                is_empresa=True,
+                is_admin=False
+            )
+        
+        # dashboard para cidadão
         return render_template(
             'dashboard.html',
             usuario=usuario,
             solicitacoes=solicitacoes_usuario,
             total_descartado=total_descartado,
             impacto_evitado=impacto_evitado,
-            pontos_acumulados=pontos_acumulados
+            pontos_acumulados=pontos_acumulados,
+            is_empresa=False,
+            is_admin=False
         )
     
     @app.route('/nova-solicitacao', methods=['GET', 'POST'])
@@ -177,14 +235,30 @@ def criar_app() -> Flask:
         
         usuario = dados_usuario()
         
+        # busca notificacoes do usuario no banco de dados
+        notificacoes_db = dados.buscar_notificacoes_usuario(usuario['id'])
+        
+        # converte para o formato esperado pelo template
         notificacoes = [
             {
-                'titulo': 'Seus valores foram finalizados',
-                'mensagem': 'Você recebeu R$ 13,95',
-                'data': datetime.now(),
+                'titulo': 'Notificação do Sistema',
+                'mensagem': n['mensagem'],
+                'data': datetime.strptime(n['timestamp'], '%d/%m/%Y %H:%M:%S'),
                 'lida': False
             }
+            for n in notificacoes_db
         ]
+        
+        # se nao tiver notificacoes, adiciona uma de exemplo
+        if not notificacoes:
+            notificacoes = [
+                {
+                    'titulo': 'Seus valores foram finalizados',
+                    'mensagem': 'Você recebeu R$ 13,95',
+                    'data': datetime.now(),
+                    'lida': False
+                }
+            ]
         
         return render_template(
             'notificacoes.html',
@@ -200,48 +274,20 @@ def criar_app() -> Flask:
         
         usuario = dados_usuario()
         
-        # dados de exemplo das entregas (talvez alterar dps)
+        # busca entregas do usuario no banco de dados
+        entregas_db = dados.buscar_entregas_usuario(usuario['id'])
+        
+        # converte para o formato esperado pelo template
         entregas = [
             {
-                'valor': 13.95,
-                'empresa': 'Ecotech - Reciclagem Cariri',
-                'id': '56492574920',
-                'data': '13 Set 2025',
-                'hora': '13:02',
-                'status': 'finalizado'
-            },
-            {
-                'valor': 8.19,
-                'empresa': 'Ecotech - Reciclagem Cariri',
-                'id': '58293049159',
-                'data': '10 Set 2025',
-                'hora': '08:55',
-                'status': 'finalizado'
-            },
-            {
-                'valor': 6.41,
-                'empresa': 'Ecotech - Reciclagem Cariri',
-                'id': '98358259431',
-                'data': '08 Set 2025',
-                'hora': '15:31',
-                'status': 'cancelado'
-            },
-            {
-                'valor': 27.65,
-                'empresa': 'Ecotech - Reciclagem Cariri',
-                'id': '47389088043',
-                'data': '03 Set 2025',
-                'hora': '16:44',
-                'status': 'finalizado'
-            },
-            {
-                'valor': 12.53,
-                'empresa': 'Ecotech - Reciclagem Cariri',
-                'id': '57463968973',
-                'data': '02 Set 2025',
-                'hora': '08:21',
-                'status': 'finalizado'
+                'valor': e['valor'],
+                'empresa': e['empresa'],
+                'id': e['id'],
+                'data': e['data'],
+                'hora': e['hora'],
+                'status': e['status']
             }
+            for e in entregas_db
         ]
         
         return render_template(
@@ -289,22 +335,31 @@ def criar_app() -> Flask:
         # busca todas as solicitacoes
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
         
+        # administrador vê tudo, outros usuários veem apenas as suas
+        if usuario['tipo'] == 'administrador':
+            solicitacoes_usuario = todas_solicitacoes
+        else:
+            solicitacoes_usuario = [
+                s for s in todas_solicitacoes 
+                if s.usuario.id == usuario['id']
+            ]
+        
         # filtra por estado se tiver parametro
         filtro_estado = request.args.get('estado', '')
         if filtro_estado:
             solicitacoes_filtradas = [
-                s for s in todas_solicitacoes 
+                s for s in solicitacoes_usuario 
                 if filtro_estado.lower() in s.estado.obter_nome().lower()
             ]
         else:
-            solicitacoes_filtradas = todas_solicitacoes
+            solicitacoes_filtradas = solicitacoes_usuario
         
-        # calcula estatisticas
+        # calcula estatisticas baseadas nas solicitações que o usuário pode ver
         stats = {
-            'pendentes': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Solicitado']),
-            'em_coleta': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Coletado']),
-            'processando': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Em Processamento']),
-            'finalizadas': len([s for s in todas_solicitacoes if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']])
+            'pendentes': len([s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Solicitado']),
+            'em_coleta': len([s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Coletado']),
+            'processando': len([s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Em Processamento']),
+            'finalizadas': len([s for s in solicitacoes_usuario if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']])
         }
         
         return render_template(
@@ -312,17 +367,54 @@ def criar_app() -> Flask:
             usuario=usuario,
             solicitacoes=solicitacoes_filtradas,
             stats=stats,
-            filtro_atual=filtro_estado
+            filtro_atual=filtro_estado,
+            is_admin=usuario['tipo'] == 'administrador'
         )
     
     @app.route('/relatorios')
     def relatorios():
-        """Página de relatórios (placeholder)."""
+        """Página de relatórios ambientais."""
         if not usuario_logado():
             return redirect(url_for('login'))
         
         usuario = dados_usuario()
-        return render_template('relatorios.html', usuario=usuario)
+        
+        # busca todas as solicitacoes
+        todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        
+        """ administrador vê relatório geral, outros veem apenas suas solicitações """
+        if usuario['tipo'] == 'administrador':
+            solicitacoes_para_relatorio = todas_solicitacoes
+            titulo_relatorio = "Relatório Geral do Sistema"
+        else:
+            solicitacoes_para_relatorio = [
+                s for s in todas_solicitacoes 
+                if s.usuario.id == usuario['id']
+            ]
+            titulo_relatorio = f"Relatório de {usuario['nome']}"
+        
+        # gera relatorio usando o servico
+        relatorio = servico_relatorio.gerar_relatorio_periodo(
+            titulo_relatorio,
+            solicitacoes_para_relatorio
+        )
+        
+        # pega metricas do relatorio
+        metricas = relatorio.gerar_relatorio()
+        
+        # filtra solicitacoes finalizadas para mostrar na tabela
+        solicitacoes_finalizadas = [
+            s for s in solicitacoes_para_relatorio
+            if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']
+        ]
+        
+        return render_template(
+            'relatorios.html',
+            usuario=usuario,
+            metricas=metricas,
+            solicitacoes=solicitacoes_finalizadas,
+            is_admin=usuario['tipo'] == 'administrador'
+        )
     
     @app.route('/usuarios')
     def usuarios():
@@ -344,8 +436,13 @@ def criar_app() -> Flask:
     return app
 
 
-def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte):
+def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
     """inicializa dados de exemplo para demonstracao."""
+    
+    # verifica se ja existem dados suficientes no banco
+    if dados.contar_usuarios() > 3:
+        return  # ja tem dados, nao precisa inicializar novamente
+    
     # usuarios de exemplo
     cidadao1 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-1',
@@ -363,10 +460,10 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte)
     
     empresa = servico_usuario.criar_usuario('empresa', {
         'id': 'user-3',
-        'nome': 'EcoTech Recicláveis',
+        'nome': 'Ecotech',
         'email': 'contato@ecotech.com',
         'cnpj': '12345678000199',
-        'razao_social': 'EcoTech Recicláveis LTDA'
+        'razao_social': 'Ecotech'
     })
     
     # pontos de coleta
@@ -379,7 +476,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte)
     )
     
     ponto2 = servico_ponto.criar_ponto_coleta(
-        'Centro de Reciclagem Cariri',
+        'Centro de Coleta Cariri',
         'Av. Padre Cícero, 500 - Centro',
         -7.2123,
         -39.3145,
@@ -437,6 +534,58 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte)
     servico_descarte.definir_metodo_tratamento(sol6, metodo3)
     servico_descarte.avancar_estado_solicitacao(sol6)  # coletado
     servico_descarte.avancar_estado_solicitacao(sol6)  # em processamento
+    
+    # adiciona historico de entregas para o cidadao1 (joao silva)
+    # isso é o que aparece na pagina de ultimas entregas
+    dados.salvar_entrega(
+        '56492574920',
+        'user-1',
+        13.95,
+        'Ecotech',
+        '13 Set 2025',
+        '13:02',
+        'finalizado'
+    )
+    
+    dados.salvar_entrega(
+        '58293049159',
+        'user-1',
+        8.19,
+        'Ecotech',
+        '10 Set 2025',
+        '08:55',
+        'finalizado'
+    )
+    
+    dados.salvar_entrega(
+        '98358259431',
+        'user-1',
+        6.41,
+        'Ecotech',
+        '08 Set 2025',
+        '15:31',
+        'cancelado'
+    )
+    
+    dados.salvar_entrega(
+        '47389088043',
+        'user-1',
+        27.65,
+        'Ecotech',
+        '03 Set 2025',
+        '16:44',
+        'finalizado'
+    )
+    
+    dados.salvar_entrega(
+        '57463968973',
+        'user-1',
+        12.53,
+        'Ecotech',
+        '02 Set 2025',
+        '08:21',
+        'finalizado'
+    )
 
 
 if __name__ == '__main__':

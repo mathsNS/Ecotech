@@ -7,15 +7,82 @@
     <div class="container">
         <div class="dashboard-header">
             <div>
+                {% if is_admin %}
+                <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
+                <p>Visão geral do sistema - {{ total_descartado|round(2) }}kg processados</p>
+                {% elif is_empresa %}
+                <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
+                <p>Sua empresa já processou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
+                {% else %}
                 <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
                 <p>Você já descartou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
+                {% endif %}
             </div>
+            {% if not is_empresa and not is_admin %}
             <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">
                 Iniciar novo descarte
             </a>
+            {% endif %}
         </div>
 
         <div class="stats-grid">
+            {% if is_admin %}
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_sistema|round(2) }}kg</h3>
+                    <p>Total processado no sistema</p>
+                </div>
+            </div>
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_processadas }}</h3>
+                    <p>Solicitações finalizadas</p>
+                </div>
+            </div>
+            <div class="stat-card-dash eco">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ impacto_evitado|round(1) }}</h3>
+                    <p>Impacto ambiental evitado</p>
+                </div>
+            </div>
+            {% elif is_empresa %}
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_sistema|round(2) }}kg</h3>
+                    <p>Total processado no sistema</p>
+                </div>
+            </div>
+            <div class="stat-card-dash">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_processadas }}</h3>
+                    <p>Solicitações finalizadas</p>
+                </div>
+            </div>
+            <div class="stat-card-dash eco">
+                <div class="stat-icon">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+                </div>
+                <div class="stat-info">
+                    <h3>{{ solicitacoes|length }}</h3>
+                    <p>Em processamento</p>
+                </div>
+            </div>
+            {% else %}
             <div class="stat-card-dash">
                 <div class="stat-icon">
                     <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
@@ -43,13 +110,22 @@
                     <p>Impacto evitado</p>
                 </div>
             </div>
+            {% endif %}
         </div>
 
         <div class="dashboard-content">
             <div class="section">
                 <div class="section-header">
+                    {% if is_admin %}
+                    <h2>Últimas solicitações do sistema</h2>
+                    <a href="{{ url_for('operacoes') }}">Ver todas</a>
+                    {% elif is_empresa %}
+                    <h2>Solicitações em processamento</h2>
+                    <a href="{{ url_for('operacoes') }}">Ver todas</a>
+                    {% else %}
                     <h2>Últimas entregas</h2>
                     <a href="{{ url_for('ultimas_entregas') }}">Ver todas</a>
+                    {% endif %}
                 </div>
                 
                 {% if solicitacoes %}
@@ -60,15 +136,25 @@
                             <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega" style="width: 32px; height: 32px;">
                         </div>
                         <div class="delivery-info">
+                            {% if is_admin %}
+                            <h4>Solicitação #{{ sol.id[:8] }}</h4>
+                            <p>{{ sol.usuario.nome }} - {{ sol.calcular_peso_total()|round(2) }}kg</p>
+                            {% elif is_empresa %}
+                            <h4>Solicitação #{{ sol.id[:8] }}</h4>
+                            <p>{{ sol.calcular_peso_total()|round(2) }}kg - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                            {% else %}
                             <h4>Incentivo por coleta</h4>
                             <p>{{ sol.obter_resumo()['tipo_usuario'] }} - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                            {% endif %}
                             <span class="delivery-id">ID: {{ sol.id[:12] }}</span>
                         </div>
                         <div class="delivery-status">
                             <span class="status-badge status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
                                 {{ sol.estado.obter_nome() }}
                             </span>
+                            {% if not is_empresa and not is_admin %}
                             <span class="delivery-value">R$ {{ (sol.calcular_peso_total() * 5.5)|round(2) }}</span>
+                            {% endif %}
                             <span class="delivery-date">{{ sol.data_criacao.strftime('%d/%m/%Y') }}</span>
                         </div>
                     </div>
@@ -76,8 +162,16 @@
                 </div>
                 {% else %}
                 <div class="empty-state">
+                    {% if is_admin %}
+                    <p>Nenhuma solicitação no sistema ainda.</p>
+                    <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver operações</a>
+                    {% elif is_empresa %}
+                    <p>Sua empresa ainda não possui solicitações em processamento.</p>
+                    <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver todas as operações</a>
+                    {% else %}
                     <p>Você ainda não fez nenhuma solicitação de descarte.</p>
                     <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>

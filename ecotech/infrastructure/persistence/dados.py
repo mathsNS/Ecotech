@@ -7,7 +7,7 @@ from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, R
 class Dados:
 
     def __init__(self):
-        self.conn = sqlite3.connect('ecotech.db')
+        self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.criar_tabelas()
         self.seed()
@@ -129,6 +129,20 @@ class Dados:
         )
         """)
 
+        # tabela de entregas/transacoes
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS entrega (
+            id TEXT PRIMARY KEY,
+            id_usuario TEXT,
+            valor REAL,
+            empresa TEXT,
+            data TEXT,
+            hora TEXT,
+            status TEXT,
+            FOREIGN KEY(id_usuario) REFERENCES usuario(id)
+        )
+        """)
+
         self.conn.commit()
 
     # -------------------
@@ -242,11 +256,145 @@ class Dados:
             
         self.conn.commit()
 
+    def salvar_entrega(self, id_entrega, id_usuario, valor, empresa, data, hora, status):
+        """Salva uma entrega/transação no histórico."""
+        c = self.conn.cursor()
+        
+        c.execute("""
+        INSERT OR REPLACE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
+        
+        self.conn.commit()
+
+    # -------------------
+    # BUSCAR
+    # -------------------
+
+    def buscar_usuario(self, id_usuario):
+        """Busca um usuário por ID."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM usuario WHERE id = ?", (id_usuario,))
+        return c.fetchone()
+
+    def buscar_todos_usuarios(self):
+        """Retorna todos os usuários."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM usuario")
+        return c.fetchall()
+
+    def buscar_cidadao(self, id_usuario):
+        """Busca dados específicos de cidadão."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.*, c.cpf, c.solicitacoes_ativas, c.pontos
+            FROM usuario u
+            JOIN cidadao c ON u.id = c.id_usuario
+            WHERE u.id = ?
+        """, (id_usuario,))
+        return c.fetchone()
+
+    def buscar_empresa(self, id_usuario):
+        """Busca dados específicos de empresa."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.*, e.cnpj, e.razao_social, e.limite_mensal, e.descartado_mes
+            FROM usuario u
+            JOIN empresa e ON u.id = e.id_usuario
+            WHERE u.id = ?
+        """, (id_usuario,))
+        return c.fetchone()
+
+    def buscar_dispositivo(self, id_dispositivo):
+        """Busca um dispositivo por ID."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM dispositivo WHERE id = ?", (id_dispositivo,))
+        return c.fetchone()
+
+    def buscar_ponto_coleta(self, id_ponto):
+        """Busca um ponto de coleta por ID."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM ponto_coleta WHERE id = ?", (id_ponto,))
+        return c.fetchone()
+
+    def buscar_todos_pontos_coleta(self):
+        """Retorna todos os pontos de coleta ativos."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM ponto_coleta WHERE ativo = 1")
+        return c.fetchall()
+
+    def buscar_solicitacao(self, id_solicitacao):
+        """Busca uma solicitação por ID."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM solicitacao_descarte WHERE id = ?", (id_solicitacao,))
+        return c.fetchone()
+
+    def buscar_todas_solicitacoes(self):
+        """Retorna todas as solicitações."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM solicitacao_descarte")
+        return c.fetchall()
+
+    def buscar_solicitacoes_usuario(self, id_usuario):
+        """Retorna todas as solicitações de um usuário específico."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM solicitacao_descarte WHERE id_usuario = ?", (id_usuario,))
+        return c.fetchall()
+
+    def buscar_itens_solicitacao(self, id_solicitacao):
+        """Retorna todos os itens de uma solicitação."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo
+            FROM item_descarte i
+            JOIN dispositivo d ON i.id_dispositivo = d.id
+            WHERE i.id_solicitacao = ?
+        """, (id_solicitacao,))
+        return c.fetchall()
+
+    def buscar_entregas_usuario(self, id_usuario):
+        """Retorna todas as entregas de um usuário."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT * FROM entrega 
+            WHERE id_usuario = ? 
+            ORDER BY data DESC, hora DESC
+        """, (id_usuario,))
+        return c.fetchall()
+
+    def buscar_notificacoes_usuario(self, id_usuario):
+        """Retorna todas as notificações de um usuário."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT * FROM notificacao 
+            WHERE id_usuario = ? 
+            ORDER BY timestamp DESC
+        """, (id_usuario,))
+        return c.fetchall()
+
+    def contar_usuarios(self):
+        """Conta total de usuários no sistema."""
+        c = self.conn.cursor()
+        c.execute("SELECT COUNT(*) as total FROM usuario")
+        return c.fetchone()['total']
+
+    def contar_solicitacoes(self):
+        """Conta total de solicitações no sistema."""
+        c = self.conn.cursor()
+        c.execute("SELECT COUNT(*) as total FROM solicitacao_descarte")
+        return c.fetchone()['total']
+
     # -------------------
     # SEED
     # -------------------
 
     def seed(self):
+        """Inicializa dados básicos apenas se o banco estiver vazio."""
+        # verifica se ja existem usuarios no banco
+        if self.contar_usuarios() > 0:
+            return  # ja tem dados, nao precisa fazer seed
+        
+        # cria dados iniciais apenas se o banco estiver vazio
         cidadao = Cidadao("USR-CID-001", "João Silva", "joaosilva@email.com", "12345678901")
         self.salvar_cidadao(cidadao)
 
@@ -267,5 +415,3 @@ class Dados:
         
         item = ItemDescarte(dispositivo, 1, "Tela trincada")
         self.salvar_itens_descarte('SOL-001', item)
-
-d = Dados()

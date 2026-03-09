@@ -3,4 +3,152 @@
 {% block title %}Relatórios - EcoTech{% endblock %}
 
 {% block content %}
+<div class="relatorios-container">
+    <div class="container">
+        <!-- header -->
+        <div class="relatorios-header">
+            <div>
+                <h1>Relatórios Ambientais</h1>
+            </div>
+        </div>
+
+        <!-- cards metricas principais -->
+        <div class="stats-grid-relatorios">
+            <div class="stat-card-rel reciclado">
+                <div class="stat-icon-rel">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Reciclado">
+                </div>
+                <div class="stat-info-rel">
+                    <h3>{{ metricas.peso_reciclado_kg }} kg</h3>
+                    <p>Peso Reciclado</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-rel reutilizado">
+                <div class="stat-icon-rel">
+                    <img src="{{ url_for('static', filename='images/coracao-verde.png') }}" alt="Reutilizado">
+                </div>
+                <div class="stat-info-rel">
+                    <h3>{{ metricas.peso_reutilizado_kg }} kg</h3>
+                    <p>Peso Reutilizado</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-rel descartado">
+                <div class="stat-icon-rel">
+                    <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Descartado">
+                </div>
+                <div class="stat-info-rel">
+                    <h3>{{ metricas.peso_descartado_kg }} kg</h3>
+                    <p>Descarte Controlado</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-rel impacto">
+                <div class="stat-icon-rel">
+                    <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Impacto">
+                </div>
+                <div class="stat-info-rel">
+                    <h3>{{ metricas.impacto_evitado|round(1) }}</h3>
+                    <p>Impacto Evitado</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- resumo geral -->
+        <div class="relatorios-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Resumo Geral</h2>
+                </div>
+                
+                <div class="resumo-grid">
+                    <div class="resumo-card">
+                        <span class="resumo-label">Total de Solicitações</span>
+                        <span class="resumo-value">{{ metricas.total_solicitacoes }}</span>
+                    </div>
+                    <div class="resumo-card">
+                        <span class="resumo-label">Peso Total Processado</span>
+                        <span class="resumo-value">{{ (metricas.peso_reciclado_kg + metricas.peso_reutilizado_kg + metricas.peso_descartado_kg)|round(2) }} kg</span>
+                    </div>
+                    <div class="resumo-card">
+                        <span class="resumo-label">Taxa de Reciclagem</span>
+                        <span class="resumo-value">
+                            {% set total = metricas.peso_reciclado_kg + metricas.peso_reutilizado_kg + metricas.peso_descartado_kg %}
+                            {% if total > 0 %}
+                                {{ ((metricas.peso_reciclado_kg / total) * 100)|round(1) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- solicitacoes finalizadas -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>Solicitações Finalizadas</h2>
+                    <span class="count-badge">{{ solicitacoes|length }} processadas</span>
+                </div>
+
+                {% if solicitacoes %}
+                <div class="table-container">
+                    <table class="operacoes-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuário</th>
+                                <th>Peso (kg)</th>
+                                <th>Impacto</th>
+                                <th>Método</th>
+                                <th>Estado Final</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sol in solicitacoes %}
+                            <tr>
+                                <td>
+                                    <span class="id-cell">{{ sol.id[:8] }}...</span>
+                                </td>
+                                <td>
+                                    <strong>{{ sol.usuario.nome }}</strong>
+                                </td>
+                                <td>
+                                    <strong>{{ sol.calcular_peso_total()|round(2) }}</strong>
+                                </td>
+                                <td>
+                                    {{ sol.calcular_impacto_total()|round(1) }}
+                                </td>
+                                <td>
+                                    {% if sol.metodo_tratamento %}
+                                        {{ sol.metodo_tratamento.obter_nome() }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
+                                        {{ sol.estado.obter_nome() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ sol.data_criacao.strftime('%d/%m/%Y') }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Vazio" style="width: 64px; opacity: 0.5;">
+                    <p>Nenhuma solicitação finalizada ainda.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
