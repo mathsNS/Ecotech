@@ -31,11 +31,15 @@ class DispositivoEletronico(ABC):
             ValueError: Se o peso <= 0 ou marca/modelo forem inválidos.
         """
         if peso_kg <= 0:
-            raise ValueError("O peso deve ser um valor positivo.")
+            raise ValueError("peso deve ser positivo")
         
         for valor, nome_campo in [(marca, "marca"), (modelo, "modelo")]:
-            if not isinstance(valor, str) or len(valor) > 100:
-                raise ValueError(f"{nome_campo} deve ser uma string com até 100 caracteres.")
+            if not isinstance(valor, str):
+                raise ValueError(f"{nome_campo} deve ser uma string")
+            if len(valor) > 100:
+                raise ValueError(f"{nome_campo} nao pode ter mais de 100 caracteres")
+            if valor and valor.strip() == "":
+                raise ValueError(f"{nome_campo} nao pode conter apenas espacos")
 
         self._id = id
         self._nome = nome
