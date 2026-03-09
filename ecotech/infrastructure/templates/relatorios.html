@@ -16,7 +16,7 @@
         <div class="stats-grid-relatorios">
             <div class="stat-card-rel reciclado">
                 <div class="stat-icon-rel">
-                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Reciclado">
+                    <img src="{{ url_for('static', filename='images/reciclagem-icone.png') }}" alt="Reciclado">
                 </div>
                 <div class="stat-info-rel">
                     <h3>{{ metricas.peso_reciclado_kg }} kg</h3>
@@ -26,7 +26,7 @@
             
             <div class="stat-card-rel reutilizado">
                 <div class="stat-icon-rel">
-                    <img src="{{ url_for('static', filename='images/coracao-verde.png') }}" alt="Reutilizado">
+                    <img src="{{ url_for('static', filename='images/reutilizacao-icone.png') }}" alt="Reutilizado">
                 </div>
                 <div class="stat-info-rel">
                     <h3>{{ metricas.peso_reutilizado_kg }} kg</h3>
@@ -36,7 +36,7 @@
             
             <div class="stat-card-rel descartado">
                 <div class="stat-icon-rel">
-                    <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Descartado">
+                    <img src="{{ url_for('static', filename='images/descarte-seguro-icone.png') }}" alt="Descartado">
                 </div>
                 <div class="stat-info-rel">
                     <h3>{{ metricas.peso_descartado_kg }} kg</h3>
@@ -46,7 +46,7 @@
             
             <div class="stat-card-rel impacto">
                 <div class="stat-icon-rel">
-                    <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Impacto">
+                    <img src="{{ url_for('static', filename='images/co2-icone.png') }}" alt="Impacto">
                 </div>
                 <div class="stat-info-rel">
                     <h3>{{ metricas.impacto_evitado|round(1) }}</h3>
@@ -119,11 +119,11 @@
                                     <strong>{{ sol.calcular_peso_total()|round(2) }}</strong>
                                 </td>
                                 <td>
-                                    {{ sol.calcular_impacto_total()|round(1) }}
+                                    {{ sol.impacto_evitado_db|round(1) }}
                                 </td>
                                 <td>
-                                    {% if sol.metodo_tratamento %}
-                                        {{ sol.metodo_tratamento.obter_nome() }}
+                                    {% if sol.metodo_tratamento_str %}
+                                        {{ sol.metodo_tratamento_str }}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}

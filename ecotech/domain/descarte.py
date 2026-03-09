@@ -175,6 +175,8 @@ class SolicitacaoDescarte:
         self._itens: List[ItemDescarte] = []
         self._estado: EstadoDescarte = Solicitado()
         self._metodo_tratamento: Optional[MetodoTratamento] = None
+        self._metodo_tratamento_str: Optional[str] = None  # método como string do banco
+        self._impacto_evitado_db: float = 0.0  # impacto calculado no banco
         self._data_criacao = datetime.now()
         self._data_agendamento: Optional[datetime] = None
         self.rastreamento = RastreamentoEntrega(f"R-{id}")
@@ -214,6 +216,24 @@ class SolicitacaoDescarte:
     @metodo_tratamento.setter
     def metodo_tratamento(self, valor: MetodoTratamento):
         self._metodo_tratamento = valor
+    
+    @property
+    def metodo_tratamento_str(self) -> Optional[str]:
+        """Retorna o método de tratamento como string (do banco de dados)."""
+        return self._metodo_tratamento_str
+    
+    @metodo_tratamento_str.setter
+    def metodo_tratamento_str(self, valor: Optional[str]):
+        self._metodo_tratamento_str = valor
+    
+    @property
+    def impacto_evitado_db(self) -> float:
+        """Retorna o impacto evitado calculado no banco de dados."""
+        return self._impacto_evitado_db
+    
+    @impacto_evitado_db.setter
+    def impacto_evitado_db(self, valor: float):
+        self._impacto_evitado_db = valor
 
     @property
     def data_criacao(self) -> datetime:

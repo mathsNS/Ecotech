@@ -77,6 +77,12 @@ class ServicoDescarte:
                 estado = _criar_estado_do_banco(row['estado'])
                 solicitacao._estado = estado
                 
+                # carrega metodo de tratamento e impacto evitado do banco
+                if row['metodo_tratamento']:
+                    solicitacao.metodo_tratamento_str = row['metodo_tratamento']
+                if row['impacto_evitado']:
+                    solicitacao.impacto_evitado_db = row['impacto_evitado']
+                
                 # busca e adiciona os itens
                 itens_db = self._dados.buscar_itens_solicitacao(row['id'])
                 for item_row in itens_db:
@@ -257,7 +263,7 @@ class ServicoUsuario:
         usuarios_db = self._dados.buscar_todos_usuarios()
         for u in usuarios_db:
             # reconstroi objetos de usuario baseado no tipo
-            if u['tipo'] == 'Cidadao':
+            if u['tipo'] == 'cidadao':
                 dados_cidadao = self._dados.buscar_cidadao(u['id'])
                 if dados_cidadao:
                     usuario = Cidadao(
@@ -267,7 +273,7 @@ class ServicoUsuario:
                         dados_cidadao['cpf']
                     )
                     self._usuarios[u['id']] = usuario
-            elif u['tipo'] == 'Empresa':
+            elif u['tipo'] == 'empresa':
                 dados_empresa = self._dados.buscar_empresa(u['id'])
                 if dados_empresa:
                     usuario = Empresa(
@@ -278,6 +284,13 @@ class ServicoUsuario:
                         dados_empresa['razao_social']
                     )
                     self._usuarios[u['id']] = usuario
+            elif u['tipo'] == 'administrador':
+                usuario = Administrador(
+                    u['id'],
+                    u['nome'],
+                    u['email']
+                )
+                self._usuarios[u['id']] = usuario
     
     def criar_usuario(self, tipo: str, dados: Dict) -> Usuario:
         from .factories import UsuarioFactory

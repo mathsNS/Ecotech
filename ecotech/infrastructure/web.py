@@ -48,6 +48,9 @@ def criar_app() -> Flask:
     # configura dependencias entre servicos
     servico_descarte.set_servicos(servico_usuario, servico_ponto)
     
+    # carrega solicitacoes do banco de dados
+    servico_descarte._carregar_solicitacoes_do_banco()
+    
     # dados exemplo
     _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
     
@@ -418,12 +421,79 @@ def criar_app() -> Flask:
     
     @app.route('/usuarios')
     def usuarios():
-        """Página de usuários (placeholder)."""
+        """Página de usuários (apenas admin)."""
         if not usuario_logado():
             return redirect(url_for('login'))
         
         usuario = dados_usuario()
-        return render_template('usuarios.html', usuario=usuario)
+        
+        # Apenas admin pode acessar
+        if usuario['tipo'] != 'administrador':
+            flash('Acesso negado. Apenas administradores podem acessar esta página.', 'error')
+            return redirect(url_for('dashboard'))
+        
+        # Buscar todos os usuários
+        dados = Dados()
+        
+        # buscar cidadaos com dados completos
+        c = dados.conn.cursor()
+        c.execute("""
+            SELECT u.id, u.nome, u.email, u.data_cadastro, c.cpf, c.pontos
+            FROM usuario u
+            JOIN cidadao c ON u.id = c.id_usuario
+            WHERE u.tipo = 'cidadao'
+        """)
+        cidadaos_raw = c.fetchall()
+        
+        # buscar empresas com dados completos
+        c.execute("""
+            SELECT u.id, u.nome, u.email, u.data_cadastro, e.cnpj, e.descartado_mes
+            FROM usuario u
+            JOIN empresa e ON u.id = e.id_usuario
+            WHERE u.tipo = 'empresa'
+        """)
+        empresas_raw = c.fetchall()
+        
+        #formatar datas
+        from datetime import datetime
+        
+        def formatar_data(data_str):
+            if not data_str:
+                return '-'
+            try:
+                dt = datetime.strptime(data_str, '%Y-%m-%d %H:%M:%S')
+                return dt.strftime('%d/%m/%Y %H:%M:%S')
+            except:
+                return data_str
+        
+        cidadaos = []
+        for c in cidadaos_raw:
+            cidadaos.append({
+                'id': c['id'],
+                'nome': c['nome'],
+                'email': c['email'],
+                'data_cadastro': formatar_data(c['data_cadastro']),
+                'cpf': c['cpf'],
+                'pontos': c['pontos']
+            })
+        
+        empresas = []
+        for e in empresas_raw:
+            empresas.append({
+                'id': e['id'],
+                'nome': e['nome'],
+                'email': e['email'],
+                'data_cadastro': formatar_data(e['data_cadastro']),
+                'cnpj': e['cnpj'],
+                'descartado_mes': e['descartado_mes']
+            })
+        
+        return render_template('usuarios.html',
+                             usuario=usuario,
+                             cidadaos=cidadaos,
+                             empresas=empresas,
+                             total_cidadaos=len(cidadaos),
+                             total_empresas=len(empresas))
     
     @app.route('/api/solicitacoes')
     def api_solicitacoes():

@@ -54,16 +54,12 @@ class RelatorioAmbiental:
         return round(total, 2)
 
     def calcular_impacto_evitado(self) -> float:
-        # M- calcula quanto de impacto ambiental foi evitado pelos metodos de tratamento
-        # cada metodo tem uma porcentagem de reducao de impacto
+        """ Soma o impacto evitado calculado no banco de dados """
         impacto_total = 0.0
         
         for sol in self._solicitacoes:
-            if sol.metodo_tratamento:
-                impacto_original = sol.calcular_impacto_total()
-                reducao = sol.metodo_tratamento.reducao_impacto_percentual
-                impacto_evitado = impacto_original * (reducao / 100)
-                impacto_total += impacto_evitado
+            # usa o valor calculado no banco
+            impacto_total += sol.impacto_evitado_db
                 
         return round(impacto_total, 2)
 

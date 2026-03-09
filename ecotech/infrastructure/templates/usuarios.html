@@ -3,4 +3,151 @@
 {% block title %}Usuários - EcoTech{% endblock %}
 
 {% block content %}
+<div class="usuarios-container">
+    <div class="container">
+        <!-- Header da página -->
+        <div class="page-header">
+            <div class="header-text">
+                <h1>Gestão de Usuários</h1>
+                <p class="subtitle">Visualize e gerencie todos os usuários da plataforma</p>
+            </div>
+        </div>
+
+        <!-- Cards de estatísticas -->
+        <div class="stats-grid-usuarios">
+            <div class="stat-card-usuarios">
+                <div class="stat-icon-usuarios">
+                    <img src="{{ url_for('static', filename='images/usuarios-grupo.png') }}" alt="Total">
+                </div>
+                <div class="stat-info-usuarios">
+                    <h3>{{ total_cidadaos + total_empresas }}</h3>
+                    <p>Total de usuários</p>
+                </div>
+            </div>
+            <div class="stat-card-usuarios">
+                <div class="stat-icon-usuarios">
+                    <img src="{{ url_for('static', filename='images/usuario-cidadao.png') }}" alt="Cidadãos">
+                </div>
+                <div class="stat-info-usuarios">
+                    <h3>{{ total_cidadaos }}</h3>
+                    <p>Cidadãos</p>
+                </div>
+            </div>
+            <div class="stat-card-usuarios">
+                <div class="stat-icon-usuarios">
+                    <img src="{{ url_for('static', filename='images/empresa-icone.png') }}" alt="Empresas">
+                </div>
+                <div class="stat-info-usuarios">
+                    <h3>{{ total_empresas }}</h3>
+                    <p>Empresas</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- secao cidadao -->
+        <div class="usuarios-section">
+            <div class="section-header">
+                <h2>Cidadãos</h2>
+            </div>
+
+            <div class="usuarios-table-container">
+                <table class="usuarios-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th>CPF</th>
+                            <th>Pontos</th>
+                            <th>Data de Cadastro</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cidadaos %}
+                        <tr class="usuario-row">
+                            <td>
+                                <div class="usuario-name-cell">
+                                    <img src="{{ url_for('static', filename='images/usuario-cidadao.png') }}" alt="Avatar" class="usuario-avatar-small">
+                                    <span class="usuario-name">{{ c['nome'] }}</span>
+                                </div>
+                            </td>
+                            <td>{{ c['email'] }}</td>
+                            <td><span class="cpf-cnpj">{{ c['cpf'] if c['cpf'] else '-' }}</span></td>
+                            <td><span class="pontos-badge">{{ c['pontos'] }} pts</span></td>
+                            <td>{{ c['data_cadastro'] if c['data_cadastro'] else '-' }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action-small btn-edit" title="Editar">✏️</button>
+                                    <button class="btn-action-small btn-delete" title="Excluir">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- secao empresas -->
+        <div class="usuarios-section" style="margin-top: 40px;">
+            <div class="section-header">
+                <h2>Empresas</h2>
+            </div>
+
+            <div class="usuarios-table-container">
+                <table class="usuarios-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th>CNPJ</th>
+                            <th>Descartado no Mês</th>
+                            <th>Data de Cadastro</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in empresas %}
+                        <tr class="usuario-row">
+                            <td>
+                                <div class="usuario-name-cell">
+                                    <img src="{{ url_for('static', filename='images/empresa-icone.png') }}" alt="Avatar" class="usuario-avatar-small">
+                                    <span class="usuario-name">{{ e['nome'] }}</span>
+                                </div>
+                            </td>
+                            <td>{{ e['email'] }}</td>
+                            <td><span class="cpf-cnpj">{{ e['cnpj'] if e['cnpj'] else '-' }}</span></td>
+                            <td>{{ "%.1f"|format(e['descartado_mes']) }} kg</td>
+                            <td>{{ e['data_cadastro'] if e['data_cadastro'] else '-' }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action-small btn-edit" title="Editar">✏️</button>
+                                    <button class="btn-action-small btn-delete" title="Excluir">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// edicao/exclusao de usuarios (apenas alertas por enquanto)
+document.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', function() {
+        alert('Função de edição em desenvolvimento');
+    });
+});
+
+document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', function() {
+        if (confirm('Tem certeza que deseja excluir este usuário?')) {
+            alert('Função de exclusão em desenvolvimento');
+        }
+    });
+});
+</script>
 {% endblock %}

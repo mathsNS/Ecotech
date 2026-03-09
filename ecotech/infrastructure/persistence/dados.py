@@ -157,7 +157,7 @@ class Dados:
         c.execute("""
         INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "Cidadao"))
+        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "cidadao"))
 
         c.execute("INSERT OR IGNORE INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (cidadao.id, cidadao.cpf, 0, 0))
 
@@ -171,7 +171,7 @@ class Dados:
         c.execute("""
         INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'Empresa'))
+        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'empresa'))
 
         c.execute("INSERT OR IGNORE INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (empresa.id, empresa.cnpj, empresa.razao_social, 0, 0))
 
@@ -185,7 +185,7 @@ class Dados:
         c.execute("""
         INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "Administrador"))
+        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "administrador"))
 
         c.execute("INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)", (administrador.id, administrador.nivel))
 

@@ -5,196 +5,266 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="container">
+        <!-- Cabecalho principal com saudacao e botao de acao -->
         <div class="dashboard-header">
-            <div>
+            <div class="header-text">
                 {% if is_admin %}
                 <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
-                <p>Visão geral do sistema - {{ total_descartado|round(2) }}kg processados</p>
+                <p class="subtitle">Atualmente existem {{ solicitacoes|length }} solicitações ativas</p>
                 {% elif is_empresa %}
                 <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
-                <p>Sua empresa já processou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
+                <p class="subtitle">Sua empresa já processou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
                 {% else %}
                 <h1>Olá, {{ usuario.nome.split()[0] }}!</h1>
-                <p>Você já descartou {{ total_descartado|round(2) }}kg de lixo eletrônico</p>
+                <p class="subtitle">Você já reciclou {{ solicitacoes|length }} aparelhos eletrônicos</p>
                 {% endif %}
             </div>
             {% if not is_empresa and not is_admin %}
-            <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">
+            <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary btn-dash">
                 Iniciar novo descarte
+                <span class="btn-icon">→</span>
             </a>
             {% endif %}
         </div>
 
-        <div class="stats-grid">
+        <!-- Grid de metricas principais - 4 cards -->
+        <div class="stats-grid-new">
             {% if is_admin %}
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+            <!-- Admin ve metricas gerais do sistema -->
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for ('static', filename='images/credito.png') }}" alt="Sistema" class="stat-icon-img">
+                    <span class="stat-label">Total processado</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ total_sistema|round(2) }}kg</h3>
-                    <p>Total processado no sistema</p>
-                </div>
+                <h3 class="stat-value">{{ total_sistema|round(2) }}kg</h3>
             </div>
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Finalizadas" class="stat-icon-img">
+                    <span class="stat-label">Solicitações</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ total_processadas }}</h3>
-                    <p>Solicitações finalizadas</p>
-                </div>
+                <h3 class="stat-value">{{ total_processadas }}</h3>
             </div>
-            <div class="stat-card-dash eco">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" class="stat-icon-img">
+                    <span class="stat-label">Impacto evitado</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ impacto_evitado|round(1) }}</h3>
-                    <p>Impacto ambiental evitado</p>
+                <h3 class="stat-value">{{ impacto_evitado|round(1) }}</h3>
+            </div>
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Dispositivos" class="stat-icon-img">
+                    <span class="stat-label">Total no sistema</span>
                 </div>
+                <h3 class="stat-value">{{ solicitacoes|length }}</h3>
             </div>
             {% elif is_empresa %}
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+            <!-- Empresa ve metricas de processamento -->
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Sistema" class="stat-icon-img">
+                    <span class="stat-label">Total processado</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ total_sistema|round(2) }}kg</h3>
-                    <p>Total processado no sistema</p>
-                </div>
+                <h3 class="stat-value">{{ total_sistema|round(2) }}kg</h3>
             </div>
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Finalizadas" class="stat-icon-img">
+                    <span class="stat-label">Finalizadas</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ total_processadas }}</h3>
-                    <p>Solicitações finalizadas</p>
-                </div>
+                <h3 class="stat-value">{{ total_processadas }}</h3>
             </div>
-            <div class="stat-card-dash eco">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Processamento" class="stat-icon-img">
+                    <span class="stat-label">Em processamento</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ solicitacoes|length }}</h3>
-                    <p>Em processamento</p>
+                <h3 class="stat-value">{{ solicitacoes|length }}</h3>
+            </div>
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Peso" class="stat-icon-img">
+                    <span class="stat-label">Peso processado</span>
                 </div>
+                <h3 class="stat-value">{{ total_descartado|round(1) }}kg</h3>
             </div>
             {% else %}
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Crédito" style="width: 32px; height: 32px;">
+            <!-- Cidadao ve saldo, pontos, tier e dispositivos -->
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Saldo" class="stat-icon-img">
+                    <span class="stat-label">Saldo acumulado</span>
                 </div>
-                <div class="stat-info">
-                    <h3>R$ {{ (total_descartado * 5.5)|round(2) }}</h3>
-                    <p>Valor acumulado</p>
-                </div>
+                <h3 class="stat-value">R$ {{ "%.2f"|format(total_descartado * 5.5)|replace('.', ',') }}</h3>
             </div>
-            <div class="stat-card-dash">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Troféu" style="width: 32px; height: 32px;">
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Pontos" class="stat-icon-img">
+                    <span class="stat-label">Pontos acumulados</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ pontos_acumulados }}</h3>
-                    <p>Pontos acumulados</p>
-                </div>
+                <h3 class="stat-value">{{ pontos_acumulados }} Pontos </h3>
             </div>
-            <div class="stat-card-dash eco">
-                <div class="stat-icon">
-                    <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" style="width: 32px; height: 32px;">
+            <div class="stat-card-new stat-tier">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Tier" class="stat-icon-img">
+                    <span class="stat-label">Tier Atual</span>
                 </div>
-                <div class="stat-info">
-                    <h3>{{ impacto_evitado|round(1) }}</h3>
-                    <p>Impacto evitado</p>
+                <h3 class="stat-value tier-badge">Tier Prata</h3>
+            </div>
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Dispositivos" class="stat-icon-img">
+                    <span class="stat-label">{{ solicitacoes|length }} dispositivos</span>
                 </div>
+                <h3 class="stat-value">{{ solicitacoes|length }} dispositivos</h3>
             </div>
             {% endif %}
         </div>
 
-        <div class="dashboard-content">
-            <div class="section">
-                <div class="section-header">
-                    {% if is_admin %}
-                    <h2>Últimas solicitações do sistema</h2>
-                    <a href="{{ url_for('operacoes') }}">Ver todas</a>
-                    {% elif is_empresa %}
-                    <h2>Solicitações em processamento</h2>
-                    <a href="{{ url_for('operacoes') }}">Ver todas</a>
-                    {% else %}
-                    <h2>Últimas entregas</h2>
-                    <a href="{{ url_for('ultimas_entregas') }}">Ver todas</a>
-                    {% endif %}
+        <!-- Conteudo principal do dashboard -->
+        <div class="dashboard-content-new">
+            
+            {% if not is_admin and not is_empresa %}
+            <!-- Secao de missao e recompensas apenas para cidadao -->
+            <div class="dashboard-row">
+                <!-- Missao atual com barra de progresso -->
+                <div class="mission-card">
+                    <h2 class="section-title-dash">Missão atual</h2>
+                    <div class="mission-content">
+                        <h3 class="mission-title">Recicle 15 aparelhos</h3>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: {{ (solicitacoes|length / 15 * 100)|round(0) }}%"></div>
+                        </div>
+                        <p class="progress-text">{{ solicitacoes|length }} / 15</p>
+                        <div class="mission-reward">
+                            <span class="reward-badge">+150 pontos</span>
+                            <span class="reward-stars">★ ★ ★ ★</span>
+                        </div>
+                        <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-mission">Ver desafios</a>
+                    </div>
                 </div>
-                
-                {% if solicitacoes %}
-                <div class="deliveries-list">
+
+                <!-- Proximas recompensas e tier -->
+                <div class="rewards-card">
+                    <h2 class="section-title-dash">Próximas recompensas</h2>
+                    <div class="rewards-content">
+                        <div class="tier-badge-large">
+                            <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Tier Ouro" class="tier-icon">
+                            <span class="tier-name">Tier Ouro</span>
+                        </div>
+                        <div class="tier-progress">
+                            <div class="tier-progress-bar">
+                                <div class="tier-progress-fill" style="width: {{ [(pontos_acumulados / 1200 * 100)|round(0), 100]|min }}%"></div>
+                            </div>
+                            <p class="tier-progress-text">{{ pontos_acumulados }} / 1200 pontos</p>
+                        </div>
+                        <ul class="rewards-benefits">
+                            <li class="benefit-item">
+                                <span class="benefit-check">✓</span>
+                                Bônus de 10% nos incentivos
+                            </li>
+                            <li class="benefit-item">
+                                <span class="benefit-check">✓</span>
+                                Prioridade em coleta
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Grid com entregas e acoes lado a lado -->
+            <div class="dashboard-row-bottom">
+                <!-- Secao de entregas -->
+                <div class="deliveries-section-new">
+                    <div class="section-header">
+                        {% if is_admin %}
+                        <h2>Últimas solicitações do sistema</h2>
+                        <a href="{{ url_for('operacoes') }}">Ver todas</a>
+                        {% elif is_empresa %}
+                        <h2>Solicitações em processamento</h2>
+                        <a href="{{ url_for('operacoes') }}">Ver todas</a>
+                        {% else %}
+                        <h2>Últimas entregas</h2>
+                        <a href="{{ url_for('ultimas_entregas') }}">Ver todas</a>
+                        {% endif %}
+                    </div>
+                    
+                    {% if solicitacoes %}
+                    <div class="deliveries-list-new">
                     {% for sol in solicitacoes %}
-                    <div class="delivery-card">
-                        <div class="delivery-icon">
-                            <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega" style="width: 32px; height: 32px;">
+                    <div class="delivery-item-new">
+                        <div class="delivery-icon-circle">
+                            <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega">
                         </div>
-                        <div class="delivery-info">
+                        <div class="delivery-info-text">
                             {% if is_admin %}
-                            <h4>Solicitação #{{ sol.id[:8] }}</h4>
-                            <p>{{ sol.usuario.nome }} - {{ sol.calcular_peso_total()|round(2) }}kg</p>
+                            <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
+                            <p class="delivery-subtitle-new">{{ sol.usuario.nome }} - {{ sol.calcular_peso_total()|round(2) }}kg</p>
                             {% elif is_empresa %}
-                            <h4>Solicitação #{{ sol.id[:8] }}</h4>
-                            <p>{{ sol.calcular_peso_total()|round(2) }}kg - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                            <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
+                            <p class="delivery-subtitle-new">{{ sol.calcular_peso_total()|round(2) }}kg - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
                             {% else %}
-                            <h4>Incentivo por coleta</h4>
-                            <p>{{ sol.obter_resumo()['tipo_usuario'] }} - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                            <h4 class="delivery-title-new">Incentivo por coleta</h4>
+                            <p class="delivery-subtitle-new">{{ sol.obter_resumo()['tipo_usuario'] }} - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
                             {% endif %}
-                            <span class="delivery-id">ID: {{ sol.id[:12] }}</span>
                         </div>
-                        <div class="delivery-status">
-                            <span class="status-badge status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
+                        <div class="delivery-right-info">
+                            <span class="status-badge-compact status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
                                 {{ sol.estado.obter_nome() }}
                             </span>
                             {% if not is_empresa and not is_admin %}
-                            <span class="delivery-value">R$ {{ (sol.calcular_peso_total() * 5.5)|round(2) }}</span>
+                            <span class="delivery-value-new">R$ {{ "%.2f"|format(sol.calcular_peso_total() * 5.5)|replace('.', ',') }}</span>
                             {% endif %}
-                            <span class="delivery-date">{{ sol.data_criacao.strftime('%d/%m/%Y') }}</span>
+                            <span class="delivery-date-new">{{ sol.data_criacao.strftime('%d/%m') }}</span>
                         </div>
                     </div>
                     {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">
-                    {% if is_admin %}
-                    <p>Nenhuma solicitação no sistema ainda.</p>
-                    <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver operações</a>
-                    {% elif is_empresa %}
-                    <p>Sua empresa ainda não possui solicitações em processamento.</p>
-                    <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver todas as operações</a>
+                    </div>
                     {% else %}
-                    <p>Você ainda não fez nenhuma solicitação de descarte.</p>
-                    <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                    <div class="empty-state">
+                        {% if is_admin %}
+                        <p>Nenhuma solicitação no sistema ainda.</p>
+                        <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver operações</a>
+                        {% elif is_empresa %}
+                        <p>Sua empresa ainda não possui solicitações em processamento.</p>
+                        <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver todas as operações</a>
+                        {% else %}
+                        <p>Você ainda não fez nenhuma solicitação de descarte.</p>
+                        <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
-                {% endif %}
-            </div>
 
-            <div class="section">
+                <!-- Secao de acoes rapidas -->
+                <div class="actions-section-new">
                 <div class="section-header">
-                    <h2>Você deseja:</h2>
+                    <h2>Ações rápidas</h2>
                 </div>
-                <div class="actions-grid">
-                    <a href="{{ url_for('nova_solicitacao') }}" class="action-card">
-                        <div class="action-icon">
-                            <img src="{{ url_for('static', filename='images/calendario.png') }}" alt="Agendar" style="width: 32px; height: 32px;">
+                <div class="actions-grid-new">
+                    <div class="action-card-new">
+                        <div class="action-icon-circle">
+                            <img src="{{ url_for('static', filename='images/calendario.png') }}" alt="Agendar">
                         </div>
-                        <h3>Agendar coleta domiciliar</h3>
-                        <p>Agende e aguarde a coleta em casa</p>
-                    </a>
-                    <a href="{{ url_for('pontos_coleta') }}" class="action-card">
-                        <div class="action-icon">
-                            <img src="{{ url_for('static', filename='images/localizacao.png') }}" alt="Localização" style="width: 32px; height: 32px;">
+                        <div class="action-text-content">
+                            <h3 class="action-title-new">Agendar coleta domiciliar</h3>
+                            <p class="action-subtitle-new">Agende e aguarde a coleta em casa</p>
                         </div>
-                        <h3>Buscar um ponto fixo de coleta</h3>
-                        <p>Encontre pontos próximos a você</p>
-                    </a>
+                        <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-action">Agendar</a>
+                    </div>
+                    <div class="action-card-new">
+                        <div class="action-icon-circle">
+                            <img src="{{ url_for('static', filename='images/localizacao.png') }}" alt="Localização">
+                        </div>
+                        <div class="action-text-content">
+                            <h3 class="action-title-new">Buscar ponto de coleta</h3>
+                            <p class="action-subtitle-new">Encontre pontos próximos a você</p>
+                        </div>
+                        <a href="{{ url_for('pontos_coleta') }}" class="btn btn-action">Buscar</a>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>
