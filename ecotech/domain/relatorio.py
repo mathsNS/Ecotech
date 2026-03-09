@@ -1,23 +1,22 @@
-# M- modulo de relatorios ambientais
-# gera estatisticas sobre descarte, reciclagem e impacto ambiental
-# calcula metricas de sustentabilidade do sistema
+"""
+Móodulo de relatórios ambientais
 
-from typing import List, Dict
+Gera estatísticas sobre descarte, reciclagem e impacto ambiental.
+Calcula métricas de sustentabilidade do sistema.
+"""
+
+from typing import Dict
 from datetime import datetime
-from .descarte import SolicitacaoDescarte
-from .estados import Reciclado, Reutilizado, Descartado
+from ..infrastructure.persistence.dados import Dados
 
 # M- em desenvolvimento - falta exportar para pdf (se der tempo e vcs quiserem, existe uma api que facilita isso)
 # M- adicionar graficos de impacto (opcional tbm)
 
 class RelatorioAmbiental:
-    # M- classe para consolidar dados e gerar relatorios de impacto
-    # agrupa solicitacoes e calcula metricas ambientais
-    
-    def __init__(self, titulo: str):
+    def __init__(self, titulo: str, bd: Dados):
         self._titulo = titulo
-        self._solicitacoes: List[SolicitacaoDescarte] = []  # lista de solicitacoes para analise
-        self._data_geracao = datetime.now()  # timestamp de quando foi criado
+        self.bd = bd
+        self._data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     @property
     def titulo(self) -> str:
@@ -27,58 +26,66 @@ class RelatorioAmbiental:
     def data_geracao(self) -> datetime:
         return self._data_geracao
 
-    def adicionar_solicitacao(self, solicitacao: SolicitacaoDescarte):
-        self._solicitacoes.append(solicitacao)
+    def total_solicitacoes(self) -> int:
+        c = self.bd.conn.cursor()
+        c.execute("""
+        SELECT COUNT(*) as total
+        FROM solicitacao_descarte
+        """)
+        resultado = c.fetchone()
 
-    # M- calcula totais por tipo de tratamento final
-    def calcular_total_peso_reciclado(self) -> float:
-        # M- soma peso de todas as solicitacoes que foram recicladas
-        total = 0.0
-        for sol in self._solicitacoes:
-            if isinstance(sol.estado, Reciclado):
-                total += sol.calcular_peso_total()
-        return round(total, 2)
+        if not resultado:
+            return 0
+        else:
+            return resultado['total']
 
-    def calcular_total_peso_reutilizado(self) -> float:
-        total = 0.0
-        for sol in self._solicitacoes:
-            if isinstance(sol.estado, Reutilizado):
-                total += sol.calcular_peso_total()
-        return round(total, 2)
+    def calcular_peso_total_metodo(self, metodo: int) -> float:
+        c = self.bd.conn.cursor()
+        c.execute("""
+        SELECT COALESCE(SUM(i.quantidade * d.peso_kg), 0.0) as peso_total
+        FROM solicitacao_descarte s
+        JOIN item_descarte i ON s.id = i.id_solicitacao
+        JOIN dispositivo d ON i.id_dispositivo = d.id
+        WHERE s.id_metodo_tratamento = ?
+        """, (metodo, ))
 
-    def calcular_total_peso_descartado(self) -> float:
-        total = 0.0
-        for sol in self._solicitacoes:
-            if isinstance(sol.estado, Descartado):
-                total += sol.calcular_peso_total()
-        return round(total, 2)
+        resultado = c.fetchone()
+
+        return round(resultado['peso_total'], 2)
 
     def calcular_impacto_evitado(self) -> float:
-        # M- calcula quanto de impacto ambiental foi evitado pelos metodos de tratamento
-        # cada metodo tem uma porcentagem de reducao de impacto
-        impacto_total = 0.0
-        
-        for sol in self._solicitacoes:
-            if sol.metodo_tratamento:
-                impacto_original = sol.calcular_impacto_total()
-                reducao = sol.metodo_tratamento.reducao_impacto_percentual
-                impacto_evitado = impacto_original * (reducao / 100)
-                impacto_total += impacto_evitado
-                
-        return round(impacto_total, 2)
+        c = self.bd.conn.cursor()
+
+        c.execute("""
+        SELECT COALESCE(SUM(impacto_ambiental), 0.0) as impacto_ambiental_total
+        FROM dispositivo
+        """)
+
+        row = c.fetchone()
+        impacto_ambiental_total = row['impacto_ambiental_total']
+
+        c.execute("""
+        SELECT COALESCE(SUM(? * (1.0- m.reducao_impacto_percentual / 100.0)), 0.0) as impacto_evitado
+        FROM solicitacao_descarte s
+        JOIN item_descarte i ON s.id = i.id_solicitacao
+        JOIN dispositivo d ON i.id_dispositivo = d.id
+        JOIN metodo_tratamento m ON s.id_metodo_tratamento = m.id
+        """, (impacto_ambiental_total, ))
+
+        resultado = c.fetchone()
+
+        return round(resultado['impacto_evitado'], 2)
 
     def gerar_relatorio(self) -> Dict:
-        # M- retorna um dicionario com todas as metricas consolidadas
-        # pode ser usado para exibir no sistema ou exportar para outros formatos
         return {
             "titulo": self._titulo,
-            "data_geracao": self._data_geracao.isoformat(),
-            "total_solicitacoes": len(self._solicitacoes),
-            "peso_reciclado_kg": self.calcular_total_peso_reciclado(),
-            "peso_reutilizado_kg": self.calcular_total_peso_reutilizado(),
-            "peso_descartado_kg": self.calcular_total_peso_descartado(),
+            "data_geracao": self._data_geracao,
+            "total_solicitacoes": self.total_solicitacoes(),
+            "peso_reciclado_kg": self.calcular_peso_total_metodo(1),
+            "peso_reutilizado_kg": self.calcular_peso_total_metodo(2),
+            "peso_descartado_kg": self.calcular_peso_total_metodo(3),
             "impacto_evitado": self.calcular_impacto_evitado()
         }
-
+    
     def __str__(self) -> str:
-        return f"Relatorio: {self._titulo} ({len(self._solicitacoes)} solicitacoes)"
+        return f"Relatorio: {self._titulo} ({self.total_solicitacoes()} solicitações)"
