@@ -3,4 +3,177 @@
 {% block title %}Operações - EcoTech{% endblock %}
 
 {% block content %}
+<div class="operacoes-container">
+    <div class="container">
+        <!-- header com titulo e filtros -->
+        <div class="operacoes-header">
+            <div>
+                <h1>Gerenciamento de Operações</h1>
+                <p>Controle e acompanhamento de todas as solicitações</p>
+            </div>
+            <div class="operacoes-filters">
+                <select id="filtro-estado" class="filter-select" onchange="window.location.href='/operacoes?estado=' + this.value">
+                    <option value="">Todos os estados</option>
+                    <option value="solicitado" {% if filtro_atual == 'solicitado' %}selected{% endif %}>Solicitado</option>
+                    <option value="coletado" {% if filtro_atual == 'coletado' %}selected{% endif %}>Coletado</option>
+                    <option value="processamento" {% if filtro_atual == 'processamento' %}selected{% endif %}>Em Processamento</option>
+                    <option value="reciclado" {% if filtro_atual == 'reciclado' %}selected{% endif %}>Finalizado</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- cards de estatisticas -->
+        <div class="stats-grid-operacoes">
+            <div class="stat-card-op">
+                <div class="stat-icon-op">
+                    <img src="{{ url_for('static', filename='images/icon-pendente.png') }}" alt="Pendentes">
+                </div>
+                <div class="stat-info-op">
+                    <h3>{{ stats.pendentes }}</h3>
+                    <p>Solicitações Pendentes</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-op">
+                <div class="stat-icon-op">
+                    <img src="{{ url_for('static', filename='images/icon-coleta.png') }}" alt="Em Coleta">
+                </div>
+                <div class="stat-info-op">
+                    <h3>{{ stats.em_coleta }}</h3>
+                    <p>Em Coleta</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-op">
+                <div class="stat-icon-op">
+                    <img src="{{ url_for('static', filename='images/icon-processamento.png') }}" alt="Processamento">
+                </div>
+                <div class="stat-info-op">
+                    <h3>{{ stats.processando }}</h3>
+                    <p>Em Processamento</p>
+                </div>
+            </div>
+            
+            <div class="stat-card-op">
+                <div class="stat-icon-op">
+                    <img src="{{ url_for('static', filename='images/icon-finalizado.png') }}" alt="Finalizadas">
+                </div>
+                <div class="stat-info-op">
+                    <h3>{{ stats.finalizadas }}</h3>
+                    <p>Finalizadas</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- tabela de solicitacoes -->
+        <div class="operacoes-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Solicitações</h2>
+                    <span class="count-badge">{{ solicitacoes|length }} encontradas</span>
+                </div>
+
+                {% if solicitacoes %}
+                <div class="table-container">
+                    <table class="operacoes-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuário</th>
+                                <th>Ponto de Coleta</th>
+                                <th>Status</th>
+                                <th>Peso (kg)</th>
+                                <th>Data</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sol in solicitacoes %}
+                            <tr>
+                                <td>
+                                    <span class="id-cell">{{ sol.id[:8] }}...</span>
+                                </td>
+                                <td>
+                                    <div class="user-cell">
+                                        <strong>{{ sol.usuario.nome }}</strong>
+                                        <span class="user-type">{{ sol.obter_resumo()['tipo_usuario'] }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if sol.ponto_coleta %}
+                                        {{ sol.ponto_coleta.nome }}
+                                    {% else %}
+                                        <span class="text-muted">Não definido</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
+                                        {{ sol.estado.obter_nome() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong>{{ sol.calcular_peso_total()|round(2) }} kg</strong>
+                                </td>
+                                <td>
+                                    {{ sol.data_criacao.strftime('%d/%m/%Y') }}
+                                </td>
+                                <td>
+                                    <button 
+                                        class="btn-action btn-details" 
+                                        onclick="abrirDetalhes('{{ sol.id }}')"
+                                        title="Ver detalhes">
+                                        Ver Detalhes
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Vazio" style="width: 64px; opacity: 0.5;">
+                    <p>Nenhuma solicitação encontrada com os filtros aplicados.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- modal de detalhes (placeholder) -->
+<div id="modal-detalhes" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Detalhes da Solicitação</h2>
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Em breve</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="fecharModal()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// funcoes basicas do modal
+function abrirDetalhes(id) {
+    // placeholder - vai buscar detalhes via api depois
+    document.getElementById('modal-detalhes').style.display = 'flex';
+}
+
+function fecharModal() {
+    document.getElementById('modal-detalhes').style.display = 'none';
+}
+
+// fecha modal clicando fora
+window.onclick = function(event) {
+    const modal = document.getElementById('modal-detalhes');
+    if (event.target == modal) {
+        fecharModal();
+    }
+}
+</script>
 {% endblock %}

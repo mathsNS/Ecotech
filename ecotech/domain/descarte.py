@@ -215,6 +215,10 @@ class SolicitacaoDescarte:
     def metodo_tratamento(self, valor: MetodoTratamento):
         self._metodo_tratamento = valor
 
+    @property
+    def data_criacao(self) -> datetime:
+        return self._data_criacao
+
     def adicionar_item(self, item: ItemDescarte):
         self._itens.append(item)
 

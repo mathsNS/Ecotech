@@ -42,7 +42,7 @@ def criar_app() -> Flask:
     servico_usuario = ServicoUsuario()
     
     # dados exemplo
-    _inicializar_dados_exemplo(servico_usuario, servico_ponto)
+    _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte)
     
     # verifica login
     def usuario_logado():
@@ -73,13 +73,15 @@ def criar_app() -> Flask:
         if request.method == 'POST':
             tipo = request.form.get('tipo', 'cidadao')
             
-            session['user_id'] = 'demo'
-            session['user_tipo'] = tipo
-            
+            # usa usuarios reais do sistema
             if tipo == 'cidadao':
+                session['user_id'] = 'user-1'
                 session['user_nome'] = 'João Silva'
+                session['user_tipo'] = 'cidadao'
             else:
-                session['user_nome'] = 'EcoTech Reciclável'
+                session['user_id'] = 'user-3'
+                session['user_nome'] = 'EcoTech Recicláveis'
+                session['user_tipo'] = 'empresa'
             
             return redirect(url_for('dashboard'))
         
@@ -91,13 +93,15 @@ def criar_app() -> Flask:
         if request.method == 'POST':
             tipo = request.form.get('tipo', 'cidadao')
             
-            session['user_id'] = 'demo'
-            session['user_tipo'] = tipo
-            
+            # usa usuarios reais do sistema
             if tipo == 'cidadao':
+                session['user_id'] = 'user-1'
                 session['user_nome'] = 'João Silva'
+                session['user_tipo'] = 'cidadao'
             else:
-                session['user_nome'] = 'EcoTech Reciclável'
+                session['user_id'] = 'user-3'
+                session['user_nome'] = 'EcoTech Recicláveis'
+                session['user_tipo'] = 'empresa'
             
             return redirect(url_for('dashboard'))
         
@@ -117,13 +121,25 @@ def criar_app() -> Flask:
         
         usuario = dados_usuario()
         
+        # busca solicitacoes do usuario logado
+        todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        solicitacoes_usuario = [
+            s for s in todas_solicitacoes 
+            if s.usuario.id == usuario['id']
+        ]
+        
+        # calcula metricas do usuario
+        total_descartado = sum(s.calcular_peso_total() for s in solicitacoes_usuario)
+        impacto_evitado = sum(s.calcular_impacto_total() for s in solicitacoes_usuario)
+        pontos_acumulados = int(total_descartado * 10)  # 10 pontos por kg
+        
         return render_template(
             'dashboard.html',
             usuario=usuario,
-            solicitacoes=[],
-            total_descartado=45.8,
-            impacto_evitado=125.3,
-            pontos_acumulados=1250
+            solicitacoes=solicitacoes_usuario,
+            total_descartado=total_descartado,
+            impacto_evitado=impacto_evitado,
+            pontos_acumulados=pontos_acumulados
         )
     
     @app.route('/nova-solicitacao', methods=['GET', 'POST'])
@@ -264,12 +280,40 @@ def criar_app() -> Flask:
     
     @app.route('/operacoes')
     def operacoes():
-        """Página de operações (placeholder)."""
+        """Página de operações para gerenciamento de solicitações."""
         if not usuario_logado():
             return redirect(url_for('login'))
         
         usuario = dados_usuario()
-        return render_template('operacoes.html', usuario=usuario)
+        
+        # busca todas as solicitacoes
+        todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        
+        # filtra por estado se tiver parametro
+        filtro_estado = request.args.get('estado', '')
+        if filtro_estado:
+            solicitacoes_filtradas = [
+                s for s in todas_solicitacoes 
+                if filtro_estado.lower() in s.estado.obter_nome().lower()
+            ]
+        else:
+            solicitacoes_filtradas = todas_solicitacoes
+        
+        # calcula estatisticas
+        stats = {
+            'pendentes': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Solicitado']),
+            'em_coleta': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Coletado']),
+            'processando': len([s for s in todas_solicitacoes if s.estado.obter_nome() == 'Em Processamento']),
+            'finalizadas': len([s for s in todas_solicitacoes if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']])
+        }
+        
+        return render_template(
+            'operacoes.html', 
+            usuario=usuario,
+            solicitacoes=solicitacoes_filtradas,
+            stats=stats,
+            filtro_atual=filtro_estado
+        )
     
     @app.route('/relatorios')
     def relatorios():
@@ -300,39 +344,99 @@ def criar_app() -> Flask:
     return app
 
 
-def _inicializar_dados_exemplo(servico_usuario, servico_ponto):
-    """Inicializa dados de exemplo para demonstração."""
-    # Usuários de exemplo
-    servico_usuario.criar_usuario('cidadao', {
+def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte):
+    """inicializa dados de exemplo para demonstracao."""
+    # usuarios de exemplo
+    cidadao1 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-1',
         'nome': 'João Silva',
         'email': 'joao@example.com',
         'cpf': '12345678900'
     })
     
-    servico_usuario.criar_usuario('empresa', {
+    cidadao2 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-2',
+        'nome': 'Maria Santos',
+        'email': 'maria@example.com',
+        'cpf': '98765432100'
+    })
+    
+    empresa = servico_usuario.criar_usuario('empresa', {
+        'id': 'user-3',
         'nome': 'EcoTech Recicláveis',
         'email': 'contato@ecotech.com',
         'cnpj': '12345678000199',
         'razao_social': 'EcoTech Recicláveis LTDA'
     })
     
-    servico_ponto.criar_ponto_coleta(
+    # pontos de coleta
+    ponto1 = servico_ponto.criar_ponto_coleta(
+        'Centro de Coleta Lagoa Seca',
         'R. Dr. Morato Saraiva, 1100 - Lagoa Seca',
-        'Juazeiro do Norte, CE',
         -7.2138,
         -39.3089,
         1000.0
     )
     
-    servico_ponto.criar_ponto_coleta(
+    ponto2 = servico_ponto.criar_ponto_coleta(
         'Centro de Reciclagem Cariri',
         'Av. Padre Cícero, 500 - Centro',
         -7.2123,
         -39.3145,
         2000.0
     )
+    
+    # cria algumas solicitacoes de exemplo com diferentes estados
+    
+    # solicitacao 1 - estado inicial (solicitado)
+    sol1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
+    celular1 = DispositivoFactory.criar_celular('cel-001', 'iPhone 11', 0.194)
+    notebook1 = DispositivoFactory.criar_computador('comp-001', 'Dell Inspiron', 2.1)
+    servico_descarte.adicionar_item_solicitacao(sol1, celular1, 1, 'tela quebrada')
+    servico_descarte.adicionar_item_solicitacao(sol1, notebook1, 1, 'nao liga mais')
+    
+    # solicitacao 2 - ja foi coletada
+    sol2 = servico_descarte.criar_solicitacao(cidadao2, ponto2)
+    tv1 = DispositivoFactory.criar_eletrodomestico('elet-001', 'TV Samsung 32"', 5.5)
+    servico_descarte.adicionar_item_solicitacao(sol2, tv1, 1)
+    servico_descarte.avancar_estado_solicitacao(sol2)  # passa pra coletado
+    
+    # solicitacao 3 - em processamento
+    sol3 = servico_descarte.criar_solicitacao(empresa, ponto1)
+    celular2 = DispositivoFactory.criar_celular('cel-002', 'Samsung Galaxy S10', 0.175)
+    tablet1 = DispositivoFactory.criar_celular('cel-003', 'iPad Air', 0.460)
+    servico_descarte.adicionar_item_solicitacao(sol3, celular2, 3)
+    servico_descarte.adicionar_item_solicitacao(sol3, tablet1, 2)
+    metodo = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol3, metodo)
+    servico_descarte.avancar_estado_solicitacao(sol3)  # coletado
+    servico_descarte.avancar_estado_solicitacao(sol3)  # em processamento
+    
+    # solicitacao 4 - finalizada (reciclada)
+    sol4 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    monitor1 = DispositivoFactory.criar_computador('comp-002', 'Monitor LG 24"', 3.2)
+    teclado1 = DispositivoFactory.criar_computador('comp-003', 'Teclado Mecanico', 0.8)
+    servico_descarte.adicionar_item_solicitacao(sol4, monitor1, 1)
+    servico_descarte.adicionar_item_solicitacao(sol4, teclado1, 1)
+    metodo2 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol4, metodo2)
+    servico_descarte.avancar_estado_solicitacao(sol4)  # coletado
+    servico_descarte.avancar_estado_solicitacao(sol4)  # em processamento
+    servico_descarte.avancar_estado_solicitacao(sol4)  # reciclado
+    
+    # solicitacao 5 - mais uma pendente
+    sol5 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
+    geladeira = DispositivoFactory.criar_eletrodomestico('elet-002', 'Geladeira Brastemp', 45.0)
+    servico_descarte.adicionar_item_solicitacao(sol5, geladeira, 1, 'compressor queimado')
+    
+    # solicitacao 6 - outra em processamento
+    sol6 = servico_descarte.criar_solicitacao(empresa, ponto2)
+    pc1 = DispositivoFactory.criar_computador('comp-004', 'Desktop HP', 8.5)
+    servico_descarte.adicionar_item_solicitacao(sol6, pc1, 5, 'lote de computadores antigos')
+    metodo3 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol6, metodo3)
+    servico_descarte.avancar_estado_solicitacao(sol6)  # coletado
+    servico_descarte.avancar_estado_solicitacao(sol6)  # em processamento
 
 
 if __name__ == '__main__':
