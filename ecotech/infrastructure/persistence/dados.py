@@ -1,5 +1,8 @@
 import sqlite3
 from datetime import datetime
+from ...domain.usuarios import Cidadao, Empresa, Administrador
+from ...domain.dispositivos import Celular
+from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, RastreamentoEntrega
 
 class Dados:
 
@@ -7,6 +10,7 @@ class Dados:
         self.conn = sqlite3.connect('ecotech.db')
         self.conn.row_factory = sqlite3.Row
         self.criar_tabelas()
+        self.seed()
 
     def criar_tabelas(self):
         c = self.conn.cursor()
@@ -137,11 +141,11 @@ class Dados:
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         c.execute("""
-        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "CIDADAO"))
+        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "Cidadao"))
 
-        c.execute("INSERT INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (cidadao.id, cidadao.cpf, 0, 0))
+        c.execute("INSERT OR IGNORE INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (cidadao.id, cidadao.cpf, 0, 0))
 
         self.conn.commit()
 
@@ -151,11 +155,11 @@ class Dados:
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         c.execute("""
-        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'EMPRESA'))
+        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'Empresa'))
 
-        c.execute("INSERT INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (empresa.id, empresa.cnpj, empresa.razao_social, 0, 0))
+        c.execute("INSERT OR IGNORE INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (empresa.id, empresa.cnpj, empresa.razao_social, 0, 0))
 
         self.conn.commit()
 
@@ -165,11 +169,11 @@ class Dados:
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         c.execute("""
-        INSERT INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
+        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
         VALUES (?, ?, ?, ?, ?, ?)
-        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "ADMINISTRADOR"))
+        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "Administrador"))
 
-        c.execute("INSERT INTO administrador (id_usuario, nivel) VALUES (?, ?)", (administrador.id, administrador.nivel))
+        c.execute("INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)", (administrador.id, administrador.nivel))
 
         self.conn.commit()
 
@@ -179,7 +183,7 @@ class Dados:
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         c.execute("""
-        INSERT INTO notificacao (id_usuario, timestamp, mensagem)
+        INSERT OR IGNORE INTO notificacao (id_usuario, timestamp, mensagem)
         VALUES (?, ?, ?)
         """, (id_usuario, timestamp, mensagem))
             
@@ -189,8 +193,8 @@ class Dados:
         c = self.conn.cursor()
 
         c.execute("""
-        INSERT INTO dispositivo (id, nome, peso_kg, marca, modelo)
-        VALUES (?, ?, ?, ?)
+        INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo)
+        VALUES (?, ?, ?, ?, ?)
         """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo))
 
         self.conn.commit()
@@ -199,7 +203,7 @@ class Dados:
         c = self.conn.cursor()
 
         c.execute("""
-        INSERT INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
+        INSERT OR IGNORE INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (ponto_coleta.id, ponto_coleta.nome, ponto_coleta.endereco, ponto_coleta.latitude, ponto_coleta.longitude, 1, ponto_coleta.capacidade_kg, 0.0))
 
@@ -211,19 +215,18 @@ class Dados:
         data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")
 
         c.execute("""
-        INSERT INTO solicitacao_descarte (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        INSERT OR IGNORE INTO solicitacao_descarte (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (solicitacao_descarte.id, solicitacao_descarte.usuario.id, solicitacao_descarte.ponto_coleta.id, 'SOLICITADO', None, data_criacao, None))
 
         self.conn.commit()
 
-    def salvar_itens_descarte(self, id_solicitacao, itens):
+    def salvar_itens_descarte(self, id_solicitacao, item):
         c = self.conn.cursor()
 
-        for item in itens:
-            c.execute("""
-            INSERT INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
-            VALUES (?, ?, ?, ?)
-            """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
+        c.execute("""
+        INSERT OR IGNORE INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
+        VALUES (?, ?, ?, ?)
+        """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
         
         self.conn.commit()
 
@@ -233,8 +236,36 @@ class Dados:
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         c.execute("""
-        INSERT INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
+        INSERT OR IGNORE INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
         VALUES (?, ?, ?)
         """, (id_solicitacao, timestamp, mensagem))
             
         self.conn.commit()
+
+    # -------------------
+    # SEED
+    # -------------------
+
+    def seed(self):
+        cidadao = Cidadao("USR-CID-001", "João Silva", "joaosilva@email.com", "12345678901")
+        self.salvar_cidadao(cidadao)
+
+        empresa = Empresa("USR-EMP-001", "EcoSoluções LTDA", "contato@ecosolucoes.com", "98765432000100", "EcoSoluções Reciclagem Industrial")
+        self.salvar_empresa(empresa)
+
+        admin = Administrador("USR-ADM-001", "Admin Master", "admin@ecotech.com", 3)
+        self.salvar_administrador(admin)
+
+        dispositivo = Celular("DISP-001", "Smartphone X", 0.2, "Tech", "Pro")
+        self.salvar_dispositivo(dispositivo)
+
+        ponto_coleta = PontoColeta("PNT-001"," EcoPonto Sul", "Rua B, 500", -23.5, -46.6, 500.0)
+        self.salvar_ponto(ponto_coleta)
+
+        solicitacao = SolicitacaoDescarte("SOL-001", cidadao, ponto_coleta)
+        self.salvar_solicitacao(solicitacao)
+        
+        item = ItemDescarte(dispositivo, 1, "Tela trincada")
+        self.salvar_itens_descarte('SOL-001', item)
+
+d = Dados()

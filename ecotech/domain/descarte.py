@@ -112,6 +112,14 @@ class PontoColeta:
     @property
     def endereco(self) -> str:
         return self._endereco
+    
+    @property
+    def latitude(self) -> str:
+        return self._latitude
+    
+    @property
+    def longitude(self) -> str:
+        return self._longitude
 
     @property
     def ativo(self) -> bool:

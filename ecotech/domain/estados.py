@@ -5,9 +5,8 @@ Implementa o padrão State para controlar transições válidas.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 from datetime import datetime
-from typing import List
 
 if TYPE_CHECKING:
     from .descarte import SolicitacaoDescarte

@@ -207,6 +207,10 @@ class Cidadao(Usuario):
 
         self._registrar_acao("Cidadão criado")
 
+    @property
+    def cpf(self) -> str:
+        return self._cpf
+
     @staticmethod
     def _validar_cpf(cpf: str) -> None:
         """Valida formato básico do CPF."""
@@ -271,6 +275,14 @@ class Empresa(Usuario):
         self._descartado_mes: float = 0.0
 
         self._registrar_acao("Empresa criada")
+
+    @property
+    def cnpj(self) -> str:
+        return self._cnpj
+    
+    @property
+    def razao_social(self) -> str:
+        return self._razao_social
 
     @staticmethod
     def _validar_cnpj(cnpj: str) -> None:
