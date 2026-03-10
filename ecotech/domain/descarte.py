@@ -17,12 +17,22 @@ class RastreamentoEntrega:
 
     def __init__(self, id_rastreio: str):
         """Inicializa o rastreamento com ID e histórico inicial."""
-        self.id_rastreio = id_rastreio
-        self.historico: List[str] = ["Solicitação iniciada"]
+        self._id_rastreio = id_rastreio
+        self._historico: List[str] = ["Solicitação iniciada"]
+
+    @property
+    def id_rastreio(self) -> str:
+        """Retorna o identificador do rastreamento."""
+        return self._id_rastreio
+
+    @property
+    def historico(self) -> List[str]:
+        """Retorna cópia do histórico de movimentações."""
+        return self._historico.copy()
 
     def atualizar_status(self, mensagem: str):
         """Adiciona uma entrada ao histórico com timestamp."""
-        self.historico.append(f"{datetime.now()}: {mensagem}")
+        self._historico.append(f"{datetime.now()}: {mensagem}")
 
 
 class ItemDescarte:
@@ -205,7 +215,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._impacto_evitado_db: float = 0.0
         self._data_criacao = datetime.now()
         self._data_agendamento: Optional[datetime] = None
-        self.rastreamento = RastreamentoEntrega(f"R-{id}")
+        self._rastreamento = RastreamentoEntrega(f"R-{id}")
         self.registrar_log("Solicitação criada", f"ID: {id}")
 
     # -------------------
@@ -227,6 +237,11 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
     @ponto_coleta.setter
     def ponto_coleta(self, valor: PontoColeta):
         self._ponto_coleta = valor
+
+    @property
+    def rastreamento(self) -> RastreamentoEntrega:
+        """Retorna o rastreamento de entrega da solicitação."""
+        return self._rastreamento
 
     @property
     def itens(self) -> List[ItemDescarte]:
@@ -284,7 +299,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         estado_anterior = self._estado.obter_nome()
         self._estado = self._estado.avancar(self)
         novo_estado = self._estado.obter_nome()
-        self.rastreamento.atualizar_status(f"Estado mudado para {novo_estado}")
+        self._rastreamento.atualizar_status(f"Estado mudado para {novo_estado}")
         self.registrar_log("Estado avançado", f"{estado_anterior} -> {novo_estado}")
         self.emitir_notificacao(
             "Mudança de estado",
@@ -296,7 +311,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         if not self._estado.pode_cancelar():
             raise ValueError("Não é possível cancelar neste estado")
         self._estado = Cancelado(motivo)
-        self.rastreamento.atualizar_status(f"Cancelado: {motivo}")
+        self._rastreamento.atualizar_status(f"Cancelado: {motivo}")
         self.registrar_log("Solicitação cancelada", motivo)
         self.emitir_notificacao(
             "Solicitação cancelada",

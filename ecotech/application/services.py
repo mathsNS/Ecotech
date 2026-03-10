@@ -82,8 +82,8 @@ class ServicoDescarte:
                 if row['data_criacao']:
                     try:
                         solicitacao._data_criacao = datetime.strptime(row['data_criacao'], "%d/%m/%Y %H:%M")
-                    except:
-                        pass  # mantem data padrao em caso de erro
+                    except (ValueError, TypeError):
+                        pass  # mantém data padrão se o formato for inválido
                 
                 # carrega metodo de tratamento e impacto evitado do banco
                 if row['metodo_tratamento']:
@@ -107,7 +107,7 @@ class ServicoDescarte:
                 # adiciona ao cache
                 self._solicitacoes[row['id']] = solicitacao
                 
-            except Exception as e:
+            except (KeyError, ValueError, TypeError) as e:
                 continue
 
     def criar_solicitacao(
