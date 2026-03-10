@@ -8,13 +8,11 @@ from ecotech.domain.usuarios import Cidadao
 class TestFactories:
     
     def test_factory_celular(self):
-        # A- testa se factory cria celular corretamente
         celular = DispositivoFactory.criar_celular("1", "iPhone", 0.2)
         assert celular.nome == "iPhone"
         assert celular.peso_kg == 0.2
     
     def test_factory_usuario(self):
-        # M- testa criacao de usuario via factory
         cidadao = UsuarioFactory.criar_cidadao("1", "João", "joao@test.com", "12345678901")
         assert cidadao.nome == "João"
 

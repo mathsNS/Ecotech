@@ -14,11 +14,14 @@ from .mixins import LoggableMixin, NotificavelMixin
 
 class RastreamentoEntrega:
     """Registra o status e histórico de movimentação de uma solicitação."""
+
     def __init__(self, id_rastreio: str):
+        """Inicializa o rastreamento com ID e histórico inicial."""
         self.id_rastreio = id_rastreio
         self.historico: List[str] = ["Solicitação iniciada"]
 
     def atualizar_status(self, mensagem: str):
+        """Adiciona uma entrada ao histórico com timestamp."""
         self.historico.append(f"{datetime.now()}: {mensagem}")
 
 

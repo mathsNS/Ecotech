@@ -2,8 +2,6 @@ import pytest
 from ecotech.domain.tratamento import Reciclagem, Reuso, DescarteControlado
 from ecotech.domain.dispositivos import Celular
 
-# TODO: adicionar testes de impacto ambiental
-# TODO: testar combinacao de metodos
 
 class TestTratamento:
     

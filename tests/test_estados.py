@@ -4,8 +4,6 @@ from ecotech.domain.estados import Solicitado, Coletado, EmProcessamento
 from ecotech.domain.descarte import SolicitacaoDescarte
 from ecotech.domain.usuarios import Cidadao
 
-# TODO: testar todas as transicoes possiveis
-# TODO: adicionar testes de estado invalido
 
 class TestEstados:
     
