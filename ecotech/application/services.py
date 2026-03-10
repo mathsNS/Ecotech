@@ -2,8 +2,6 @@ from typing import List, Optional, Dict
 from datetime import datetime
 import uuid
 
-# temporario - melhorar validacoes depois
-
 from ..domain.usuarios import Usuario, Cidadao, Empresa, Administrador
 from ..domain.dispositivos import DispositivoEletronico
 from ..domain.descarte import (
@@ -17,7 +15,7 @@ from ..domain.estados import (
     Solicitado, Coletado, EmProcessamento,
     Reciclado, Reutilizado, Descartado, Cancelado
 )
-from ..infrastructure.persistence.dados import Dados
+from ..domain.repositorio import RepositorioBase
 
 
 def _criar_estado_do_banco(nome_estado: str):
@@ -37,12 +35,15 @@ def _criar_estado_do_banco(nome_estado: str):
 
 
 class ServicoDescarte:
-    # camada de aplicacao para gerenciar solicitacoes de descarte
-    # orquestra as regras de negocio do dominio
-    # agora com persistencia no banco de dados
+    """Serviço de aplicação para gerenciar solicitações de descarte.
+
+    Orquestra as regras de negócio do domínio, coordenando usuários,
+    dispositivos, pontos de coleta e métodos de tratamento.
+    Depende da abstração RepositorioBase para persistência (DIP).
+    """
     
-    def __init__(self, dados: Optional[Dados] = None, servico_usuario=None, servico_ponto=None):
-        self._dados = dados or Dados()
+    def __init__(self, dados: Optional[RepositorioBase] = None, servico_usuario=None, servico_ponto=None):
+        self._dados = dados
         self._servico_usuario = servico_usuario
         self._servico_ponto = servico_ponto
         self._solicitacoes: Dict[str, SolicitacaoDescarte] = {}
@@ -54,7 +55,7 @@ class ServicoDescarte:
     
     def _carregar_solicitacoes_do_banco(self):
         """Carrega todas as solicitacoes do banco de dados."""
-        if not self._servico_usuario or not self._servico_ponto:
+        if not self._servico_usuario or not self._servico_ponto or not self._dados:
             return  # precisa dos servicos pra reconstruir
         
         from .factories import DispositivoFactory
@@ -87,8 +88,9 @@ class ServicoDescarte:
                 # carrega metodo de tratamento e impacto evitado do banco
                 if row['metodo_tratamento']:
                     solicitacao.metodo_tratamento_str = row['metodo_tratamento']
-                if row['impacto_evitado']:
-                    solicitacao.impacto_evitado_db = row['impacto_evitado']
+                
+                # calcula impacto evitado a partir dos itens carregados
+                solicitacao.impacto_evitado_db = solicitacao.calcular_impacto_total()
                 
                 # busca e adiciona os itens
                 itens_db = self._dados.buscar_itens_solicitacao(row['id'])
@@ -115,13 +117,12 @@ class ServicoDescarte:
         usuario: Usuario,
         ponto_coleta: Optional[PontoColeta] = None
     ) -> SolicitacaoDescarte:
-        # cria uma nova solicitacao com id unico
+        """Cria uma nova solicitação com ID único."""
         id_solicitacao = str(uuid.uuid4())
         solicitacao = SolicitacaoDescarte(id_solicitacao, usuario, ponto_coleta)
         self._solicitacoes[id_solicitacao] = solicitacao
         
-        # persiste no banco se tiver ponto de coleta
-        if ponto_coleta:
+        if ponto_coleta and self._dados:
             self._dados.salvar_solicitacao(solicitacao)
         
         return solicitacao
@@ -133,13 +134,13 @@ class ServicoDescarte:
         quantidade: int = 1,
         observacoes: str = ""
     ) -> ItemDescarte:
-        # adiciona um dispositivo a solicitacao
+        """Adiciona um dispositivo à solicitação."""
         item = ItemDescarte(dispositivo, quantidade, observacoes)
         solicitacao.adicionar_item(item)
         
-        # salva dispositivo e item no banco
-        self._dados.salvar_dispositivo(dispositivo)
-        self._dados.salvar_itens_descarte(solicitacao.id, item)
+        if self._dados:
+            self._dados.salvar_dispositivo(dispositivo)
+            self._dados.salvar_itens_descarte(solicitacao.id, item)
         
         return item
 
@@ -148,7 +149,7 @@ class ServicoDescarte:
         solicitacao: SolicitacaoDescarte,
         ponto_coleta: PontoColeta
     ):
-        # define onde sera entregue e verifica capacidade
+        """Define onde será entregue e verifica capacidade."""
         peso_total = solicitacao.calcular_peso_total()
         
         if not ponto_coleta.pode_receber(peso_total):
@@ -159,44 +160,49 @@ class ServicoDescarte:
         solicitacao.ponto_coleta = ponto_coleta
         ponto_coleta.adicionar_ocupacao(peso_total)
         
-        # persiste a solicitacao completa no banco
-        self._dados.salvar_solicitacao(solicitacao)
+        if self._dados:
+            self._dados.salvar_solicitacao(solicitacao)
 
     def definir_metodo_tratamento(
         self,
         solicitacao: SolicitacaoDescarte,
         metodo: MetodoTratamento
     ):
-        # define qual metodo de tratamento sera usado (reciclagem etc)
+        """Define qual método de tratamento será usado."""
         solicitacao.metodo_tratamento = metodo
 
     def avancar_estado_solicitacao(self, solicitacao: SolicitacaoDescarte):
-        # avanca pro proximo estado (padrao state)
+        """Avança para o próximo estado (padrão State)."""
         solicitacao.avancar_estado()
 
     def cancelar_solicitacao(self, solicitacao: SolicitacaoDescarte, motivo: str = ""):
+        """Cancela uma solicitação com motivo opcional."""
         solicitacao.cancelar(motivo)
 
     def listar_solicitacoes(self) -> List[SolicitacaoDescarte]:
-        # carrega do banco se o cache estiver vazio
+        """Retorna todas as solicitações, carregando do banco se necessário."""
         if not self._solicitacoes and self._servico_usuario and self._servico_ponto:
             self._carregar_solicitacoes_do_banco()
         
         return list(self._solicitacoes.values())
 
     def obter_solicitacao(self, id: str) -> Optional[SolicitacaoDescarte]:
+        """Busca uma solicitação pelo ID."""
         return self._solicitacoes.get(id)
 
 
 class ServicoRelatorio:
-    # M- servico pra gerar relatorios ambientais
+    """Serviço para geração de relatórios ambientais.
+
+    Consolida solicitações de descarte em relatórios de impacto.
+    """
     
     def gerar_relatorio_periodo(
         self,
         titulo: str,
         solicitacoes: List[SolicitacaoDescarte]
     ) -> RelatorioAmbiental:
-        # M- cria relatorio consolidando as solicitacoes do periodo
+        """Cria relatório consolidando as solicitações do período."""
         relatorio = RelatorioAmbiental(titulo)
         
         for solicitacao in solicitacoes:
@@ -206,16 +212,20 @@ class ServicoRelatorio:
 
 
 class ServicoPontoColeta:
-    # M- servico pra gerenciar pontos de coleta
-    # agora com persistencia no banco
+    """Serviço para gerenciamento de pontos de coleta.
+
+    Gerencia o ciclo de vida de pontos de coleta com persistência
+    via RepositorioBase (DIP).
+    """
     
-    def __init__(self, dados: Optional[Dados] = None):
-        self._dados = dados or Dados()
+    def __init__(self, dados: Optional[RepositorioBase] = None):
+        self._dados = dados
         self._pontos: Dict[str, PontoColeta] = {}
-        self._carregar_pontos()
+        if self._dados:
+            self._carregar_pontos()
     
     def _carregar_pontos(self):
-        # carrega pontos do banco para o cache
+        """Carrega pontos do banco para o cache."""
         pontos_db = self._dados.buscar_todos_pontos_coleta()
         for p in pontos_db:
             ponto = PontoColeta(
@@ -226,7 +236,7 @@ class ServicoPontoColeta:
                 p['longitude'], 
                 p['capacidade_kg']
             )
-            ponto.ocupacao_atual = p['ocupacao_atual_kg']
+            ponto.ocupacao_atual_kg = p['ocupacao_atual_kg']
             self._pontos[p['id']] = ponto
     
     def criar_ponto_coleta(
@@ -237,36 +247,44 @@ class ServicoPontoColeta:
         longitude: float,
         capacidade_kg: float = 1000.0
     ) -> PontoColeta:
+        """Cria e persiste um novo ponto de coleta."""
         id_ponto = str(uuid.uuid4())
         ponto = PontoColeta(id_ponto, nome, endereco, latitude, longitude, capacidade_kg)
         self._pontos[id_ponto] = ponto
         
-        # persiste no banco
-        self._dados.salvar_ponto(ponto)
+        if self._dados:
+            self._dados.salvar_ponto(ponto)
         
         return ponto
     
     def adicionar_ponto(self, ponto: PontoColeta):
+        """Adiciona um ponto de coleta ao cache."""
         self._pontos[ponto.id] = ponto
     
     def listar_pontos(self) -> List[PontoColeta]:
+        """Retorna todos os pontos de coleta."""
         return list(self._pontos.values())
     
     def buscar_ponto(self, id: str) -> Optional[PontoColeta]:
+        """Busca um ponto de coleta pelo ID."""
         return self._pontos.get(id)
 
 
 class ServicoUsuario:
-    # servico para gerenciar usuarios
-    # com persistencia no banco
+    """Serviço para gerenciamento de usuários.
+
+    Gerencia cadastro e consulta de usuários com persistência
+    via RepositorioBase (DIP).
+    """
     
-    def __init__(self, dados: Optional[Dados] = None):
-        self._dados = dados or Dados()
+    def __init__(self, dados: Optional[RepositorioBase] = None):
+        self._dados = dados
         self._usuarios: Dict[str, Usuario] = {}
-        self._carregar_usuarios()
+        if self._dados:
+            self._carregar_usuarios()
     
     def _carregar_usuarios(self):
-        # carrega usuarios do banco para o cache
+        """Carrega usuários do banco para o cache."""
         usuarios_db = self._dados.buscar_todos_usuarios()
         for u in usuarios_db:
             # reconstroi objetos de usuario baseado no tipo
@@ -300,34 +318,37 @@ class ServicoUsuario:
                 self._usuarios[u['id']] = usuario
     
     def criar_usuario(self, tipo: str, dados: Dict) -> Usuario:
+        """Cria e persiste um novo usuário do tipo especificado."""
         from .factories import UsuarioFactory
         
-        # gera id se nao tiver um especificado
         if 'id' not in dados:
             dados['id'] = str(uuid.uuid4())
         
         usuario = UsuarioFactory.criar_usuario(tipo, dados)
         self._usuarios[usuario.id] = usuario
         
-        # persiste no banco
-        if tipo == 'cidadao':
-            self._dados.salvar_cidadao(usuario)
-        elif tipo == 'empresa':
-            self._dados.salvar_empresa(usuario)
-        elif tipo == 'administrador':
-            self._dados.salvar_administrador(usuario)
+        if self._dados:
+            if tipo == 'cidadao':
+                self._dados.salvar_cidadao(usuario)
+            elif tipo == 'empresa':
+                self._dados.salvar_empresa(usuario)
+            elif tipo == 'administrador':
+                self._dados.salvar_administrador(usuario)
         
         return usuario
     
     def buscar_usuario(self, id: str) -> Optional[Usuario]:
+        """Busca um usuário pelo ID."""
         return self._usuarios.get(id)
     
     def autenticar_usuario(self, email: str) -> Optional[Usuario]:
+        """Autentica usuário pelo email."""
         for usuario in self._usuarios.values():
             if usuario.email == email:
                 return usuario
         return None
     
     def listar_usuarios(self) -> List[Usuario]:
+        """Retorna todos os usuários cadastrados."""
         return list(self._usuarios.values())
 

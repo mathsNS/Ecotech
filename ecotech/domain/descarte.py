@@ -10,6 +10,7 @@ from .dispositivos import DispositivoEletronico
 from .usuarios import Usuario
 from .estados import EstadoDescarte, Solicitado, Cancelado
 from .tratamento import MetodoTratamento
+from .mixins import LoggableMixin, NotificavelMixin
 
 class RastreamentoEntrega:
     """Registra o status e histórico de movimentação de uma solicitação."""
@@ -76,8 +77,12 @@ class ItemDescarte:
         return f"{self._quantidade}x {self._dispositivo.nome}"
 
 
-class PontoColeta:
-    """Representa um ponto de coleta fisico com capacidade controlada."""
+class PontoColeta(LoggableMixin):
+    """Representa um ponto de coleta físico com capacidade controlada.
+
+    Herda de LoggableMixin para registrar auditoria de operações
+    como recebimento de resíduos e alterações de capacidade.
+    """
     
     def __init__(
         self,
@@ -88,6 +93,7 @@ class PontoColeta:
         longitude: float,
         capacidade_kg: float = 1000.0
     ):
+        self.__init_log__()
         self._id = id
         self._nome = nome
         self._endereco = endereco
@@ -96,6 +102,7 @@ class PontoColeta:
         self._ativo = True
         self._capacidade_kg = capacidade_kg
         self._ocupacao_atual_kg = 0.0
+        self.registrar_log("Ponto de coleta criado", f"{nome} - {endereco}")
 
     # -------------------
     # PROPERTIES
@@ -131,7 +138,15 @@ class PontoColeta:
 
     @property
     def ocupacao_atual_kg(self) -> float:
+        """Retorna a ocupação atual em kg."""
         return self._ocupacao_atual_kg
+
+    @ocupacao_atual_kg.setter
+    def ocupacao_atual_kg(self, valor: float) -> None:
+        """Define a ocupação atual em kg (usado ao carregar do banco)."""
+        if valor < 0:
+            raise ValueError("Ocupação não pode ser negativa.")
+        self._ocupacao_atual_kg = valor
 
     def validar_e_receber(self, peso_kg: float):
         """Valida se o ponto pode receber e incrementa a ocupação."""
@@ -144,7 +159,9 @@ class PontoColeta:
         return self._ativo and (self._ocupacao_atual_kg + peso_kg) <= self._capacidade_kg
 
     def adicionar_ocupacao(self, peso_kg: float):
+        """Adiciona peso à ocupação atual e registra no log."""
         self._ocupacao_atual_kg += peso_kg
+        self.registrar_log("Ocupação adicionada", f"+{peso_kg}kg (total: {self._ocupacao_atual_kg}kg)")
     
     def calcular_disponibilidade_percentual(self) -> float:
         if self._capacidade_kg == 0:
@@ -160,8 +177,12 @@ class PontoColeta:
         return f"{self._nome} - {self._endereco}"
 
 
-class SolicitacaoDescarte:
-    """Classe central que gerencia o ciclo de vida da solicitação de descarte."""
+class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
+    """Classe central que gerencia o ciclo de vida da solicitação de descarte.
+
+    Herda de LoggableMixin e NotificavelMixin via herança múltipla,
+    obtendo capacidades de auditoria e notificações sem duplicar código.
+    """
     
     def __init__(
         self,
@@ -169,17 +190,20 @@ class SolicitacaoDescarte:
         usuario: Usuario,
         ponto_coleta: Optional[PontoColeta] = None
     ):
+        self.__init_log__()
+        self.__init_notificacoes__()
         self._id = id
         self._usuario = usuario
         self._ponto_coleta = ponto_coleta
         self._itens: List[ItemDescarte] = []
         self._estado: EstadoDescarte = Solicitado()
         self._metodo_tratamento: Optional[MetodoTratamento] = None
-        self._metodo_tratamento_str: Optional[str] = None  # método como string do banco
-        self._impacto_evitado_db: float = 0.0  # impacto calculado no banco
+        self._metodo_tratamento_str: Optional[str] = None
+        self._impacto_evitado_db: float = 0.0
         self._data_criacao = datetime.now()
         self._data_agendamento: Optional[datetime] = None
         self.rastreamento = RastreamentoEntrega(f"R-{id}")
+        self.registrar_log("Solicitação criada", f"ID: {id}")
 
     # -------------------
     # PROPERTIES
@@ -254,14 +278,28 @@ class SolicitacaoDescarte:
 
     def avancar_estado(self):
         """Transiciona para o próximo estado e registra no rastreamento."""
+        estado_anterior = self._estado.obter_nome()
         self._estado = self._estado.avancar(self)
-        self.rastreamento.atualizar_status(f"Estado mudado para {self._estado.obter_nome()}")
+        novo_estado = self._estado.obter_nome()
+        self.rastreamento.atualizar_status(f"Estado mudado para {novo_estado}")
+        self.registrar_log("Estado avançado", f"{estado_anterior} -> {novo_estado}")
+        self.emitir_notificacao(
+            "Mudança de estado",
+            f"Solicitação {self._id} avançou para {novo_estado}"
+        )
 
     def cancelar(self, motivo: str = ""):
+        """Cancela a solicitação com motivo opcional."""
         if not self._estado.pode_cancelar():
             raise ValueError("Não é possível cancelar neste estado")
         self._estado = Cancelado(motivo)
         self.rastreamento.atualizar_status(f"Cancelado: {motivo}")
+        self.registrar_log("Solicitação cancelada", motivo)
+        self.emitir_notificacao(
+            "Solicitação cancelada",
+            f"Solicitação {self._id} foi cancelada: {motivo}",
+            prioridade="alta"
+        )
 
     def obter_resumo(self) -> Dict:
         return {

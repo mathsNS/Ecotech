@@ -3,8 +3,14 @@ from datetime import datetime
 from ...domain.usuarios import Cidadao, Empresa, Administrador
 from ...domain.dispositivos import Celular
 from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, RastreamentoEntrega
+from ...domain.repositorio import RepositorioBase
 
-class Dados:
+class Dados(RepositorioBase):
+    """Implementação concreta de RepositorioBase usando SQLite.
+
+    Gerencia a persistência de dados do sistema em banco de dados SQLite,
+    implementando todos os métodos definidos na interface abstrata.
+    """
 
     def __init__(self):
         self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
