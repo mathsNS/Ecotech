@@ -1,38 +1,44 @@
-# M- modulo de relatorios ambientais
-# gera estatisticas sobre descarte, reciclagem e impacto ambiental
-# calcula metricas de sustentabilidade do sistema
+"""Módulo de relatórios ambientais.
+
+Gera estatísticas sobre descarte, reciclagem e impacto ambiental,
+calculando métricas de sustentabilidade do sistema.
+"""
 
 from typing import List, Dict
 from datetime import datetime
 from .descarte import SolicitacaoDescarte
 from .estados import Reciclado, Reutilizado, Descartado
 
-# M- em desenvolvimento - falta exportar para pdf (se der tempo e vcs quiserem, existe uma api que facilita isso)
-# M- adicionar graficos de impacto (opcional tbm)
 
 class RelatorioAmbiental:
-    # M- classe para consolidar dados e gerar relatorios de impacto
-    # agrupa solicitacoes e calcula metricas ambientais
+    """Consolida dados de solicitações e gera relatórios de impacto ambiental.
+
+    Agrupa solicitações de descarte e calcula métricas ambientais
+    como peso reciclado, reutilizado e impacto evitado.
+    """
     
     def __init__(self, titulo: str):
+        """Inicializa o relatório com título e timestamp."""
         self._titulo = titulo
-        self._solicitacoes: List[SolicitacaoDescarte] = []  # lista de solicitacoes para analise
-        self._data_geracao = datetime.now()  # timestamp de quando foi criado
+        self._solicitacoes: List[SolicitacaoDescarte] = []
+        self._data_geracao = datetime.now()
 
     @property
     def titulo(self) -> str:
+        """Retorna o título do relatório."""
         return self._titulo
 
     @property
     def data_geracao(self) -> datetime:
+        """Retorna a data de geração do relatório."""
         return self._data_geracao
 
     def adicionar_solicitacao(self, solicitacao: SolicitacaoDescarte):
+        """Adiciona uma solicitação ao relatório para análise."""
         self._solicitacoes.append(solicitacao)
 
-    # M- calcula totais por tipo de tratamento final
     def calcular_total_peso_reciclado(self) -> float:
-        # M- soma peso de todas as solicitacoes que foram recicladas
+        """Soma o peso de todas as solicitações recicladas."""
         total = 0.0
         for sol in self._solicitacoes:
             if isinstance(sol.estado, Reciclado):
@@ -40,6 +46,7 @@ class RelatorioAmbiental:
         return round(total, 2)
 
     def calcular_total_peso_reutilizado(self) -> float:
+        """Soma o peso de todas as solicitações reutilizadas."""
         total = 0.0
         for sol in self._solicitacoes:
             if isinstance(sol.estado, Reutilizado):
@@ -47,6 +54,7 @@ class RelatorioAmbiental:
         return round(total, 2)
 
     def calcular_total_peso_descartado(self) -> float:
+        """Soma o peso de todas as solicitações descartadas."""
         total = 0.0
         for sol in self._solicitacoes:
             if isinstance(sol.estado, Descartado):
@@ -54,18 +62,14 @@ class RelatorioAmbiental:
         return round(total, 2)
 
     def calcular_impacto_evitado(self) -> float:
-        """ Soma o impacto evitado calculado no banco de dados """
+        """Soma o impacto evitado de todas as solicitações."""
         impacto_total = 0.0
-        
         for sol in self._solicitacoes:
-            # usa o valor calculado no banco
             impacto_total += sol.impacto_evitado_db
-                
         return round(impacto_total, 2)
 
     def gerar_relatorio(self) -> Dict:
-        # M- retorna um dicionario com todas as metricas consolidadas
-        # pode ser usado para exibir no sistema ou exportar para outros formatos
+        """Retorna dicionário com todas as métricas consolidadas."""
         return {
             "titulo": self._titulo,
             "data_geracao": self._data_geracao.isoformat(),
@@ -77,4 +81,5 @@ class RelatorioAmbiental:
         }
 
     def __str__(self) -> str:
+        """Representação textual do relatório."""
         return f"Relatorio: {self._titulo} ({len(self._solicitacoes)} solicitacoes)"

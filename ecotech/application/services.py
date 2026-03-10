@@ -108,8 +108,6 @@ class ServicoDescarte:
                 self._solicitacoes[row['id']] = solicitacao
                 
             except Exception as e:
-                # ignora solicitacoes com erro e continua
-                print(f"[AVISO] erro ao carregar solicitacao {row['id']}: {e}")
                 continue
 
     def criar_solicitacao(
