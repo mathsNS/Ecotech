@@ -23,8 +23,17 @@
             </div>
             <div class="entrega-detalhes">
                 <span class="valor-entrega {{ entrega.status }}">R$ {{ "%.2f"|format(entrega.valor) }}</span>
-                <span class="status-badge {{ entrega.status }}">{{ entrega.status }}</span>
-                <span class="data-entrega">{{ entrega.data }}</span>
+                <span class="status-badge {{ entrega.status }}">
+                    {% if entrega.status == 'finalizado' %}FINALIZADO
+                    {% elif entrega.status == 'em_processamento' %}EM PROCESSAMENTO
+                    {% elif entrega.status == 'reciclado' %}RECICLADO
+                    {% elif entrega.status == 'reutilizado' %}REUTILIZADO
+                    {% elif entrega.status == 'descartado' %}DESCARTADO
+                    {% elif entrega.status == 'cancelado' %}CANCELADO
+                    {% else %}{{ entrega.status|upper }}
+                    {% endif %}
+                </span>
+                <span class="data-entrega">{{ entrega.data_formatada }}</span>
                 <span class="hora-entrega">{{ entrega.hora }}</span>
             </div>
         </div>

@@ -77,6 +77,13 @@ class ServicoDescarte:
                 estado = _criar_estado_do_banco(row['estado'])
                 solicitacao._estado = estado
                 
+                # carrega data_criacao do banco 
+                if row['data_criacao']:
+                    try:
+                        solicitacao._data_criacao = datetime.strptime(row['data_criacao'], "%d/%m/%Y %H:%M")
+                    except:
+                        pass  # mantem data padrao em caso de erro
+                
                 # carrega metodo de tratamento e impacto evitado do banco
                 if row['metodo_tratamento']:
                     solicitacao.metodo_tratamento_str = row['metodo_tratamento']

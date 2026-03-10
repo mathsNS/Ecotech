@@ -134,7 +134,7 @@
                     <div class="mission-content">
                         <h3 class="mission-title">Recicle 15 aparelhos</h3>
                         <div class="progress-bar-container">
-                            <div class="progress-bar-fill" style="width: {{ (solicitacoes|length / 15 * 100)|round(0) }}%"></div>
+                            <div class="progress-bar-fill" data-progress="{{ progresso_missao }}"></div>
                         </div>
                         <p class="progress-text">{{ solicitacoes|length }} / 15</p>
                         <div class="mission-reward">
@@ -150,12 +150,12 @@
                     <h2 class="section-title-dash">Próximas recompensas</h2>
                     <div class="rewards-content">
                         <div class="tier-badge-large">
-                            <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Tier Ouro" class="tier-icon">
+                            <img src="{{ url_for('static', filename='images/icon-rank_ouro.png') }}" alt="Tier Ouro" class="tier-icon">
                             <span class="tier-name">Tier Ouro</span>
                         </div>
                         <div class="tier-progress">
                             <div class="tier-progress-bar">
-                                <div class="tier-progress-fill" style="width: {{ [(pontos_acumulados / 1200 * 100)|round(0), 100]|min }}%"></div>
+                                <div class="tier-progress-fill" data-progress="{{ progresso_tier }}"></div>
                             </div>
                             <p class="tier-progress-text">{{ pontos_acumulados }} / 1200 pontos</p>
                         </div>
@@ -191,50 +191,79 @@
                         {% endif %}
                     </div>
                     
-                    {% if solicitacoes %}
-                    <div class="deliveries-list-new">
-                    {% for sol in solicitacoes %}
-                    <div class="delivery-item-new">
-                        <div class="delivery-icon-circle">
-                            <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega">
+                    {% if is_admin or is_empresa %}
+                        {% if solicitacoes %}
+                        <div class="deliveries-list-new">
+                        {% for sol in solicitacoes %}
+                        <div class="delivery-item-new">
+                            <div class="delivery-icon-circle">
+                                <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega">
+                            </div>
+                            <div class="delivery-info-text">
+                                {% if is_admin %}
+                                <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
+                                <p class="delivery-subtitle-new">{{ sol.usuario.nome }} - {{ sol.calcular_peso_total()|round(2) }}kg</p>
+                                {% elif is_empresa %}
+                                <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
+                                <p class="delivery-subtitle-new">{{ sol.calcular_peso_total()|round(2) }}kg - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="delivery-right-info">
+                                <span class="status-badge-compact status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
+                                    {{ sol.estado.obter_nome() }}
+                                </span>
+                                <span class="delivery-date-new">{{ sol.data_criacao.strftime('%d/%m') }}</span>
+                            </div>
                         </div>
-                        <div class="delivery-info-text">
-                            {% if is_admin %}
-                            <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
-                            <p class="delivery-subtitle-new">{{ sol.usuario.nome }} - {{ sol.calcular_peso_total()|round(2) }}kg</p>
-                            {% elif is_empresa %}
-                            <h4 class="delivery-title-new">Solicitação #{{ sol.id[:8] }}</h4>
-                            <p class="delivery-subtitle-new">{{ sol.calcular_peso_total()|round(2) }}kg - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
-                            {% else %}
-                            <h4 class="delivery-title-new">Incentivo por coleta</h4>
-                            <p class="delivery-subtitle-new">{{ sol.obter_resumo()['tipo_usuario'] }} - {{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}</p>
-                            {% endif %}
+                        {% endfor %}
                         </div>
-                        <div class="delivery-right-info">
-                            <span class="status-badge-compact status-{{ sol.estado.obter_nome().lower().replace(' ', '-') }}">
-                                {{ sol.estado.obter_nome() }}
-                            </span>
-                            {% if not is_empresa and not is_admin %}
-                            <span class="delivery-value-new">R$ {{ "%.2f"|format(sol.calcular_peso_total() * 5.5)|replace('.', ',') }}</span>
-                            {% endif %}
-                            <span class="delivery-date-new">{{ sol.data_criacao.strftime('%d/%m') }}</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="empty-state">
-                        {% if is_admin %}
-                        <p>Nenhuma solicitação no sistema ainda.</p>
-                        <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver operações</a>
-                        {% elif is_empresa %}
-                        <p>Sua empresa ainda não possui solicitações em processamento.</p>
-                        <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver todas as operações</a>
                         {% else %}
-                        <p>Você ainda não fez nenhuma solicitação de descarte.</p>
-                        <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                        <div class="empty-state">
+                            {% if is_admin %}
+                            <p>Nenhuma solicitação no sistema ainda.</p>
+                            <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver operações</a>
+                            {% elif is_empresa %}
+                            <p>Sua empresa ainda não possui solicitações em processamento.</p>
+                            <a href="{{ url_for('operacoes') }}" class="btn btn-primary">Ver todas as operações</a>
+                            {% endif %}
+                        </div>
                         {% endif %}
-                    </div>
+                    {% else %}
+                        {# Cidadão - mostra entregas do histórico #}
+                        {% if entregas %}
+                        <div class="deliveries-list-new">
+                        {% for entrega in entregas %}
+                        <div class="delivery-item-new">
+                            <div class="delivery-icon-circle">
+                                <img src="{{ url_for('static', filename='images/pacote.png') }}" alt="Entrega">
+                            </div>
+                            <div class="delivery-info-text">
+                                <h4 class="delivery-title-new">Incentivo por coleta</h4>
+                                <p class="delivery-subtitle-new">- {{ entrega.empresa }}</p>
+                            </div>
+                            <div class="delivery-right-info">
+                                <span class="status-badge-compact status-{{ entrega.status }}">
+                                    {% if entrega.status == 'finalizado' %}FINALIZADO
+                                    {% elif entrega.status == 'em_processamento' %}EM PROCESSAMENTO
+                                    {% elif entrega.status == 'reciclado' %}RECICLADO
+                                    {% elif entrega.status == 'reutilizado' %}REUTILIZADO
+                                    {% elif entrega.status == 'descartado' %}DESCARTADO
+                                    {% elif entrega.status == 'cancelado' %}CANCELADO
+                                    {% else %}{{ entrega.status|upper }}
+                                    {% endif %}
+                                </span>
+                                <span class="delivery-value-new">R$ {{ "%.2f"|format(entrega.valor)|replace('.', ',') }}</span>
+                                <span class="delivery-date-new">{{ entrega.data_formatada }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <p>Você ainda não tem entregas no histórico.</p>
+                            <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary">Fazer primeira solicitação</a>
+                        </div>
+                        {% endif %}
                     {% endif %}
                 </div>
 
@@ -264,10 +293,31 @@
                         </div>
                         <a href="{{ url_for('pontos_coleta') }}" class="btn btn-action">Buscar</a>
                     </div>
+                    {% if not is_admin and not is_empresa %}
+                    <div class="action-card-new">
+                        <div class="action-icon-circle">
+                            <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Saque">
+                        </div>
+                        <div class="action-text-content">
+                            <h3 class="action-title-new">Sacar recompensas</h3>
+                            <p class="action-subtitle-new">Resgate seus incentivos acumulados</p>
+                        </div>
+                        <a href="{{ url_for('saque') }}" class="btn btn-action">Sacar</a>
+                    </div>
+                    {% endif %}
                 </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Aplica larguras das barras de progresso
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-progress]').forEach(function(el) {
+        el.style.width = el.getAttribute('data-progress') + '%';
+    });
+});
+</script>
 {% endblock %}

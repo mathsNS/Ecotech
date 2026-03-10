@@ -191,14 +191,57 @@ def criar_app() -> Flask:
                 is_admin=False
             )
         
-        # dashboard para cidadão
+        # dashboard para cidadão - busca entregas do histórico
+        entregas_db = dados.buscar_entregas_usuario(usuario['id'])
+        
+        # converte e ordena entregas por data
+        entregas = []
+        for e in entregas_db:
+            # substitui abreviações de mês
+            data_str = e['data'].replace('Jan', '01').replace('Fev', '02').replace('Feb', '02')
+            data_str = data_str.replace('Mar', '03').replace('Abr', '04').replace('Apr', '04')
+            data_str = data_str.replace('Mai', '05').replace('May', '05').replace('Jun', '06')
+            data_str = data_str.replace('Jul', '07').replace('Ago', '08').replace('Aug', '08')
+            data_str = data_str.replace('Set', '09').replace('Sep', '09').replace('Out', '10')
+            data_str = data_str.replace('Oct', '10').replace('Nov', '11').replace('Dez', '12')
+            data_str = data_str.replace('Dec', '12')
+            
+            partes = data_str.split()
+            if len(partes) == 3:
+                data_ordenavel = f"{partes[2]}-{partes[1]}-{partes[0]} {e['hora']}"
+                data_formatada = f"{partes[0]}/{partes[1]}"  # dd/mm
+            else:
+                data_ordenavel = e['data'] + ' ' + e['hora']
+                data_formatada = e['data']
+            
+            entregas.append({
+                'valor': e['valor'],
+                'empresa': e['empresa'],
+                'id': e['id'],
+                'data': e['data'],
+                'data_formatada': data_formatada,
+                'hora': e['hora'],
+                'status': e['status'],
+                '_data_ordenavel': data_ordenavel
+            })
+        
+        # ordena por data (mais recente primeiro)
+        entregas.sort(key=lambda x: x['_data_ordenavel'], reverse=True)
+        
+        # calcula porcentagens para barras de progresso
+        progresso_missao = min(round((len(solicitacoes_usuario) / 15) * 100), 100)
+        progresso_tier = min(round((pontos_acumulados / 1200) * 100), 100)
+        
         return render_template(
             'dashboard.html',
             usuario=usuario,
             solicitacoes=solicitacoes_usuario,
+            entregas=entregas[:10],  # apenas 10 mais recentes
             total_descartado=total_descartado,
             impacto_evitado=impacto_evitado,
             pontos_acumulados=pontos_acumulados,
+            progresso_missao=progresso_missao,
+            progresso_tier=progresso_tier,
             is_empresa=False,
             is_admin=False
         )
@@ -215,8 +258,11 @@ def criar_app() -> Flask:
             # redireciona dashboard
             return redirect(url_for('dashboard'))
         
-        pontos = servico_ponto.listar_pontos()
-        return render_template('nova_solicitacao.html', usuario=usuario, pontos=pontos)
+        # data minima para agendamento eh hoje
+        from datetime import date
+        hoje = date.today().strftime('%Y-%m-%d')
+        
+        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje)
     
     @app.route('/pontos-coleta')
     def pontos_coleta():
@@ -281,17 +327,41 @@ def criar_app() -> Flask:
         entregas_db = dados.buscar_entregas_usuario(usuario['id'])
         
         # converte para o formato esperado pelo template
-        entregas = [
-            {
+        from datetime import datetime
+        import locale
+        
+        entregas = []
+        for e in entregas_db:
+            # substitui abreviacoes pt e ing
+            data_str = e['data'].replace('Jan', '01').replace('Fev', '02').replace('Feb', '02')
+            data_str = data_str.replace('Mar', '03').replace('Abr', '04').replace('Apr', '04')
+            data_str = data_str.replace('Mai', '05').replace('May', '05').replace('Jun', '06')
+            data_str = data_str.replace('Jul', '07').replace('Ago', '08').replace('Aug', '08')
+            data_str = data_str.replace('Set', '09').replace('Sep', '09').replace('Out', '10')
+            data_str = data_str.replace('Oct', '10').replace('Nov', '11').replace('Dez', '12')
+            data_str = data_str.replace('Dec', '12')
+            
+            partes = data_str.split()
+            if len(partes) == 3:
+                data_ordenavel = f"{partes[2]}-{partes[1]}-{partes[0]} {e['hora']}"
+                data_formatada = f"{partes[0]}/{partes[1]}"  # dd/mm
+            else:
+                data_ordenavel = e['data'] + ' ' + e['hora']
+                data_formatada = e['data']
+            
+            entregas.append({
                 'valor': e['valor'],
                 'empresa': e['empresa'],
                 'id': e['id'],
                 'data': e['data'],
+                'data_formatada': data_formatada,
                 'hora': e['hora'],
-                'status': e['status']
-            }
-            for e in entregas_db
-        ]
+                'status': e['status'],
+                '_data_ordenavel': data_ordenavel
+            })
+        
+        # ordena por data (mais recente primeiro)
+        entregas.sort(key=lambda x: x['_data_ordenavel'], reverse=True)
         
         return render_template(
             'ultimas_entregas.html',

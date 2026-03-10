@@ -3,119 +3,354 @@
 {% block title %}Nova Solicitação - EcoTech{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="page-header">
-        <h1>Nova Solicitação de Descarte</h1>
-        <p>Preencha as informações sobre o dispositivo que deseja descartar</p>
+<div class="nova-solicitacao-container">
+    <div class="container">
+        <!-- header -->
+        <div class="page-header-nova">
+            <div>
+                <h1>Nova Solicitação de Descarte</h1>
+                <p>Preencha as informações sobre o dispositivo que deseja descartar</p>
+            </div>
+        </div>
+
+        <!-- layout em 2 colunas -->
+        <div class="nova-solicitacao-grid">
+            <!-- coluna esquerda formulário -->
+            <div class="form-column">
+                <!-- stepper de progresso -->
+                <div class="stepper-container">
+                    <div class="stepper-step active" data-step="1">
+                        <div class="step-circle">
+                            <svg class="step-check" width="20" height="20" fill="white" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span class="step-number">1</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-info">
+                            <span class="step-label">ETAPA 1</span>
+                            <span class="step-title">Dispositivo</span>
+                            <span class="step-status">Em progresso</span>
+                        </div>
+                    </div>
+
+                    <div class="stepper-step" data-step="2">
+                        <div class="step-circle">
+                            <svg class="step-check" width="20" height="20" fill="white" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span class="step-number">2</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-info">
+                            <span class="step-label">ETAPA 2</span>
+                            <span class="step-title">Endereço</span>
+                            <span class="step-status">Pendente</span>
+                        </div>
+                    </div>
+
+                    <div class="stepper-step" data-step="3">
+                        <div class="step-circle">
+                            <svg class="step-check" width="20" height="20" fill="white" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span class="step-number">3</span>
+                        </div>
+                        <div class="step-info">
+                            <span class="step-label">ETAPA 3</span>
+                            <span class="step-title">Agendamento</span>
+                            <span class="step-status">Pendente</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" class="solicitation-form-new">
+                    <!-- etapa 1: informações do dispositivo -->
+                    <div class="step-content active" data-step-content="1">
+                        <div class="form-section-new">
+                        <div class="section-header-icon">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14z"/>
+                            </svg>
+                            <h3>Informações do Dispositivo</h3>
+                        </div>
+
+                        <div class="form-group-new">
+                            <label for="tipo_dispositivo">Tipo de Dispositivo <span class="required">*</span></label>
+                            <select id="tipo_dispositivo" name="tipo_dispositivo" class="form-control-new" required>
+                                <option value="celular">Celular / Smartphone</option>
+                                <option value="computador">Computador</option>
+                                <option value="eletrodomestico">Eletrodoméstico</option>
+                            </select>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group-new">
+                                <label for="nome">Modelo/Nome <span class="required">*</span></label>
+                                <input type="text" id="nome" name="nome" class="form-control-new" 
+                                       placeholder="Ex: iPhone 11, Samsung Galaxy S20" required>
+                            </div>
+
+                            <div class="form-group-new">
+                                <label for="peso_kg">Peso aproximado <span class="required">*</span></label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="peso_kg" name="peso_kg" class="form-control-new" 
+                                           step="0.1" min="0.1" value="1.0" required>
+                                    <span class="unit-label">kg</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group-new">
+                                <label for="ano_fabricacao">Ano de Fabricação <span class="required">*</span></label>
+                                <select id="ano_fabricacao" name="ano_fabricacao" class="form-control-new" required>
+                                    {% for ano in range(2026, 1989, -1) %}
+                                    <option value="{{ ano }}" {% if ano == 2020 %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group-new">
+                                <label for="quantidade">Quantidade <span class="required">*</span></label>
+                                <input type="number" id="quantidade" name="quantidade" class="form-control-new" 
+                                       min="1" value="1" required>
+                            </div>
+                        </div>
+                        
+                        <!-- botoes navegacao etapa 1 -->
+                        <div class="step-navigation">
+                            <button type="button" class="btn-next-step">
+                                Próximo
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+
+                    <!-- etapa 2: endereco de coleta -->
+                    <div class="step-content" data-step-content="2">
+                        <div class="form-section-new">
+                        <div class="section-header-icon">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                            <h3>Endereço de Coleta</h3>
+                        </div>
+
+                        <div class="form-group-new">
+                            <label for="endereco">Endereço completo <span class="required">*</span></label>
+                            <input type="text" id="endereco" name="endereco" class="form-control-new" 
+                                   placeholder="Ex: Rua Dr. Mauro Sampaio, 1100 - Lagoa Seca" required>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group-new">
+                                <label for="ponto_referencia">Ponto de referência</label>
+                                <input type="text" id="ponto_referencia" name="ponto_referencia" class="form-control-new" 
+                                       placeholder="Ex: Perto do banco, rua da delegacia, etc.">
+                            </div>
+
+                            <div class="form-group-new">
+                                <label for="nome_completo">Nome completo</label>
+                                <input type="text" id="nome_completo" name="nome_completo" class="form-control-new" 
+                                       placeholder="Nome de quem receberá a coleta">
+                            </div>
+                        </div>
+
+                        <div class="form-group-new">
+                            <label for="observacoes_endereco">Observações sobre o endereço</label>
+                            <textarea id="observacoes_endereco" name="observacoes_endereco" class="form-control-new" 
+                                      rows="3" placeholder="Alguma informação adicional que possa ajudar na coleta..."></textarea>
+                        </div>
+                        
+                        <!-- botoes navegacao etapa 2 -->
+                        <div class="step-navigation">
+                            <button type="button" class="btn-prev-step">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                </svg>
+                                Anterior
+                            </button>
+                            <button type="button" class="btn-next-step">
+                                Próximo
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+
+                    <!-- etapa 3: agendamento -->
+                    <div class="step-content" data-step-content="3">
+                        <div class="form-section-new">
+                        <div class="section-header-icon">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
+                            </svg>
+                            <h3>Agendamento da Coleta</h3>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group-new">
+                                <label for="data_coleta">Data da coleta <span class="required">*</span></label>
+                                <input type="date" id="data_coleta" name="data_coleta" class="form-control-new" 
+                                       min="{{ today }}" required>
+                            </div>
+
+                            <div class="form-group-new">
+                                <label for="horario_coleta">Horário aproximado <span class="required">*</span></label>
+                                <input type="time" id="horario_coleta" name="horario_coleta" class="form-control-new" required>
+                            </div>
+                        </div>
+
+                        <div class="schedule-info">
+                            <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/>
+                            </svg>
+                            <span>Funcionários qualificados irão até você no dia agendado! Se possível, confirme se estará disponível no endereço informado.</span>
+                        </div>
+                        
+                        <!-- botoes navegacao etapa 3 -->
+                        <div class="step-navigation step-navigation-final">
+                            <button type="button" class="btn-prev-step">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                </svg>
+                                Anterior
+                            </button>
+                            <div style="display: flex; gap: 12px;">
+                                <a href="{{ url_for('dashboard') }}" class="btn-cancel-new">Cancelar</a>
+                                <button type="submit" class="btn-submit-new">
+                                    Criar Solicitação
+                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- coluna direita: ilustracao e dicas -->
+            <div class="info-column">
+                <!-- ilustracao principal -->
+                <div class="illustration-container">
+                    <img src="{{ url_for('static', filename='images/icon-descarte.png') }}" alt="Descarte Ecologico">
+                </div>
+
+                <!-- card de dicas -->
+                <div class="tips-card">
+                    <div class="tips-header">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        <h4>Dicas para o Descarte</h4>
+                    </div>
+                    <ul class="tips-list">
+                        <li>
+                            <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span>Remova baterias antes do descarte</span>
+                        </li>
+                        <li>
+                            <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span>Apague dados pessoais dos dispositivos</span>
+                        </li>
+                        <li>
+                            <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span>Separe cabos e acessórios</span>
+                        </li>
+                        <li>
+                            <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                            <span>Embale itens frágeis adequadamente</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <form method="POST" class="solicitation-form">
-        <div class="form-section">
-            <h3>Informações do Dispositivo</h3>
-            
-            <div class="form-group">
-                <label for="tipo_dispositivo">Tipo de Dispositivo</label>
-                <select id="tipo_dispositivo" name="tipo_dispositivo" class="form-control" required>
-                    <option value="celular">Celular/Smartphone</option>
-                    <option value="computador">Computador</option>
-                    <option value="eletrodomestico">Eletrodoméstico</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="nome">Modelo/Nome</label>
-                <input type="text" id="nome" name="nome" class="form-control" 
-                       placeholder="Ex: iPhone 11, Samsung Galaxy S20" required>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="peso_kg">Peso aproximado (kg)</label>
-                    <input type="number" id="peso_kg" name="peso_kg" class="form-control" 
-                           step="0.1" min="0.1" value="1.0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="ano_fabricacao">Ano de Fabricação</label>
-                    <input type="number" id="ano_fabricacao" name="ano_fabricacao" class="form-control" 
-                           min="1990" max="2026" value="2020" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="quantidade">Quantidade</label>
-                    <input type="number" id="quantidade" name="quantidade" class="form-control" 
-                           min="1" value="1" required>
-                </div>
-            </div>
-
-            <div id="computador-fields" class="conditional-fields" style="display: none;">
-                <div class="form-group">
-                    <label for="tipo_computador">Tipo de Computador</label>
-                    <select id="tipo_computador" name="tipo_computador" class="form-control">
-                        <option value="desktop">Desktop</option>
-                        <option value="notebook">Notebook</option>
-                        <option value="servidor">Servidor</option>
-                    </select>
-                </div>
-            </div>
-
-            <div id="eletrodomestico-fields" class="conditional-fields" style="display: none;">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="categoria">Categoria</label>
-                        <select id="categoria" name="categoria" class="form-control">
-                            <option value="geladeira">Geladeira</option>
-                            <option value="tv">TV</option>
-                            <option value="micro-ondas">Micro-ondas</option>
-                            <option value="ar-condicionado">Ar Condicionado</option>
-                            <option value="lavadora">Lavadora</option>
-                            <option value="outro">Outro</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="tem_gas">Possui gás refrigerante?</label>
-                        <select id="tem_gas" name="tem_gas" class="form-control">
-                            <option value="nao">Não</option>
-                            <option value="sim">Sim</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <h3>Ponto de Coleta</h3>
-            
-            <div class="form-group">
-                <label for="ponto_coleta">Selecione um ponto de coleta</label>
-                <select id="ponto_coleta" name="ponto_coleta" class="form-control">
-                    <option value="">Escolher depois</option>
-                    {% for ponto in pontos %}
-                    <option value="{{ ponto.id }}">
-                        {{ ponto.nome }} - {{ ponto.endereco }}
-                        ({{ ponto.calcular_disponibilidade_percentual() }}% disponível)
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-
-        <div class="form-actions">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-primary">Criar Solicitação</button>
-        </div>
-    </form>
 </div>
 
 <script>
-const tipoDispositivo = document.getElementById('tipo_dispositivo');
-const computadorFields = document.getElementById('computador-fields');
-const eletrodomesticoFields = document.getElementById('eletrodomestico-fields');
+// navegacao entre etapas
+let currentStep = 1;
+const totalSteps = 3;
 
-tipoDispositivo.addEventListener('change', function() {
-    computadorFields.style.display = this.value === 'computador' ? 'block' : 'none';
-    eletrodomesticoFields.style.display = this.value === 'eletrodomestico' ? 'block' : 'none';
+function updateStepper() {
+    // atualizar círculos e linhas
+    document.querySelectorAll('.stepper-step').forEach((step, index) => {
+        const stepNumber = index + 1;
+        const stepStatus = step.querySelector('.step-status');
+        
+        step.classList.remove('active', 'completed');
+        
+        if (stepNumber < currentStep) {
+            step.classList.add('completed');
+            stepStatus.textContent = 'Concluído';
+        } else if (stepNumber === currentStep) {
+            step.classList.add('active');
+            stepStatus.textContent = 'Em progresso';
+        } else {
+            stepStatus.textContent = 'Pendente';
+        }
+    });
+    
+    // atualizar conteudo visivel
+    document.querySelectorAll('.step-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    const activeContent = document.querySelector(`[data-step-content="${currentStep}"]`);
+    if (activeContent) {
+        activeContent.classList.add('active');
+    }
+}
+
+// botoes de navegacao
+document.querySelectorAll('.btn-next-step').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (currentStep < totalSteps) {
+            currentStep++;
+            updateStepper();
+        }
+    });
 });
+
+document.querySelectorAll('.btn-prev-step').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (currentStep > 1) {
+            currentStep--;
+            updateStepper();
+        }
+    });
+});
+
+// click direto nos steps
+document.querySelectorAll('.stepper-step').forEach((step, index) => {
+    step.style.cursor = 'pointer';
+    step.addEventListener('click', () => {
+        currentStep = index + 1;
+        updateStepper();
+    });
+});
+
+// inicializar
+updateStepper();
+
+// campos adicionais
+const tipoDispositivo = document.getElementById('tipo_dispositivo');
 </script>
 {% endblock %}

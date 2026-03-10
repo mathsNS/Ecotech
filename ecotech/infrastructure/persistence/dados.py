@@ -357,8 +357,7 @@ class Dados:
         c = self.conn.cursor()
         c.execute("""
             SELECT * FROM entrega 
-            WHERE id_usuario = ? 
-            ORDER BY data DESC, hora DESC
+            WHERE id_usuario = ?
         """, (id_usuario,))
         return c.fetchall()
 
