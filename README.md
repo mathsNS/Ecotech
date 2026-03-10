@@ -8,7 +8,7 @@ O EcoTech é um sistema de gerenciamento de descarte de lixo eletrônico que fac
 
 - Abner Levi - [@abnerlevi](https://github.com/abnerlevi)
 - Maria Antônia - [@mariastrajano](https://github.com/mariastrajano)
-- Matheus Nogueira - [@mathNS](https://github.com/mathNS)
+- Matheus Nogueira - [@mathsNS](https://github.com/mathsNS)
 
 ### Divisão de Responsabilidades
 
