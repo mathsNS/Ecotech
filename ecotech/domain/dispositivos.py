@@ -7,6 +7,21 @@ valor de revenda.
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class StatusDispositivo(Enum):
+    """
+    Representa o estado físico de um dispositivo eletrônico.
+
+    Utilizado para determinar a elegibilidade do dispositivo a métodos
+    de tratamento que exigem condições mínimas de funcionamento, como
+    o reuse (recondicionamento).
+    """
+
+    FUNCIONANDO = "funcionando"
+    PARCIALMENTE_FUNCIONAL = "parcialmente_funcional"
+    DANIFICADO = "danificado"
 
 class DispositivoEletronico(ABC):
     """
@@ -16,7 +31,7 @@ class DispositivoEletronico(ABC):
     Fornece validações básicas no construtor e propriedades de acesso aos atributos.
     """
 
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = ""):
+    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = "", status: StatusDispositivo = StatusDispositivo.FUNCIONANDO):
         """
         Inicializa um dispositivo eletrônico.
 
@@ -26,9 +41,11 @@ class DispositivoEletronico(ABC):
             peso_kg: Peso em kg (> 0).
             marca: Nome do fabricante.
             modelo: Designação do modelo.
+            status: Estado físico atual do dispositivo.
 
         Raises:
-            ValueError: Se o peso <= 0 ou marca/modelo forem inválidos.
+            ValueError: Se o peso <= 0, marca/modelo forem inválidos
+                ou status não for uma instância de StatusDispositivo.
         """
         if peso_kg <= 0:
             raise ValueError("peso deve ser positivo")
@@ -41,11 +58,15 @@ class DispositivoEletronico(ABC):
             if valor and valor.strip() == "":
                 raise ValueError(f"{nome_campo} nao pode conter apenas espacos")
 
+        if not isinstance(status, StatusDispositivo):
+            raise ValueError("status deve ser uma instância de StatusDispositivo.")
+
         self._id = id
         self._nome = nome
         self._peso_kg = peso_kg
         self._marca = marca
         self._modelo = modelo
+        self._status = status
 
     # -------------------
     # PROPERTIES
@@ -70,6 +91,11 @@ class DispositivoEletronico(ABC):
     @property
     def modelo(self) -> str:
         return self._modelo
+
+    @property
+    def status(self) -> StatusDispositivo:
+        """Retorna o estado físico atual do dispositivo."""
+        return self._status
 
     # ------------------
     # MÉTODOS ABSTRATOS

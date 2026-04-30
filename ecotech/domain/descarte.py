@@ -285,8 +285,15 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._itens.append(item)
 
     def remover_item(self, item: ItemDescarte):
-        if item in self._itens:
-            self._itens.remove(item)
+        """
+        Remove um item da solicitação.
+
+        Raises:
+            ValueError: Se o item não estiver presente na solicitação.
+        """
+        if item not in self._itens:
+            raise ValueError("Item não encontrado na solicitação.")
+        self._itens.remove(item)
 
     def calcular_peso_total(self) -> float:
         return sum(item.calcular_peso_total() for item in self._itens)

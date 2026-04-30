@@ -20,21 +20,43 @@ class RepositorioBase(ABC):
     infraestrutura.
     """
 
-    # --- Usuários ---
+    # --- Usuários: salvar ---
 
     @abstractmethod
-    def salvar_cidadao(self, cidadao: Any) -> None:
+    def salvar_cidadao(self, cidadao: Any, password_hash: str = "") -> None:
         """Persiste um cidadão no repositório."""
         ...
 
     @abstractmethod
-    def salvar_empresa(self, empresa: Any) -> None:
+    def salvar_empresa(self, empresa: Any, password_hash: str = "") -> None:
         """Persiste uma empresa no repositório."""
         ...
 
     @abstractmethod
-    def salvar_administrador(self, administrador: Any) -> None:
+    def salvar_administrador(self, administrador: Any, password_hash: str = "") -> None:
         """Persiste um administrador no repositório."""
+        ...
+
+    # --- Usuários: buscar ---
+
+    @abstractmethod
+    def buscar_usuario(self, id_usuario: str) -> Optional[Any]:
+        """Busca um usuário pelo ID."""
+        ...
+
+    @abstractmethod
+    def buscar_usuario_por_cpf(self, cpf: str) -> Optional[Any]:
+        """Busca um cidadão pelo CPF. Retorna linha com password_hash."""
+        ...
+
+    @abstractmethod
+    def buscar_usuario_por_cnpj(self, cnpj: str) -> Optional[Any]:
+        """Busca uma empresa pelo CNPJ. Retorna linha com password_hash."""
+        ...
+
+    @abstractmethod
+    def buscar_usuario_por_email(self, email: str) -> Optional[Any]:
+        """Busca um usuário pelo e-mail. Retorna linha com password_hash."""
         ...
 
     @abstractmethod
@@ -44,12 +66,19 @@ class RepositorioBase(ABC):
 
     @abstractmethod
     def buscar_cidadao(self, id_usuario: str) -> Optional[Any]:
-        """Busca dados de cidadão pelo ID do usuário."""
+        """Busca dados de cidadão (com CPF e pontos) pelo ID do usuário."""
         ...
 
     @abstractmethod
     def buscar_empresa(self, id_usuario: str) -> Optional[Any]:
-        """Busca dados de empresa pelo ID do usuário."""
+        """Busca dados de empresa (com CNPJ e razão social) pelo ID do usuário."""
+        ...
+
+    # --- Usuários: atualizar / desativar ---
+
+    @abstractmethod
+    def desativar_usuario(self, id_usuario: str) -> None:
+        """Desativa (soft-delete) um usuário pelo ID."""
         ...
 
     # --- Dispositivos ---
@@ -72,11 +101,21 @@ class RepositorioBase(ABC):
         ...
 
     @abstractmethod
+    def buscar_ponto_coleta(self, id_ponto: str) -> Optional[Any]:
+        """Busca um ponto de coleta pelo ID."""
+        ...
+
+    @abstractmethod
     def buscar_todos_pontos_coleta(self) -> List[Any]:
         """Retorna todos os pontos de coleta ativos."""
         ...
 
-    # --- Solicitações ---
+    @abstractmethod
+    def atualizar_ocupacao_ponto(self, id_ponto: str, ocupacao_atual_kg: float) -> None:
+        """Atualiza a ocupação atual de um ponto de coleta."""
+        ...
+
+    # --- Solicitações: salvar ---
 
     @abstractmethod
     def salvar_solicitacao(self, solicitacao: Any) -> None:
@@ -89,13 +128,38 @@ class RepositorioBase(ABC):
         ...
 
     @abstractmethod
+    def salvar_historico_rastreamento(self, id_solicitacao: str, mensagem: str) -> None:
+        """Persiste uma entrada no histórico de rastreamento de uma solicitação."""
+        ...
+
+    # --- Solicitações: buscar ---
+
+    @abstractmethod
+    def buscar_solicitacao(self, id_solicitacao: str) -> Optional[Any]:
+        """Busca uma solicitação de descarte pelo ID."""
+        ...
+
+    @abstractmethod
     def buscar_todas_solicitacoes(self) -> List[Any]:
         """Retorna todas as solicitações de descarte."""
         ...
 
     @abstractmethod
+    def buscar_solicitacoes_usuario(self, id_usuario: str) -> List[Any]:
+        """Retorna todas as solicitações de um usuário específico."""
+        ...
+
+    @abstractmethod
     def buscar_itens_solicitacao(self, id_solicitacao: str) -> List[Any]:
         """Retorna todos os itens de uma solicitação específica."""
+        ...
+
+    # --- Solicitações: atualizar ---
+
+    @abstractmethod
+    def atualizar_solicitacao(self, id_solicitacao: str, estado: str,
+                               metodo_tratamento: Optional[str] = None) -> None:
+        """Atualiza o estado (e opcionalmente o método de tratamento) de uma solicitação."""
         ...
 
     # --- Notificações e Entregas ---

@@ -5,9 +5,6 @@ Este módulo implementa a interface web usando Flask,
 baseada no design mobile fornecido.
 """
 
-# sistema web ainda em desenvolvimento
-# algumas rotas precisam de ajustes
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from datetime import datetime
 from typing import Optional
@@ -79,51 +76,98 @@ def criar_app() -> Flask:
     
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        """Página de login."""
-        if request.method == 'POST':
-            tipo = request.form.get('tipo', 'cidadao')
-            
-            # 3 perfis fixos: João Silva (cidadão), Recicla Kariri (empresa) e Admin
-            if tipo == 'cidadao':
-                session['user_id'] = 'user-1'
-                session['user_nome'] = 'João Silva'
-                session['user_tipo'] = 'cidadao'
-            elif tipo == 'empresa':
-                session['user_id'] = 'user-3'
-                session['user_nome'] = 'Recicla Kariri'
-                session['user_tipo'] = 'empresa'
-            elif tipo == 'admin':
-                session['user_id'] = 'USR-ADM-001'
-                session['user_nome'] = 'Admin Ecotech'
-                session['user_tipo'] = 'administrador'
-            
+        """Página de login com autenticação real por credencial e senha."""
+        if usuario_logado():
             return redirect(url_for('dashboard'))
-        
-        return render_template('login.html')
+
+        if request.method == 'POST':
+            tipo      = request.form.get('tipo', 'cidadao')
+            credencial = request.form.get('credencial', '').strip()
+            senha      = request.form.get('senha', '')
+
+            # normaliza CPF/CNPJ removendo pontuação — aceita "123.456.789-09" ou "12345678909"
+            if tipo in ('cidadao', 'empresa'):
+                credencial = credencial.replace('.', '').replace('-', '').replace('/', '').replace(' ', '')
+
+            usuario_obj = servico_usuario.autenticar(tipo, credencial, senha)
+
+            if usuario_obj is None:
+                flash('Credencial ou senha inválidos.', 'error')
+                return render_template('login.html', tipo_selecionado=tipo)
+
+            session['user_id']   = usuario_obj.id
+            session['user_nome'] = usuario_obj.nome
+            session['user_tipo'] = usuario_obj.obter_tipo().split()[0].lower()
+
+            # normaliza o tipo da sessão para valores esperados pelo resto do sistema
+            _tipo_map = {
+                'cidadão': 'cidadao',
+                'empresa': 'empresa',
+                'administrador': 'administrador',
+            }
+            session['user_tipo'] = _tipo_map.get(session['user_tipo'], session['user_tipo'])
+
+            return redirect(url_for('dashboard'))
+
+        return render_template('login.html', tipo_selecionado='cidadao')
     
     @app.route('/criar-conta', methods=['GET', 'POST'])
     def criar_conta():
-        """Página de criação de conta."""
-        if request.method == 'POST':
-            tipo = request.form.get('tipo', 'cidadao')
-            
-            # 3 perfis fixos: João Silva (cidadão), Recicla Kariri (empresa) e Admin
-            if tipo == 'cidadao':
-                session['user_id'] = 'user-1'
-                session['user_nome'] = 'João Silva'
-                session['user_tipo'] = 'cidadao'
-            elif tipo == 'empresa':
-                session['user_id'] = 'user-3'
-                session['user_nome'] = 'Recicla Kariri'
-                session['user_tipo'] = 'empresa'
-            elif tipo == 'admin':
-                session['user_id'] = 'USR-ADM-001'
-                session['user_nome'] = 'Admin Ecotech'
-                session['user_tipo'] = 'administrador'
-            
+        """Página de cadastro de nova conta."""
+        if usuario_logado():
             return redirect(url_for('dashboard'))
-        
-        return render_template('criar_conta.html')
+
+        if request.method == 'POST':
+            tipo  = request.form.get('tipo', 'cidadao')
+            nome  = request.form.get('nome', '').strip()
+            email = request.form.get('email', '').strip()
+            senha = request.form.get('senha', '')
+            senha_confirmacao = request.form.get('senha_confirmacao', '')
+
+            # validações básicas
+            if not nome or not email or not senha:
+                flash('Preencha todos os campos obrigatórios.', 'error')
+                return render_template('criar_conta.html', tipo_selecionado=tipo)
+
+            if senha != senha_confirmacao:
+                flash('As senhas não coincidem.', 'error')
+                return render_template('criar_conta.html', tipo_selecionado=tipo)
+
+            if len(senha) < 6:
+                flash('A senha deve ter pelo menos 6 caracteres.', 'error')
+                return render_template('criar_conta.html', tipo_selecionado=tipo)
+
+            try:
+                dados_novo = {'nome': nome, 'email': email}
+
+                if tipo == 'cidadao':
+                    dados_novo['cpf'] = request.form.get('cpf', '').strip()
+                elif tipo == 'empresa':
+                    dados_novo['cnpj']         = request.form.get('cnpj', '').strip()
+                    dados_novo['razao_social']  = request.form.get('razao_social', '').strip()
+
+                usuario_obj = servico_usuario.criar_usuario(tipo, dados_novo, senha)
+
+            except (ValueError, Exception) as e:
+                flash(str(e), 'error')
+                return render_template('criar_conta.html', tipo_selecionado=tipo)
+
+            # loga o usuário automaticamente após o cadastro
+            session['user_id']   = usuario_obj.id
+            session['user_nome'] = usuario_obj.nome
+
+            _tipo_map = {
+                'cidadão': 'cidadao',
+                'empresa': 'empresa',
+                'administrador': 'administrador',
+            }
+            tipo_sessao = usuario_obj.obter_tipo().split()[0].lower()
+            session['user_tipo'] = _tipo_map.get(tipo_sessao, tipo_sessao)
+
+            flash(f'Conta criada com sucesso! Bem-vindo(a), {usuario_obj.nome}.', 'success')
+            return redirect(url_for('dashboard'))
+
+        return render_template('criar_conta.html', tipo_selecionado='cidadao')
     
     @app.route('/logout')
     def logout():
@@ -592,36 +636,42 @@ def criar_app() -> Flask:
 
 
 def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
-    """inicializa dados de exemplo para demonstracao."""
-    
-    # verifica se os usuarios de exemplo ja existem (user-1 é criado nesta função)
-    if servico_usuario.buscar_usuario('user-1') is not None:
-        return  # ja foi inicializado, nao repete
-    
-    # usuarios de exemplo
-    cidadao1 = servico_usuario.criar_usuario('cidadao', {
+    """Cria os perfis base e dados de demonstração para o sistema."""
+
+    if dados.contar_usuarios() > 0:
+        return  # banco já populado, não sobrescrever
+
+    # ---- usuários base ----
+    cidadao1    cidadao1 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-1',
         'nome': 'João Silva',
-        'email': 'joao@example.com',
-        'cpf': '12345678900'
-    })
-    
-    cidadao2 = servico_usuario.criar_usuario('cidadao', {
+        'email': 'joao@ecotech.com',
+        'cpf': '12345678909'
+    }, senha='cidadao123')
+
+    empresa = servico_usuario.criar_usuario('empresa', {
         'id': 'user-2',
+        'nome': 'Recicla Kariri',
+        'email': 'contato@recilakariri.com',
+        'cnpj': '11222333000181',
+        'razao_social': 'Recicla Kariri Reciclagem LTDA'
+    }, senha='empresa123')
+
+    servico_usuario.criar_usuario('administrador', {
+        'id': 'USR-ADM-001',
+        'nome': 'Admin Ecotech',
+        'email': 'admin@ecotech.com',
+        'nivel_acesso': 3
+    }, senha='admin123')
+
+    cidadao2 = servico_usuario.criar_usuario('cidadao', {
+        'id': 'user-3',
         'nome': 'Maria Santos',
         'email': 'maria@example.com',
         'cpf': '98765432100'
     })
-    
-    empresa = servico_usuario.criar_usuario('empresa', {
-        'id': 'user-3',
-        'nome': 'Ecotech',
-        'email': 'contato@ecotech.com',
-        'cnpj': '12345678000199',
-        'razao_social': 'Ecotech'
-    })
-    
-    # pontos de coleta
+
+    # ---- pontos de coleta ----
     ponto1 = servico_ponto.criar_ponto_coleta(
         'Centro de Coleta Lagoa Seca',
         'R. Dr. Morato Saraiva, 1100 - Lagoa Seca',
@@ -629,7 +679,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         -39.3089,
         5000.0
     )
-    
+
     ponto2 = servico_ponto.criar_ponto_coleta(
         'Centro de Coleta Cariri',
         'Av. Padre Cícero, 500 - Centro',

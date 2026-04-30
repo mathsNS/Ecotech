@@ -13,7 +13,7 @@ class TestFactories:
         assert celular.peso_kg == 0.2
     
     def test_factory_usuario(self):
-        cidadao = UsuarioFactory.criar_cidadao("1", "João", "joao@test.com", "12345678901")
+        cidadao = UsuarioFactory.criar_cidadao("1", "João", "joao@test.com", "12345678909")
         assert cidadao.nome == "João"
 
 
@@ -28,7 +28,7 @@ class TestServicos:
     
     def test_listar_solicitacoes(self):
         servico = ServicoDescarte()
-        cidadao = Cidadao("1", "João", "joao@test.com", "12345678901")
+        cidadao = Cidadao("1", "João", "joao@test.com", "12345678909")
         
         servico.criar_solicitacao(cidadao)
         servico.criar_solicitacao(cidadao)

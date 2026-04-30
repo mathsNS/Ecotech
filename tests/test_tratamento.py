@@ -1,6 +1,6 @@
 import pytest
 from ecotech.domain.tratamento import Reciclagem, Reuso, DescarteControlado
-from ecotech.domain.dispositivos import Celular
+from ecotech.domain.dispositivos import Celular, StatusDispositivo
 
 
 class TestTratamento:
@@ -31,4 +31,39 @@ class TestTratamento:
         
         impacto = reuso.calcular_impacto_ambiental(dispositivos)
         assert impacto > 0
+
+
+# -----------------------------------------
+# TESTES validar_compatibilidade (Item 15)
+# -----------------------------------------
+
+class TestValidarCompatibilidade:
+
+    def test_reuso_rejeita_dispositivo_danificado(self):
+        """Reuso não deve aceitar dispositivo com status DANIFICADO."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.DANIFICADO)
+        reuso = Reuso()
+
+        with pytest.raises(ValueError, match="danificado"):
+            reuso.validar_compatibilidade([celular])
+
+    def test_reuso_aceita_dispositivo_funcionando(self):
+        """Reuso deve aceitar dispositivo FUNCIONANDO sem erro."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.FUNCIONANDO)
+        Reuso().validar_compatibilidade([celular])
+
+    def test_reuso_aceita_parcialmente_funcional(self):
+        """Reuso deve aceitar dispositivo PARCIALMENTE_FUNCIONAL."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.PARCIALMENTE_FUNCIONAL)
+        Reuso().validar_compatibilidade([celular])
+
+    def test_reciclagem_aceita_qualquer_status(self):
+        """Reciclagem deve aceitar dispositivo em qualquer estado sem erro."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.DANIFICADO)
+        Reciclagem().validar_compatibilidade([celular])
+
+    def test_descarte_controlado_aceita_qualquer_status(self):
+        """DescarteControlado deve aceitar dispositivo em qualquer estado."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.DANIFICADO)
+        DescarteControlado().validar_compatibilidade([celular])
 

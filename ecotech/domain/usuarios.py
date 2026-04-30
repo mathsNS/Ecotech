@@ -10,19 +10,25 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Dict
 import re
+from .mixins import NotificavelMixin
 
-class Usuario(ABC):
+class Usuario(ABC, NotificavelMixin):
     """
     Classe abstrata base para todos os usuários do sistema.
 
     Esta classe define a interface comum, validações e comportamentos
     compartilhados entre cidadãos, empresas e administradores.
+
+    Herda de NotificavelMixin para prover um sistema de notificações
+    consistente com o restante do domínio.
     """
 
     def __init__(self, id, nome, email) -> None:
         """
         Inicializa um novo usuário.
         """
+
+        self.__init_notificacoes__()
 
         self._validar_nome(nome)
         self._validar_email(email)
@@ -32,9 +38,6 @@ class Usuario(ABC):
         self._email: str = email
         self._data_cadastro: datetime = datetime.now()
         self._ativo: bool = True
-
-        # Sistema de notificações
-        self._notificacoes: List[str] = []
 
         # Sistema de histórico
         self._historico_acoes: List[Dict] = []
@@ -86,8 +89,11 @@ class Usuario(ABC):
 
     @property
     def notificacoes(self) -> List[str]:
-        """Retorna todas as notificações."""
-        return self._notificacoes.copy()
+        """Retorna todas as notificações como strings formatadas."""
+        return [
+            f"[{n['timestamp']}] {n['mensagem']}"
+            for n in self._fila_notificacoes
+        ]
 
     @property
     def historico_acoes(self) -> List[Dict]:
@@ -115,17 +121,17 @@ class Usuario(ABC):
     def adicionar_notificacao(self, mensagem: str) -> None:
         """
         Adiciona uma nova notificação ao usuário.
+
+        Delega para NotificavelMixin.emitir_notificacao, garantindo
+        consistência de formato com o restante do domínio.
         """
-
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
-        notificacao = f"[{timestamp}] {mensagem}"
-
-        self._notificacoes.append(notificacao)
+        self.emitir_notificacao("Notificação", mensagem)
         self._registrar_acao("Notificação recebida")
 
     def limpar_notificacoes(self) -> None:
         """Remove todas as notificações."""
-        self._notificacoes.clear()
+        self.marcar_todas_como_lidas()
+        self.limpar_notificacoes_lidas()
         self._registrar_acao("Notificações limpas")
 
     # ------------
@@ -213,11 +219,32 @@ class Cidadao(Usuario):
 
     @staticmethod
     def _validar_cpf(cpf: str) -> None:
-        """Valida formato básico do CPF."""
-        padrao = r"^\d{11}$"
+        """
+        Valida o CPF, incluindo os dígitos verificadores.
 
+        Raises:
+            ValueError: Se o CPF não tiver 11 dígitos, for uma sequência
+                repetida ou tiver dígito verificador inválido.
+        """
+        padrao = r"^\d{11}$"
         if not re.match(padrao, cpf):
             raise ValueError("CPF deve conter 11 números.")
+        if len(set(cpf)) == 1:
+            raise ValueError("CPF inválido.")
+
+        pesos_1 = range(10, 1, -1)
+        soma = sum(int(cpf[i]) * pesos_1[i] for i in range(9))
+        resto = soma % 11
+        digito1 = 0 if resto < 2 else 11 - resto
+        if int(cpf[9]) != digito1:
+            raise ValueError("CPF inválido.")
+
+        pesos_2 = range(11, 1, -1)
+        soma = sum(int(cpf[i]) * pesos_2[i] for i in range(10))
+        resto = soma % 11
+        digito2 = 0 if resto < 2 else 11 - resto
+        if int(cpf[10]) != digito2:
+            raise ValueError("CPF inválido.")
 
     @property
     def pontos(self) -> int:
@@ -284,12 +311,42 @@ class Empresa(Usuario):
     def razao_social(self) -> str:
         return self._razao_social
 
+    @property
+    def limite_mensal(self) -> float:
+        return self._limite_mensal
+
+    @property
+    def descartado_mes(self) -> float:
+        return self._descartado_mes
+
     @staticmethod
     def _validar_cnpj(cnpj: str) -> None:
-        padrao = r"^\d{14}$"
+        """
+        Valida o CNPJ, incluindo os dígitos verificadores.
 
+        Raises:
+            ValueError: Se o CNPJ não tiver 14 dígitos, for uma sequência
+                repetida ou tiver dígito verificador inválido.
+        """
+        padrao = r"^\d{14}$"
         if not re.match(padrao, cnpj):
             raise ValueError("CNPJ deve conter 14 números.")
+        if len(set(cnpj)) == 1:
+            raise ValueError("CNPJ inválido.")
+
+        pesos_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = sum(int(cnpj[i]) * pesos_1[i] for i in range(12))
+        resto = soma % 11
+        digito1 = 0 if resto < 2 else 11 - resto
+        if int(cnpj[12]) != digito1:
+            raise ValueError("CNPJ inválido.")
+
+        pesos_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = sum(int(cnpj[i]) * pesos_2[i] for i in range(13))
+        resto = soma % 11
+        digito2 = 0 if resto < 2 else 11 - resto
+        if int(cnpj[13]) != digito2:
+            raise ValueError("CNPJ inválido.")
 
     def registrar_descarte(self, peso: float) -> None:
 

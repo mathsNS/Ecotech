@@ -1,7 +1,7 @@
 """Testes para o módulo de dispositivos eletrônicos."""
 
 import pytest
-from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico
+from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico, StatusDispositivo
 
 
 class TestDispositivos:
@@ -172,3 +172,30 @@ class TestTodosCombinados:
         # Tentar atribuir deve falhar (properties nao tem setter)
         with pytest.raises(AttributeError):
             celular.peso_kg = 0.5
+
+
+# -----------------------------------------
+# TESTES StatusDispositivo (Item 15)
+# -----------------------------------------
+
+class TestStatusDispositivo:
+
+    def test_status_padrao_e_funcionando(self):
+        """Status padrão ao criar dispositivo deve ser FUNCIONANDO."""
+        celular = Celular("1", "iPhone", 0.2)
+        assert celular.status == StatusDispositivo.FUNCIONANDO
+
+    def test_status_danificado(self):
+        """Dispositivo pode ser criado com status DANIFICADO."""
+        celular = Celular("1", "iPhone", 0.2, status=StatusDispositivo.DANIFICADO)
+        assert celular.status == StatusDispositivo.DANIFICADO
+
+    def test_status_parcialmente_funcional(self):
+        """Dispositivo pode ser criado com status PARCIALMENTE_FUNCIONAL."""
+        computador = Computador("1", "Dell", 2.5, status=StatusDispositivo.PARCIALMENTE_FUNCIONAL)
+        assert computador.status == StatusDispositivo.PARCIALMENTE_FUNCIONAL
+
+    def test_status_invalido_levanta_erro(self):
+        """Passar string no lugar de StatusDispositivo deve levantar ValueError."""
+        with pytest.raises(ValueError, match="StatusDispositivo"):
+            Celular("1", "iPhone", 0.2, status="danificado")

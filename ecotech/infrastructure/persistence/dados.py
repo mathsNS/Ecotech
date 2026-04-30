@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from werkzeug.security import generate_password_hash
 from ...domain.usuarios import Cidadao, Empresa, Administrador
 from ...domain.dispositivos import Celular
 from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, RastreamentoEntrega
@@ -15,8 +16,8 @@ class Dados(RepositorioBase):
     def __init__(self):
         self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
         self.criar_tabelas()
-        self.seed()
 
     def criar_tabelas(self):
         c = self.conn.cursor()
@@ -29,9 +30,16 @@ class Dados(RepositorioBase):
             email TEXT,
             data_cadastro TEXT,
             ativo INTEGER,
-            tipo TEXT   
+            tipo TEXT,
+            password_hash TEXT
         )
         """)
+
+        # Migração incremental: adiciona password_hash se a tabela já existia sem ela
+        try:
+            c.execute("ALTER TABLE usuario ADD COLUMN password_hash TEXT")
+        except Exception:
+            pass  # coluna já existe
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS cidadao (
@@ -162,145 +170,144 @@ class Dados(RepositorioBase):
     # SALVAR
     # -------------------
 
-    def salvar_cidadao(self, cidadao):
-        c = self.conn.cursor()
-
+    def salvar_cidadao(self, cidadao, password_hash: str = ""):
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "cidadao", password_hash))
+            self.conn.execute(
+                "INSERT OR IGNORE INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)",
+                (cidadao.id, cidadao.cpf, 0, 0)
+            )
 
-        c.execute("""
-        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "cidadao"))
-
-        c.execute("INSERT OR IGNORE INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)", (cidadao.id, cidadao.cpf, 0, 0))
-
-        self.conn.commit()
-
-    def salvar_empresa(self, empresa):
-        c = self.conn.cursor()
-
+    def salvar_empresa(self, empresa, password_hash: str = ""):
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'empresa', password_hash))
+            self.conn.execute(
+                "INSERT OR IGNORE INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)",
+                (empresa.id, empresa.cnpj, empresa.razao_social, empresa.limite_mensal, empresa.descartado_mes)
+            )
 
-        c.execute("""
-        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'empresa'))
-
-        c.execute("INSERT OR IGNORE INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)", (empresa.id, empresa.cnpj, empresa.razao_social, 0, 0))
-
-        self.conn.commit()
-
-    def salvar_administrador(self, administrador):
-        c = self.conn.cursor()
-
+    def salvar_administrador(self, administrador, password_hash: str = ""):
         data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
-        c.execute("""
-        INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "administrador"))
-
-        c.execute("INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)", (administrador.id, administrador.nivel))
-
-        self.conn.commit()
-
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "administrador", password_hash))
+            self.conn.execute(
+                "INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)",
+                (administrador.id, administrador.nivel)
+            )
     def salvar_notificacao(self, id_usuario, mensagem):
-        c = self.conn.cursor()
-        
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        
-        c.execute("""
-        INSERT OR IGNORE INTO notificacao (id_usuario, timestamp, mensagem)
-        VALUES (?, ?, ?)
-        """, (id_usuario, timestamp, mensagem))
-            
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT INTO notificacao (id_usuario, timestamp, mensagem)
+            VALUES (?, ?, ?)
+            """, (id_usuario, timestamp, mensagem))
 
     def salvar_dispositivo(self, dispositivo):
-        c = self.conn.cursor()
-
-        c.execute("""
-        INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower()))
-
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower()))
 
     def salvar_ponto(self, ponto_coleta):
-        c = self.conn.cursor()
-
-        c.execute("""
-        INSERT OR IGNORE INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (ponto_coleta.id, ponto_coleta.nome, ponto_coleta.endereco, ponto_coleta.latitude, ponto_coleta.longitude, 1, ponto_coleta.capacidade_kg, 0.0))
-
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (ponto_coleta.id, ponto_coleta.nome, ponto_coleta.endereco,
+                  ponto_coleta.latitude, ponto_coleta.longitude, 1,
+                  ponto_coleta.capacidade_kg, ponto_coleta.ocupacao_atual_kg))
 
     def salvar_solicitacao(self, solicitacao_descarte):
-        c = self.conn.cursor()
-
         data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-        estado_nome = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
-        metodo_str = None
-        if solicitacao_descarte.metodo_tratamento:
-            metodo_str = solicitacao_descarte.metodo_tratamento.obter_nome()
-
-        c.execute("""
-        INSERT OR IGNORE INTO solicitacao_descarte (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (solicitacao_descarte.id, solicitacao_descarte.usuario.id, solicitacao_descarte.ponto_coleta.id, estado_nome, metodo_str, data_criacao, None))
-
-        self.conn.commit()
-
-    def atualizar_solicitacao(self, solicitacao_descarte):
-        """Atualiza estado e método de tratamento de uma solicitação existente."""
-        c = self.conn.cursor()
-
-        estado_nome = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
-        metodo_str = None
-        if solicitacao_descarte.metodo_tratamento:
-            metodo_str = solicitacao_descarte.metodo_tratamento.obter_nome()
-        elif solicitacao_descarte.metodo_tratamento_str:
-            metodo_str = solicitacao_descarte.metodo_tratamento_str
-
-        c.execute("""
-        UPDATE solicitacao_descarte SET estado = ?, metodo_tratamento = ? WHERE id = ?
-        """, (estado_nome, metodo_str, solicitacao_descarte.id))
-
-        self.conn.commit()
+        estado_str = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
+        metodo_str = (
+            solicitacao_descarte.metodo_tratamento.obter_nome()
+            if solicitacao_descarte.metodo_tratamento else None
+        )
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO solicitacao_descarte
+                (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                solicitacao_descarte.id,
+                solicitacao_descarte.usuario.id,
+                solicitacao_descarte.ponto_coleta.id if solicitacao_descarte.ponto_coleta else None,
+                estado_str,
+                metodo_str,
+                data_criacao,
+                None
+            ))
 
     def salvar_itens_descarte(self, id_solicitacao, item):
-        c = self.conn.cursor()
-
-        c.execute("""
-        INSERT OR IGNORE INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
-        VALUES (?, ?, ?, ?)
-        """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
-        
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
+            VALUES (?, ?, ?, ?)
+            """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
 
     def salvar_historico_rastreamento(self, id_solicitacao, mensagem):
-        c = self.conn.cursor()
-        
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        
-        c.execute("""
-        INSERT OR IGNORE INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
-        VALUES (?, ?, ?)
-        """, (id_solicitacao, timestamp, mensagem))
-            
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
+            VALUES (?, ?, ?)
+            """, (id_solicitacao, timestamp, mensagem))
 
     def salvar_entrega(self, id_entrega, id_usuario, valor, empresa, data, hora, status):
         """Salva uma entrega/transação no histórico."""
-        c = self.conn.cursor()
-        
-        c.execute("""
-        INSERT OR REPLACE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
-        
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR REPLACE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
+
+    # -------------------
+    # ATUALIZAR
+    # -------------------
+
+    def atualizar_solicitacao(self, id_solicitacao: str, estado: str,
+                               metodo_tratamento=None) -> None:
+        """Atualiza estado e opcionalmente o método de tratamento de uma solicitação."""
+        with self.conn:
+            self.conn.execute("""
+            UPDATE solicitacao_descarte
+               SET estado = ?,
+                   metodo_tratamento = COALESCE(?, metodo_tratamento)
+             WHERE id = ?
+            """, (estado, metodo_tratamento, id_solicitacao))
+
+    def atualizar_ocupacao_ponto(self, id_ponto: str, ocupacao_atual_kg: float) -> None:
+        """Atualiza a ocupação atual de um ponto de coleta."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE ponto_coleta SET ocupacao_atual_kg = ? WHERE id = ?",
+                (ocupacao_atual_kg, id_ponto)
+            )
+
+    # -------------------
+    # DESATIVAR (soft-delete)
+    # -------------------
+
+    def desativar_usuario(self, id_usuario: str) -> None:
+        """Desativa um usuário (soft-delete: mantém dados, marca ativo = 0)."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE usuario SET ativo = 0 WHERE id = ?",
+                (id_usuario,)
+            )
 
     # -------------------
     # BUSCAR
@@ -310,6 +317,49 @@ class Dados(RepositorioBase):
         """Busca um usuário por ID."""
         c = self.conn.cursor()
         c.execute("SELECT * FROM usuario WHERE id = ?", (id_usuario,))
+        return c.fetchone()
+
+    def buscar_usuario_por_cpf(self, cpf: str):
+        """
+        Busca um cidadão pelo CPF.
+
+        Retorna a linha completa da tabela usuario com todos os campos,
+        incluindo password_hash, para uso na autenticação.
+        """
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.*
+            FROM usuario u
+            JOIN cidadao ci ON u.id = ci.id_usuario
+            WHERE ci.cpf = ? AND u.ativo = 1
+        """, (cpf,))
+        return c.fetchone()
+
+    def buscar_usuario_por_cnpj(self, cnpj: str):
+        """
+        Busca uma empresa pelo CNPJ.
+
+        Retorna a linha completa da tabela usuario com todos os campos,
+        incluindo password_hash, para uso na autenticação.
+        """
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.*
+            FROM usuario u
+            JOIN empresa e ON u.id = e.id_usuario
+            WHERE e.cnpj = ? AND u.ativo = 1
+        """, (cnpj,))
+        return c.fetchone()
+
+    def buscar_usuario_por_email(self, email: str):
+        """
+        Busca um usuário pelo email.
+
+        Utilizado no login de administradores, que não possuem CPF nem CNPJ.
+        Retorna a linha completa da tabela usuario incluindo password_hash.
+        """
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM usuario WHERE email = ? AND ativo = 1", (email,))
         return c.fetchone()
 
     def buscar_todos_usuarios(self):
@@ -423,29 +473,5 @@ class Dados(RepositorioBase):
     # -------------------
 
     def seed(self):
-        """Inicializa dados básicos apenas se o banco estiver vazio."""
-        # verifica se ja existem usuarios no banco
-        if self.contar_usuarios() > 0:
-            return  # ja tem dados, nao precisa fazer seed
-        
-        # cria dados iniciais apenas se o banco estiver vazio
-        cidadao = Cidadao("USR-CID-001", "João Silva", "joaosilva@email.com", "12345678901")
-        self.salvar_cidadao(cidadao)
-
-        empresa = Empresa("USR-EMP-001", "EcoSoluções LTDA", "contato@ecosolucoes.com", "98765432000100", "EcoSoluções Reciclagem Industrial")
-        self.salvar_empresa(empresa)
-
-        admin = Administrador("USR-ADM-001", "Admin Master", "admin@ecotech.com", 3)
-        self.salvar_administrador(admin)
-
-        dispositivo = Celular("DISP-001", "Smartphone X", 0.2, "Tech", "Pro")
-        self.salvar_dispositivo(dispositivo)
-
-        ponto_coleta = PontoColeta("PNT-001"," EcoPonto Sul", "Rua B, 500", -23.5, -46.6, 500.0)
-        self.salvar_ponto(ponto_coleta)
-
-        solicitacao = SolicitacaoDescarte("SOL-001", cidadao, ponto_coleta)
-        self.salvar_solicitacao(solicitacao)
-        
-        item = ItemDescarte(dispositivo, 1, "Tela trincada")
-        self.salvar_itens_descarte('SOL-001', item)
+        """Mantido por compatibilidade. Seeding é gerenciado por _inicializar_dados_exemplo em web.py."""
+        pass

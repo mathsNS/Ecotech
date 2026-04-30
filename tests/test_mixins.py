@@ -64,7 +64,7 @@ class TestNotificavelMixin:
 
     def _criar_solicitacao(self):
         """Helper para criar solicitação de teste."""
-        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678901")
+        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678909")
         return SolicitacaoDescarte("SOL-1", cidadao)
 
     def test_emitir_notificacao(self):
@@ -123,7 +123,7 @@ class TestHerancaMultipla:
 
     def test_log_e_notificacao_independentes(self):
         """Verifica que log e notificações operam de forma independente."""
-        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678901")
+        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678909")
         sol = SolicitacaoDescarte("SOL-1", cidadao)
 
         qtd_logs_inicial = len(sol.log_registros)
@@ -133,7 +133,7 @@ class TestHerancaMultipla:
 
     def test_avancar_estado_gera_log_e_notificacao(self):
         """Verifica que avançar estado popula tanto log quanto notificações."""
-        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678901")
+        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678909")
         sol = SolicitacaoDescarte("SOL-1", cidadao)
 
         logs_antes = len(sol.log_registros)
@@ -146,7 +146,7 @@ class TestHerancaMultipla:
 
     def test_cancelar_gera_log_e_notificacao_alta_prioridade(self):
         """Verifica que cancelar gera log e notificação de alta prioridade."""
-        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678901")
+        cidadao = Cidadao("1", "Maria", "maria@email.com", "12345678909")
         sol = SolicitacaoDescarte("SOL-1", cidadao)
 
         sol.cancelar("Motivo teste")

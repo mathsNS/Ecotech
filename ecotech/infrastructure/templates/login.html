@@ -9,32 +9,86 @@
             <h2>Entrar no sistema</h2>
             <p>Selecione o tipo de conta para acessar</p>
         </div>
-        
-        <form method="POST" action="{{ url_for('login') }}">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'error' else category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}" id="login-form">
             <div class="form-group">
                 <label>Tipo de conta</label>
                 <div class="radio-group">
                     <label class="radio-label">
-                        <input type="radio" name="tipo" value="cidadao" checked>
+                        <input type="radio" name="tipo" value="cidadao"
+                               {% if tipo_selecionado == 'cidadao' %}checked{% endif %}>
                         <span>Cidadão</span>
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="tipo" value="empresa">
+                        <input type="radio" name="tipo" value="empresa"
+                               {% if tipo_selecionado == 'empresa' %}checked{% endif %}>
                         <span>Empresa</span>
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="tipo" value="admin">
+                        <input type="radio" name="tipo" value="administrador"
+                               {% if tipo_selecionado == 'administrador' %}checked{% endif %}>
                         <span>Administrador</span>
                     </label>
                 </div>
             </div>
 
+            <!-- campo de credencial (muda dinamicamente conforme o tipo) -->
+            <div class="form-group">
+                <label id="credencial-label" for="credencial">CPF</label>
+                <input type="text" id="credencial" name="credencial" class="form-control"
+                       placeholder="000.000.000-00" required autocomplete="username"
+                       value="{{ request.form.get('credencial', '') }}">
+            </div>
+
+            <div class="form-group">
+                <label for="senha">Senha</label>
+                <input type="password" id="senha" name="senha" class="form-control"
+                       placeholder="Sua senha" required autocomplete="current-password">
+            </div>
+
             <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Entrar</button>
         </form>
-        
+
         <div class="auth-footer">
             <p>Não tem uma conta? <a href="{{ url_for('criar_conta') }}">Criar conta</a></p>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const radios   = document.querySelectorAll('input[name="tipo"]');
+    const label    = document.getElementById('credencial-label');
+    const input    = document.getElementById('credencial');
+
+    const config = {
+        cidadao:       { label: 'CPF',   placeholder: '000.000.000-00',       maxlength: '14' },
+        empresa:       { label: 'CNPJ',  placeholder: '00.000.000/0000-00',   maxlength: '18' },
+        administrador: { label: 'E-mail', placeholder: 'admin@ecotech.com',   maxlength: '254' },
+    };
+
+    function atualizar(tipo) {
+        const c = config[tipo] || config.cidadao;
+        label.textContent    = c.label;
+        input.placeholder    = c.placeholder;
+        input.maxLength      = c.maxlength;
+        input.type           = tipo === 'administrador' ? 'email' : 'text';
+        input.autocomplete   = tipo === 'administrador' ? 'email' : 'username';
+    }
+
+    radios.forEach(r => r.addEventListener('change', () => atualizar(r.value)));
+
+    // aplica o estado inicial
+    const checked = document.querySelector('input[name="tipo"]:checked');
+    if (checked) atualizar(checked.value);
+})();
+</script>
 {% endblock %}

@@ -138,3 +138,6 @@ class Cancelado(EstadoFinal):
 
     def obter_nome(self) -> str:
         return "Cancelado"
+    
+
+    

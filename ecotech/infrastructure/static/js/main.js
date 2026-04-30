@@ -1,6 +1,6 @@
 // JavaScript para funcionalidades adicionais, como auto-hide de alertas (apenas estetico)
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-hide alerts após 5 segundos
+    // auto-hide alerts após 5 segundos
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(alert => {
         setTimeout(() => {
@@ -20,7 +20,7 @@ function toggleDonation() {
     }
 }
 
-// Animação de slide out para alerts
+// animacao de slide out para alerts
 const style = document.createElement('style');
 style.textContent = `
     @keyframes slideOut {

@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import List, Dict
 from datetime import datetime
-from .dispositivos import DispositivoEletronico
+from .dispositivos import DispositivoEletronico, StatusDispositivo
 
 class MetodoTratamento(ABC):
     """
@@ -54,6 +54,21 @@ class MetodoTratamento(ABC):
         """Calcula o impacto ambiental resultante do tratamento."""
         pass
 
+    def validar_compatibilidade(self, dispositivos: List[DispositivoEletronico]) -> None:
+        """
+        Valida se o método de tratamento é compatível com os dispositivos fornecidos.
+
+        Por padrão, todos os métodos aceitam dispositivos em qualquer estado.
+        Subclasses podem sobrescrever para impor restrições específicas.
+
+        Args:
+            dispositivos: Lista de dispositivos a serem submetidos ao tratamento.
+
+        Raises:
+            ValueError: Se algum dispositivo for incompatível com o método.
+        """
+        pass
+
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
@@ -89,6 +104,8 @@ class Reuso(MetodoTratamento):
     Método que recondiciona dispositivos para reutilização.
 
     O reuso reduz quase totalmente o impacto ambiental e possui baixo custo.
+    Requer que os dispositivos estejam em condições de recondicionamento
+    (não aceita status DANIFICADO).
     """
 
     def __init__(self):
@@ -105,6 +122,24 @@ class Reuso(MetodoTratamento):
         impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
         impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
         return round(impacto_liquido, 2)
+
+    def validar_compatibilidade(self, dispositivos: List[DispositivoEletronico]) -> None:
+        """
+        Valida que nenhum dispositivo está no estado 'danificado'.
+
+        O reuso exige que os dispositivos possam ser recondicionados. Dispositivos
+        com danos irreparáveis devem ser encaminhados para reciclagem ou descarte
+        controlado.
+
+        Raises:
+            ValueError: Se algum dispositivo estiver com status DANIFICADO.
+        """
+        for dispositivo in dispositivos:
+            if dispositivo.status == StatusDispositivo.DANIFICADO:
+                raise ValueError(
+                    f"Reuso não é aplicável ao dispositivo '{dispositivo.nome}': "
+                    "status 'danificado' é incompatível com reaproveitamento."
+                )
 
 class DescarteControlado(MetodoTratamento):
     """
@@ -247,3 +282,7 @@ class RelatorioImpactoPorMetodo:
     def __str__(self) -> str:
         """Representação textual do relatório com número de rastreamentos."""
         return f"Relatorio '{self.titulo}' com {len(self._rastreamentos)} rastreamentos"
+
+
+
+        

@@ -2,6 +2,8 @@ from typing import List, Optional, Dict
 from datetime import datetime
 import uuid
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from ..domain.usuarios import Usuario, Cidadao, Empresa, Administrador
 from ..domain.dispositivos import DispositivoEletronico
 from ..domain.descarte import (
@@ -335,8 +337,19 @@ class ServicoUsuario:
                 )
                 self._usuarios[u['id']] = usuario
     
-    def criar_usuario(self, tipo: str, dados: Dict) -> Usuario:
-        """Cria e persiste um novo usuário do tipo especificado."""
+    def criar_usuario(self, tipo: str, dados: Dict, senha: str = "") -> Usuario:
+        """
+        Cria e persiste um novo usuário do tipo especificado.
+
+        Args:
+            tipo: 'cidadao', 'empresa' ou 'administrador'.
+            dados: Dicionário com os atributos do usuário.
+            senha: Senha em texto plano. Será transformada em hash antes de
+                persisitir. Se omitida, nenhum hash é armazenado.
+
+        Returns:
+            Instância do usuário criado.
+        """
         from .factories import UsuarioFactory
         
         if 'id' not in dados:
@@ -345,26 +358,59 @@ class ServicoUsuario:
         usuario = UsuarioFactory.criar_usuario(tipo, dados)
         self._usuarios[usuario.id] = usuario
         
+        password_hash = generate_password_hash(senha) if senha else ""
+        
         if self._dados:
             if tipo == 'cidadao':
-                self._dados.salvar_cidadao(usuario)
+                self._dados.salvar_cidadao(usuario, password_hash)
             elif tipo == 'empresa':
-                self._dados.salvar_empresa(usuario)
+                self._dados.salvar_empresa(usuario, password_hash)
             elif tipo == 'administrador':
-                self._dados.salvar_administrador(usuario)
+                self._dados.salvar_administrador(usuario, password_hash)
         
         return usuario
     
     def buscar_usuario(self, id: str) -> Optional[Usuario]:
         """Busca um usuário pelo ID."""
         return self._usuarios.get(id)
-    
-    def autenticar_usuario(self, email: str) -> Optional[Usuario]:
-        """Autentica usuário pelo email."""
-        for usuario in self._usuarios.values():
-            if usuario.email == email:
-                return usuario
-        return None
+
+    def autenticar(self, tipo: str, credencial: str, senha: str) -> Optional[Usuario]:
+        """
+        Autentica um usuário verificando credencial e senha.
+
+        A credencial varia por tipo de conta:
+        - Cidadão  → CPF (11 dígitos)
+        - Empresa   → CNPJ (14 dígitos)
+        - Admin     → email
+
+        Args:
+            tipo: 'cidadao', 'empresa' ou 'administrador'.
+            credencial: CPF, CNPJ ou email dependendo do tipo.
+            senha: Senha em texto plano para comparação com o hash.
+
+        Returns:
+            Instância do usuário autenticado, ou None se credenciais inválidas.
+        """
+        if not self._dados:
+            return None
+
+        if tipo == 'cidadao':
+            row = self._dados.buscar_usuario_por_cpf(credencial)
+        elif tipo == 'empresa':
+            row = self._dados.buscar_usuario_por_cnpj(credencial)
+        elif tipo == 'administrador':
+            row = self._dados.buscar_usuario_por_email(credencial)
+        else:
+            return None
+
+        if not row:
+            return None
+
+        hash_armazenado = row['password_hash'] or ""
+        if not hash_armazenado or not check_password_hash(hash_armazenado, senha):
+            return None
+
+        return self._usuarios.get(row['id'])
     
     def listar_usuarios(self) -> List[Usuario]:
         """Retorna todos os usuários cadastrados."""

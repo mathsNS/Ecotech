@@ -10,7 +10,7 @@ def test_criar_cidadao_valido():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     assert usuario.nome == "Maria"
@@ -23,7 +23,7 @@ def test_nome_invalido():
             id="1",
             nome="Ma",
             email="email@email.com",
-            cpf="12345678901"
+            cpf="12345678909"
         )
 
 def test_email_invalido():
@@ -32,7 +32,7 @@ def test_email_invalido():
             id="1",
             nome="Maria",
             email="email_invalido",
-            cpf="12345678901"
+            cpf="12345678909"
         )
 
 # --------------------
@@ -44,7 +44,7 @@ def test_adicionar_notificacao():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     usuario.adicionar_notificacao("Teste")
@@ -57,7 +57,7 @@ def test_limpar_notificacoes():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     usuario.adicionar_notificacao("Teste")
@@ -74,7 +74,7 @@ def test_historico_registra_acoes():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     tamanho_inicial = len(usuario.historico_acoes)
@@ -92,7 +92,7 @@ def test_adicionar_pontos():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     usuario.adicionar_pontos(10)
@@ -104,7 +104,7 @@ def test_limite_solicitacoes():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     for _ in range(usuario.MAX_SOLICITACOES_ATIVAS):
@@ -117,7 +117,7 @@ def test_incrementar_solicitacao_excede_limite():
         id="1",
         nome="Maria",
         email="maria@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     for _ in range(usuario.MAX_SOLICITACOES_ATIVAS):
@@ -135,7 +135,7 @@ def test_registrar_descarte_valido():
         id="1",
         nome="Tech",
         email="tech@email.com",
-        cnpj="12345678901234",
+        cnpj="11222333000181",
         razao_social="Tech LTDA"
     )
 
@@ -148,7 +148,7 @@ def test_registrar_descarte_excede_limite():
         id="1",
         nome="Tech",
         email="tech@email.com",
-        cnpj="12345678901234",
+        cnpj="11222333000181",
         razao_social="Tech LTDA"
     )
 
@@ -160,7 +160,7 @@ def test_resetar_mes():
         id="1",
         nome="Tech",
         email="tech@email.com",
-        cnpj="12345678901234",
+        cnpj="11222333000181",
         razao_social="Tech LTDA"
     )
 
@@ -212,7 +212,7 @@ def test_desativar_usuario():
         id="1",
         nome="Maria",
         email="email@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     usuario.desativar()
@@ -225,10 +225,38 @@ def test_ativar_usuario():
         id="1",
         nome="Maria",
         email="email@email.com",
-        cpf="12345678901"
+        cpf="12345678909"
     )
 
     usuario.desativar()
     usuario.ativar()
 
     assert usuario.ativo is True
+
+
+# --------------------------------
+# TESTES VALIDAÇÃO CPF / CNPJ
+# --------------------------------
+
+def test_cpf_digito_verificador_invalido():
+    """CPF com dígito verificador errado deve ser rejeitado."""
+    with pytest.raises(ValueError, match="CPF inválido"):
+        Cidadao(id="1", nome="Maria", email="m@m.com", cpf="12345678900")
+
+
+def test_cpf_sequencia_repetida_invalida():
+    """CPF com todos os dígitos iguais deve ser rejeitado."""
+    with pytest.raises(ValueError, match="CPF inválido"):
+        Cidadao(id="1", nome="Maria", email="m@m.com", cpf="11111111111")
+
+
+def test_cnpj_digito_verificador_invalido():
+    """CNPJ com dígito verificador errado deve ser rejeitado."""
+    with pytest.raises(ValueError, match="CNPJ inválido"):
+        Empresa(id="1", nome="Tech", email="t@t.com", cnpj="12345678901234", razao_social="Tech")
+
+
+def test_cnpj_sequencia_repetida_invalida():
+    """CNPJ com todos os dígitos iguais deve ser rejeitado."""
+    with pytest.raises(ValueError, match="CNPJ inválido"):
+        Empresa(id="1", nome="Tech", email="t@t.com", cnpj="00000000000000", razao_social="Tech")

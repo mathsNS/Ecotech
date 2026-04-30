@@ -9,32 +9,120 @@
             <h2>Criar conta</h2>
             <p>Selecione o tipo de conta para começar</p>
         </div>
-        
-        <form method="POST" action="{{ url_for('criar_conta') }}">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'error' else category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('criar_conta') }}" id="criar-conta-form">
+            <!-- tipo de conta -->
             <div class="form-group">
                 <label>Tipo de conta</label>
                 <div class="radio-group">
                     <label class="radio-label">
-                        <input type="radio" name="tipo" value="cidadao" checked>
+                        <input type="radio" name="tipo" value="cidadao"
+                               {% if tipo_selecionado == 'cidadao' %}checked{% endif %}>
                         <span>Cidadão</span>
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="tipo" value="empresa">
+                        <input type="radio" name="tipo" value="empresa"
+                               {% if tipo_selecionado == 'empresa' %}checked{% endif %}>
                         <span>Empresa</span>
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="tipo" value="admin">
-                        <span>Administrador</span>
                     </label>
                 </div>
             </div>
 
+            <!-- campos comuns -->
+            <div class="form-group">
+                <label for="nome">Nome completo *</label>
+                <input type="text" id="nome" name="nome" class="form-control"
+                       placeholder="Seu nome" required maxlength="120"
+                       value="{{ request.form.get('nome', '') }}">
+            </div>
+
+            <div class="form-group">
+                <label for="email">E-mail *</label>
+                <input type="email" id="email" name="email" class="form-control"
+                       placeholder="voce@exemplo.com" required maxlength="254"
+                       value="{{ request.form.get('email', '') }}">
+            </div>
+
+            <!-- campo exclusivo: cidadão -->
+            <div class="form-group" id="campo-cpf">
+                <label for="cpf">CPF *</label>
+                <input type="text" id="cpf" name="cpf" class="form-control"
+                       placeholder="000.000.000-00" maxlength="14"
+                       value="{{ request.form.get('cpf', '') }}">
+            </div>
+
+            <!-- campos exclusivos: empresa -->
+            <div class="form-group" id="campo-cnpj" style="display:none;">
+                <label for="cnpj">CNPJ *</label>
+                <input type="text" id="cnpj" name="cnpj" class="form-control"
+                       placeholder="00.000.000/0000-00" maxlength="18"
+                       value="{{ request.form.get('cnpj', '') }}">
+            </div>
+
+            <div class="form-group" id="campo-razao" style="display:none;">
+                <label for="razao_social">Razão social *</label>
+                <input type="text" id="razao_social" name="razao_social" class="form-control"
+                       placeholder="Nome jurídico da empresa" maxlength="200"
+                       value="{{ request.form.get('razao_social', '') }}">
+            </div>
+
+            <!-- senha -->
+            <div class="form-group">
+                <label for="senha">Senha * <small>(mínimo 6 caracteres)</small></label>
+                <input type="password" id="senha" name="senha" class="form-control"
+                       placeholder="Crie uma senha" required minlength="6"
+                       autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label for="senha_confirmacao">Confirmar senha *</label>
+                <input type="password" id="senha_confirmacao" name="senha_confirmacao" class="form-control"
+                       placeholder="Repita a senha" required minlength="6"
+                       autocomplete="new-password">
+            </div>
+
             <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Criar conta</button>
         </form>
-        
+
         <div class="auth-footer">
             <p>Já tem uma conta? <a href="{{ url_for('login') }}">Entrar</a></p>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const radios    = document.querySelectorAll('input[name="tipo"]');
+    const campoCpf  = document.getElementById('campo-cpf');
+    const campoCnpj = document.getElementById('campo-cnpj');
+    const campoRazao= document.getElementById('campo-razao');
+    const inputCpf  = document.getElementById('cpf');
+    const inputCnpj = document.getElementById('cnpj');
+    const inputRazao= document.getElementById('razao_social');
+
+    function atualizar(tipo) {
+        const isCidadao = tipo === 'cidadao';
+        campoCpf.style.display   = isCidadao ? '' : 'none';
+        campoCnpj.style.display  = isCidadao ? 'none' : '';
+        campoRazao.style.display = isCidadao ? 'none' : '';
+
+        inputCpf.required   = isCidadao;
+        inputCnpj.required  = !isCidadao;
+        inputRazao.required = !isCidadao;
+    }
+
+    radios.forEach(r => r.addEventListener('change', () => atualizar(r.value)));
+
+    const checked = document.querySelector('input[name="tipo"]:checked');
+    if (checked) atualizar(checked.value);
+})();
+</script>
 {% endblock %}

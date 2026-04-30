@@ -156,3 +156,30 @@ def test_obter_resumo():
 
     assert resumo["id"] == "1"
     assert resumo["usuario"] == "Maria"
+
+
+# ---------------------------------------
+# TESTES remover_item (Item 2)
+# ---------------------------------------
+
+def test_remover_item_existente():
+    usuario = MockUsuario()
+    dispositivo = MockDispositivo()
+    solicitacao = SolicitacaoDescarte("SOL-1", usuario)
+    item = ItemDescarte(dispositivo)
+
+    solicitacao.adicionar_item(item)
+    solicitacao.remover_item(item)
+
+    assert len(solicitacao.itens) == 0
+
+
+def test_remover_item_inexistente_levanta_erro():
+    """remover_item deve lançar ValueError se o item não estiver na solicitação."""
+    usuario = MockUsuario()
+    dispositivo = MockDispositivo()
+    solicitacao = SolicitacaoDescarte("SOL-1", usuario)
+    item = ItemDescarte(dispositivo)
+
+    with pytest.raises(ValueError, match="Item não encontrado"):
+        solicitacao.remover_item(item)
