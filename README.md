@@ -115,18 +115,14 @@ O projeto conta com **85 testes automatizados** cobrindo:
 
 ### Pré-requisitos
 
-## Instalação
-
-### Pré-requisitos
-
 - Python 3.10 ou superior
 - Poetry (gerenciador de dependências)
 
 ### Passos
 
 ```bash
-git clone https://github.com/abnerlevi/ecotech.git
-cd ecotech
+git clone https://github.com/mathsNS/Ecotech.git
+cd Ecotech
 poetry install
 poetry shell
 ```
@@ -142,8 +138,7 @@ A aplicação estará disponível em http://localhost:5000
 ### Executar Testes
 
 ```bash
-pytest
-pytest --cov=ecotech
+pytest -v
 ```
 
 ## Tecnologias Utilizadas
