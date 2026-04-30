@@ -49,7 +49,7 @@
                     <img src="{{ url_for('static', filename='images/co2-icone.png') }}" alt="Impacto">
                 </div>
                 <div class="stat-info-rel">
-                    <h3>{{ metricas.impacto_evitado|round(1) }}</h3>
+                    <h3>{{ metricas.impacto_evitado|round(1) }} kg CO₂</h3>
                     <p>Impacto Evitado</p>
                 </div>
             </div>
@@ -119,7 +119,7 @@
                                     <strong>{{ sol.calcular_peso_total()|round(2) }}</strong>
                                 </td>
                                 <td>
-                                    {{ sol.impacto_evitado_db|round(1) }}
+                                    {{ sol.calcular_impacto_total()|round(1) }}
                                 </td>
                                 <td>
                                     {% if sol.metodo_tratamento_str %}

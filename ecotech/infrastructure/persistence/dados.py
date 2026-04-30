@@ -80,9 +80,16 @@ class Dados(RepositorioBase):
             nome TEXT,
             peso_kg REAL,
             marca TEXT,
-            modelo TEXT
+            modelo TEXT,
+            tipo TEXT DEFAULT 'celular'
         )
         """)
+        # migracao: adiciona coluna tipo se nao existir
+        try:
+            c.execute("ALTER TABLE dispositivo ADD COLUMN tipo TEXT DEFAULT 'celular'")
+            self.conn.commit()
+        except Exception:
+            pass  # coluna ja existe
 
         # Tabela de Ponto de Coleta
         c.execute("""
@@ -213,9 +220,9 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
 
         c.execute("""
-        INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo)
-        VALUES (?, ?, ?, ?, ?)
-        """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo))
+        INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower()))
 
         self.conn.commit()
 
@@ -234,9 +241,31 @@ class Dados(RepositorioBase):
 
         data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")
 
+        estado_nome = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
+        metodo_str = None
+        if solicitacao_descarte.metodo_tratamento:
+            metodo_str = solicitacao_descarte.metodo_tratamento.obter_nome()
+
         c.execute("""
         INSERT OR IGNORE INTO solicitacao_descarte (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (solicitacao_descarte.id, solicitacao_descarte.usuario.id, solicitacao_descarte.ponto_coleta.id, 'SOLICITADO', None, data_criacao, None))
+        """, (solicitacao_descarte.id, solicitacao_descarte.usuario.id, solicitacao_descarte.ponto_coleta.id, estado_nome, metodo_str, data_criacao, None))
+
+        self.conn.commit()
+
+    def atualizar_solicitacao(self, solicitacao_descarte):
+        """Atualiza estado e método de tratamento de uma solicitação existente."""
+        c = self.conn.cursor()
+
+        estado_nome = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
+        metodo_str = None
+        if solicitacao_descarte.metodo_tratamento:
+            metodo_str = solicitacao_descarte.metodo_tratamento.obter_nome()
+        elif solicitacao_descarte.metodo_tratamento_str:
+            metodo_str = solicitacao_descarte.metodo_tratamento_str
+
+        c.execute("""
+        UPDATE solicitacao_descarte SET estado = ?, metodo_tratamento = ? WHERE id = ?
+        """, (estado_nome, metodo_str, solicitacao_descarte.id))
 
         self.conn.commit()
 
@@ -351,7 +380,7 @@ class Dados(RepositorioBase):
         """Retorna todos os itens de uma solicitação."""
         c = self.conn.cursor()
         c.execute("""
-            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo
+            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo
             FROM item_descarte i
             JOIN dispositivo d ON i.id_dispositivo = d.id
             WHERE i.id_solicitacao = ?

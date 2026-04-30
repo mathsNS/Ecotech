@@ -172,6 +172,14 @@ def criar_app() -> Flask:
         impacto_evitado = sum(s.calcular_impacto_total() for s in solicitacoes_usuario)
         pontos_acumulados = int(total_descartado * 10)  # 10 pontos por kg
         
+        # calcula tier com base nos pontos
+        if pontos_acumulados >= 1200:
+            tier_nome = 'Tier Ouro'
+        elif pontos_acumulados >= 400:
+            tier_nome = 'Tier Prata'
+        else:
+            tier_nome = 'Tier Bronze'
+        
         # dashboard diferente para empresa
         if usuario['tipo'] == 'empresa':
             # metricas gerais do sistema para empresa
@@ -187,6 +195,7 @@ def criar_app() -> Flask:
                 pontos_acumulados=pontos_acumulados,
                 total_sistema=total_sistema,
                 total_processadas=total_processadas,
+                tier_nome=tier_nome,
                 is_empresa=True,
                 is_admin=False
             )
@@ -242,6 +251,7 @@ def criar_app() -> Flask:
             pontos_acumulados=pontos_acumulados,
             progresso_missao=progresso_missao,
             progresso_tier=progresso_tier,
+            tier_nome=tier_nome,
             is_empresa=False,
             is_admin=False
         )
@@ -390,11 +400,16 @@ def criar_app() -> Flask:
         
         usuario = dados_usuario()
         
+        todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        solicitacoes_usuario = [s for s in todas_solicitacoes if s.usuario.id == usuario['id']]
+        total_peso = sum(s.calcular_peso_total() for s in solicitacoes_usuario)
+        pontos_reais = int(total_peso * 10)
+        
         return render_template(
             'perfil.html',
             usuario=usuario,
-            total_solicitacoes=5,
-            pontos=1250
+            total_solicitacoes=len(solicitacoes_usuario),
+            pontos=pontos_reais
         )
     
     @app.route('/operacoes')
@@ -579,9 +594,9 @@ def criar_app() -> Flask:
 def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
     """inicializa dados de exemplo para demonstracao."""
     
-    # verifica se ja existem dados suficientes no banco
-    if dados.contar_usuarios() > 3:
-        return  # ja tem dados, nao precisa inicializar novamente
+    # verifica se os usuarios de exemplo ja existem (user-1 é criado nesta função)
+    if servico_usuario.buscar_usuario('user-1') is not None:
+        return  # ja foi inicializado, nao repete
     
     # usuarios de exemplo
     cidadao1 = servico_usuario.criar_usuario('cidadao', {
@@ -612,7 +627,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'R. Dr. Morato Saraiva, 1100 - Lagoa Seca',
         -7.2138,
         -39.3089,
-        1000.0
+        5000.0
     )
     
     ponto2 = servico_ponto.criar_ponto_coleta(
@@ -620,112 +635,206 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'Av. Padre Cícero, 500 - Centro',
         -7.2123,
         -39.3145,
-        2000.0
+        5000.0
     )
-    
-    # cria algumas solicitacoes de exemplo com diferentes estados
-    
-    # solicitacao 1 - estado inicial (solicitado)
-    sol1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
-    celular1 = DispositivoFactory.criar_celular('cel-001', 'iPhone 11', 0.194)
-    notebook1 = DispositivoFactory.criar_computador('comp-001', 'Dell Inspiron', 2.1)
-    servico_descarte.adicionar_item_solicitacao(sol1, celular1, 1, 'tela quebrada')
-    servico_descarte.adicionar_item_solicitacao(sol1, notebook1, 1, 'nao liga mais')
-    
-    # solicitacao 2 - ja foi coletada
-    sol2 = servico_descarte.criar_solicitacao(cidadao2, ponto2)
-    tv1 = DispositivoFactory.criar_eletrodomestico('elet-001', 'TV Samsung 32"', 5.5)
-    servico_descarte.adicionar_item_solicitacao(sol2, tv1, 1)
-    servico_descarte.avancar_estado_solicitacao(sol2)  # passa pra coletado
-    
-    # solicitacao 3 - em processamento
-    sol3 = servico_descarte.criar_solicitacao(empresa, ponto1)
-    celular2 = DispositivoFactory.criar_celular('cel-002', 'Samsung Galaxy S10', 0.175)
-    tablet1 = DispositivoFactory.criar_celular('cel-003', 'iPad Air', 0.460)
-    servico_descarte.adicionar_item_solicitacao(sol3, celular2, 3)
-    servico_descarte.adicionar_item_solicitacao(sol3, tablet1, 2)
-    metodo = MetodoTratamentoFactory.criar_reciclagem()
-    servico_descarte.definir_metodo_tratamento(sol3, metodo)
-    servico_descarte.avancar_estado_solicitacao(sol3)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol3)  # em processamento
-    
-    # solicitacao 4 - finalizada (reciclada)
-    sol4 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
-    monitor1 = DispositivoFactory.criar_computador('comp-002', 'Monitor LG 24"', 3.2)
-    teclado1 = DispositivoFactory.criar_computador('comp-003', 'Teclado Mecanico', 0.8)
-    servico_descarte.adicionar_item_solicitacao(sol4, monitor1, 1)
-    servico_descarte.adicionar_item_solicitacao(sol4, teclado1, 1)
-    metodo2 = MetodoTratamentoFactory.criar_reciclagem()
-    servico_descarte.definir_metodo_tratamento(sol4, metodo2)
-    servico_descarte.avancar_estado_solicitacao(sol4)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol4)  # em processamento
-    servico_descarte.avancar_estado_solicitacao(sol4)  # reciclado
-    
-    # solicitacao 5 - mais uma pendente
-    sol5 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
-    geladeira = DispositivoFactory.criar_eletrodomestico('elet-002', 'Geladeira Brastemp', 45.0)
-    servico_descarte.adicionar_item_solicitacao(sol5, geladeira, 1, 'compressor queimado')
-    
-    # solicitacao 6 - outra em processamento
-    sol6 = servico_descarte.criar_solicitacao(empresa, ponto2)
-    pc1 = DispositivoFactory.criar_computador('comp-004', 'Desktop HP', 8.5)
-    servico_descarte.adicionar_item_solicitacao(sol6, pc1, 5, 'lote de computadores antigos')
-    metodo3 = MetodoTratamentoFactory.criar_reuso()
-    servico_descarte.definir_metodo_tratamento(sol6, metodo3)
-    servico_descarte.avancar_estado_solicitacao(sol6)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol6)  # em processamento
-    
-    # adiciona historico de entregas para o cidadao1 (joao silva)
-    # isso é o que aparece na pagina de ultimas entregas
-    dados.salvar_entrega(
-        '56492574920',
-        'user-1',
-        13.95,
-        'Ecotech',
-        '13 Set 2025',
-        '13:02',
-        'finalizado'
+
+    ponto3 = servico_ponto.criar_ponto_coleta(
+        'EcoPonto Sul',
+        'Av. Leão Sampaio, 200 - Juazeiro do Norte',
+        -7.2190,
+        -39.3200,
+        3000.0
     )
-    
-    dados.salvar_entrega(
-        '58293049159',
-        'user-1',
-        8.19,
-        'Ecotech',
-        '10 Set 2025',
-        '08:55',
-        'finalizado'
-    )
-    
-    dados.salvar_entrega(
-        '98358259431',
-        'user-1',
-        6.41,
-        'Ecotech',
-        '08 Set 2025',
-        '15:31',
-        'cancelado'
-    )
-    
-    dados.salvar_entrega(
-        '47389088043',
-        'user-1',
-        27.65,
-        'Ecotech',
-        '03 Set 2025',
-        '16:44',
-        'finalizado'
-    )
-    
-    dados.salvar_entrega(
-        '57463968973',
-        'user-1',
-        12.53,
-        'Ecotech',
-        '02 Set 2025',
-        '08:21',
-        'finalizado'
-    )
+
+    # ── ESTADO: SOLICITADO (5 solicitações) ────────────────────────
+    sol_s1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_s1, DispositivoFactory.criar_celular('cel-001', 'iPhone 11', 0.194), 1, 'tela quebrada')
+    servico_descarte.adicionar_item_solicitacao(sol_s1, DispositivoFactory.criar_computador('comp-001', 'Dell Inspiron 15', 2.1), 1, 'não liga mais')
+
+    sol_s2 = servico_descarte.criar_solicitacao(cidadao2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_s2, DispositivoFactory.criar_celular('cel-010', 'Motorola Moto G', 0.180), 2, 'bateria inchada')
+
+    sol_s3 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_s3, DispositivoFactory.criar_eletrodomestico('elet-020', 'Impressora HP', 4.5), 1, 'sem uso')
+    servico_descarte.adicionar_item_solicitacao(sol_s3, DispositivoFactory.criar_computador('comp-020', 'Mouse Logitech', 0.1), 3)
+
+    sol_s4 = servico_descarte.criar_solicitacao(empresa, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_s4, DispositivoFactory.criar_computador('comp-021', 'Servidor Dell PowerEdge', 12.0), 2, 'lote servidores obsoletos')
+
+    sol_s5 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_s5, DispositivoFactory.criar_celular('cel-022', 'Samsung Galaxy A20', 0.168), 1, 'display danificado')
+
+    # ── ESTADO: COLETADO (4 solicitações) ──────────────────────────
+    sol_c1 = servico_descarte.criar_solicitacao(cidadao2, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_c1, DispositivoFactory.criar_eletrodomestico('elet-001', 'TV Samsung 32"', 5.5), 1)
+    servico_descarte.avancar_estado_solicitacao(sol_c1)
+
+    sol_c2 = servico_descarte.criar_solicitacao(cidadao1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_c2, DispositivoFactory.criar_computador('comp-010', 'MacBook Air 2019', 1.29), 1, 'placa mãe queimada')
+    servico_descarte.avancar_estado_solicitacao(sol_c2)
+
+    sol_c3 = servico_descarte.criar_solicitacao(empresa, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_c3, DispositivoFactory.criar_celular('cel-030', 'Xiaomi Redmi Note 10', 0.178), 8, 'lote corporativo')
+    servico_descarte.avancar_estado_solicitacao(sol_c3)
+
+    sol_c4 = servico_descarte.criar_solicitacao(cidadao2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_c4, DispositivoFactory.criar_eletrodomestico('elet-030', 'Ar-condicionado LG 9000', 28.0), 1, 'defeito no compressor')
+    servico_descarte.avancar_estado_solicitacao(sol_c4)
+
+    # ── ESTADO: EM PROCESSAMENTO (4 solicitações) ──────────────────
+    sol_ep1 = servico_descarte.criar_solicitacao(empresa, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_ep1, DispositivoFactory.criar_celular('cel-002', 'Samsung Galaxy S10', 0.175), 3)
+    servico_descarte.adicionar_item_solicitacao(sol_ep1, DispositivoFactory.criar_celular('cel-003', 'iPad Air', 0.460), 2)
+    servico_descarte.definir_metodo_tratamento(sol_ep1, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_ep1)
+    servico_descarte.avancar_estado_solicitacao(sol_ep1)
+
+    sol_ep2 = servico_descarte.criar_solicitacao(cidadao2, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_ep2, DispositivoFactory.criar_eletrodomestico('elet-010', 'Micro-ondas Consul', 11.0), 1)
+    servico_descarte.definir_metodo_tratamento(sol_ep2, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_ep2)
+    servico_descarte.avancar_estado_solicitacao(sol_ep2)
+
+    sol_ep3 = servico_descarte.criar_solicitacao(cidadao1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_ep3, DispositivoFactory.criar_computador('comp-040', 'Notebook Acer Aspire', 2.2), 2)
+    servico_descarte.adicionar_item_solicitacao(sol_ep3, DispositivoFactory.criar_computador('comp-041', 'HD Externo 1TB', 0.26), 4)
+    servico_descarte.definir_metodo_tratamento(sol_ep3, MetodoTratamentoFactory.criar_reuso())
+    servico_descarte.avancar_estado_solicitacao(sol_ep3)
+    servico_descarte.avancar_estado_solicitacao(sol_ep3)
+
+    sol_ep4 = servico_descarte.criar_solicitacao(empresa, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_ep4, DispositivoFactory.criar_eletrodomestico('elet-040', 'Lavadora Electrolux', 52.0), 1, 'placa queimada')
+    servico_descarte.definir_metodo_tratamento(sol_ep4, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_ep4)
+    servico_descarte.avancar_estado_solicitacao(sol_ep4)
+
+    # ── ESTADO: RECICLADO (5 solicitações) ─────────────────────────
+    sol_r1 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_r1, DispositivoFactory.criar_computador('comp-002', 'Monitor LG 24"', 3.2), 1)
+    servico_descarte.adicionar_item_solicitacao(sol_r1, DispositivoFactory.criar_computador('comp-003', 'Teclado Mecânico', 0.8), 1)
+    servico_descarte.definir_metodo_tratamento(sol_r1, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_r1)
+    servico_descarte.avancar_estado_solicitacao(sol_r1)
+    servico_descarte.avancar_estado_solicitacao(sol_r1)
+
+    sol_r2 = servico_descarte.criar_solicitacao(empresa, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_r2, DispositivoFactory.criar_celular('cel-011', 'iPhone XR', 0.194), 5)
+    servico_descarte.adicionar_item_solicitacao(sol_r2, DispositivoFactory.criar_celular('cel-012', 'Galaxy A51', 0.172), 4)
+    servico_descarte.definir_metodo_tratamento(sol_r2, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_r2)
+    servico_descarte.avancar_estado_solicitacao(sol_r2)
+    servico_descarte.avancar_estado_solicitacao(sol_r2)
+
+    sol_r3 = servico_descarte.criar_solicitacao(cidadao2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_r3, DispositivoFactory.criar_eletrodomestico('elet-050', 'TV LG 42"', 8.9), 1)
+    servico_descarte.adicionar_item_solicitacao(sol_r3, DispositivoFactory.criar_eletrodomestico('elet-051', 'DVD Player Sony', 1.4), 2)
+    servico_descarte.definir_metodo_tratamento(sol_r3, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_r3)
+    servico_descarte.avancar_estado_solicitacao(sol_r3)
+    servico_descarte.avancar_estado_solicitacao(sol_r3)
+
+    sol_r4 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_r4, DispositivoFactory.criar_celular('cel-050', 'iPhone 7', 0.138), 3, 'bateria inchada')
+    servico_descarte.definir_metodo_tratamento(sol_r4, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_r4)
+    servico_descarte.avancar_estado_solicitacao(sol_r4)
+    servico_descarte.avancar_estado_solicitacao(sol_r4)
+
+    sol_r5 = servico_descarte.criar_solicitacao(empresa, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_r5, DispositivoFactory.criar_computador('comp-050', 'Roteador TP-Link', 0.3), 10, 'lote equipamentos rede')
+    servico_descarte.adicionar_item_solicitacao(sol_r5, DispositivoFactory.criar_computador('comp-051', 'Switch 24 portas', 2.1), 3)
+    servico_descarte.definir_metodo_tratamento(sol_r5, MetodoTratamentoFactory.criar_reciclagem())
+    servico_descarte.avancar_estado_solicitacao(sol_r5)
+    servico_descarte.avancar_estado_solicitacao(sol_r5)
+    servico_descarte.avancar_estado_solicitacao(sol_r5)
+
+    # ── ESTADO: REUTILIZADO (4 solicitações) ───────────────────────
+    sol_ru1 = servico_descarte.criar_solicitacao(cidadao1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_ru1, DispositivoFactory.criar_computador('comp-005', 'Desktop HP EliteDesk', 6.8), 2)
+    servico_descarte.definir_metodo_tratamento(sol_ru1, MetodoTratamentoFactory.criar_reuso())
+    servico_descarte.avancar_estado_solicitacao(sol_ru1)
+    servico_descarte.avancar_estado_solicitacao(sol_ru1)
+    servico_descarte.avancar_estado_solicitacao(sol_ru1)
+
+    sol_ru2 = servico_descarte.criar_solicitacao(empresa, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_ru2, DispositivoFactory.criar_computador('comp-006', 'Notebook Lenovo ThinkPad', 1.95), 3)
+    servico_descarte.adicionar_item_solicitacao(sol_ru2, DispositivoFactory.criar_celular('cel-006', 'iPhone 8', 0.148), 6)
+    servico_descarte.definir_metodo_tratamento(sol_ru2, MetodoTratamentoFactory.criar_reuso())
+    servico_descarte.avancar_estado_solicitacao(sol_ru2)
+    servico_descarte.avancar_estado_solicitacao(sol_ru2)
+    servico_descarte.avancar_estado_solicitacao(sol_ru2)
+
+    sol_ru3 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_ru3, DispositivoFactory.criar_computador('comp-060', 'iMac 21.5" 2017', 5.55), 1, 'tela riscada')
+    servico_descarte.definir_metodo_tratamento(sol_ru3, MetodoTratamentoFactory.criar_reuso())
+    servico_descarte.avancar_estado_solicitacao(sol_ru3)
+    servico_descarte.avancar_estado_solicitacao(sol_ru3)
+    servico_descarte.avancar_estado_solicitacao(sol_ru3)
+
+    sol_ru4 = servico_descarte.criar_solicitacao(empresa, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_ru4, DispositivoFactory.criar_celular('cel-060', 'iPad Pro 11"', 0.471), 4)
+    servico_descarte.adicionar_item_solicitacao(sol_ru4, DispositivoFactory.criar_celular('cel-061', 'Samsung Tab A7', 0.476), 3)
+    servico_descarte.definir_metodo_tratamento(sol_ru4, MetodoTratamentoFactory.criar_reuso())
+    servico_descarte.avancar_estado_solicitacao(sol_ru4)
+    servico_descarte.avancar_estado_solicitacao(sol_ru4)
+    servico_descarte.avancar_estado_solicitacao(sol_ru4)
+
+    # ── ESTADO: DESCARTADO (4 solicitações) ────────────────────────
+    sol_d1 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_d1, DispositivoFactory.criar_eletrodomestico('elet-002', 'Geladeira Brastemp', 45.0), 1, 'compressor queimado')
+    servico_descarte.definir_metodo_tratamento(sol_d1, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_d1)
+    servico_descarte.avancar_estado_solicitacao(sol_d1)
+    servico_descarte.avancar_estado_solicitacao(sol_d1)
+
+    sol_d2 = servico_descarte.criar_solicitacao(empresa, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_d2, DispositivoFactory.criar_computador('comp-004', 'Desktop HP Compaq', 8.5), 5, 'lote de computadores antigos')
+    servico_descarte.definir_metodo_tratamento(sol_d2, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_d2)
+    servico_descarte.avancar_estado_solicitacao(sol_d2)
+    servico_descarte.avancar_estado_solicitacao(sol_d2)
+
+    sol_d3 = servico_descarte.criar_solicitacao(cidadao1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_d3, DispositivoFactory.criar_eletrodomestico('elet-070', 'Fogão Brastemp 4 bocas', 22.0), 1, 'sem condições de reparo')
+    servico_descarte.definir_metodo_tratamento(sol_d3, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_d3)
+    servico_descarte.avancar_estado_solicitacao(sol_d3)
+    servico_descarte.avancar_estado_solicitacao(sol_d3)
+
+    sol_d4 = servico_descarte.criar_solicitacao(empresa, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_d4, DispositivoFactory.criar_eletrodomestico('elet-071', 'No-break APC 1500VA', 9.8), 4, 'baterias viciadas')
+    servico_descarte.definir_metodo_tratamento(sol_d4, MetodoTratamentoFactory.criar_descarte_controlado())
+    servico_descarte.avancar_estado_solicitacao(sol_d4)
+    servico_descarte.avancar_estado_solicitacao(sol_d4)
+    servico_descarte.avancar_estado_solicitacao(sol_d4)
+
+    # ── ESTADO: CANCELADO (4 solicitações) ─────────────────────────
+    sol_can1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_can1, DispositivoFactory.criar_celular('cel-007', 'Xiaomi Redmi 9', 0.198), 1)
+    servico_descarte.cancelar_solicitacao(sol_can1, 'Usuário desistiu da entrega')
+
+    sol_can2 = servico_descarte.criar_solicitacao(cidadao2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_can2, DispositivoFactory.criar_eletrodomestico('elet-007', 'Ventilador Arno', 2.3), 2)
+    servico_descarte.cancelar_solicitacao(sol_can2, 'Ponto de coleta indisponível')
+
+    sol_can3 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_can3, DispositivoFactory.criar_computador('comp-070', 'Webcam Logitech C920', 0.162), 1)
+    servico_descarte.cancelar_solicitacao(sol_can3, 'Endereço incorreto informado')
+
+    sol_can4 = servico_descarte.criar_solicitacao(empresa, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_can4, DispositivoFactory.criar_celular('cel-070', 'iPhone 6S', 0.143), 10, 'lote para descarte')
+    servico_descarte.cancelar_solicitacao(sol_can4, 'Lote redirecionado para outra unidade')
+
+    # ── HISTÓRICO DE ENTREGAS (João Silva) ──────────────────────────
+    dados.salvar_entrega('56492574920', 'user-1', 13.95, 'Ecotech', '13 Set 2025', '13:02', 'finalizado')
+    dados.salvar_entrega('58293049159', 'user-1', 8.19,  'Ecotech', '10 Set 2025', '08:55', 'finalizado')
+    dados.salvar_entrega('98358259431', 'user-1', 6.41,  'Ecotech', '08 Set 2025', '15:31', 'cancelado')
+    dados.salvar_entrega('47389088043', 'user-1', 27.65, 'Ecotech', '03 Set 2025', '16:44', 'finalizado')
+    dados.salvar_entrega('57463968973', 'user-1', 12.53, 'Ecotech', '02 Set 2025', '08:21', 'finalizado')
+    dados.salvar_entrega('61927384019', 'user-1', 19.80, 'Ecotech', '20 Ago 2025', '10:15', 'finalizado')
+    dados.salvar_entrega('73849201938', 'user-1', 4.50,  'Ecotech', '15 Ago 2025', '14:30', 'reciclado')
+    dados.salvar_entrega('84920173641', 'user-1', 31.20, 'Ecotech', '05 Ago 2025', '09:00', 'finalizado')
+    dados.salvar_entrega('92837461029', 'user-1', 9.75,  'Ecotech', '28 Jul 2025', '11:45', 'finalizado')
 
 
 if __name__ == '__main__':

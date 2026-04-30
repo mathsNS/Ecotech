@@ -89,20 +89,34 @@ class ServicoDescarte:
                 if row['metodo_tratamento']:
                     solicitacao.metodo_tratamento_str = row['metodo_tratamento']
                 
-                # calcula impacto evitado a partir dos itens carregados
-                solicitacao.impacto_evitado_db = solicitacao.calcular_impacto_total()
-                
                 # busca e adiciona os itens
                 itens_db = self._dados.buscar_itens_solicitacao(row['id'])
                 for item_row in itens_db:
-                    # cria dispositivo simplificado
-                    dispositivo = DispositivoFactory.criar_celular(
-                        item_row['id_dispositivo'],
-                        item_row['nome'],
-                        item_row['peso_kg']
-                    )
+                    # cria dispositivo com o tipo correto
+                    tipo_dispositivo = (item_row['tipo'] or 'celular').lower()
+                    if tipo_dispositivo == 'computador':
+                        dispositivo = DispositivoFactory.criar_computador(
+                            item_row['id_dispositivo'],
+                            item_row['nome'],
+                            item_row['peso_kg']
+                        )
+                    elif tipo_dispositivo == 'eletrodomestico':
+                        dispositivo = DispositivoFactory.criar_eletrodomestico(
+                            item_row['id_dispositivo'],
+                            item_row['nome'],
+                            item_row['peso_kg']
+                        )
+                    else:
+                        dispositivo = DispositivoFactory.criar_celular(
+                            item_row['id_dispositivo'],
+                            item_row['nome'],
+                            item_row['peso_kg']
+                        )
                     item = ItemDescarte(dispositivo, item_row['quantidade'], item_row['observacoes'] or '')
                     solicitacao._itens.append(item)
+                
+                # calcula impacto evitado após os itens estarem carregados
+                solicitacao.impacto_evitado_db = solicitacao.calcular_impacto_total()
                 
                 # adiciona ao cache
                 self._solicitacoes[row['id']] = solicitacao
@@ -168,14 +182,20 @@ class ServicoDescarte:
     ):
         """Define qual método de tratamento será usado."""
         solicitacao.metodo_tratamento = metodo
+        if self._dados:
+            self._dados.atualizar_solicitacao(solicitacao)
 
     def avancar_estado_solicitacao(self, solicitacao: SolicitacaoDescarte):
         """Avança para o próximo estado (padrão State)."""
         solicitacao.avancar_estado()
+        if self._dados:
+            self._dados.atualizar_solicitacao(solicitacao)
 
     def cancelar_solicitacao(self, solicitacao: SolicitacaoDescarte, motivo: str = ""):
         """Cancela uma solicitação com motivo opcional."""
         solicitacao.cancelar(motivo)
+        if self._dados:
+            self._dados.atualizar_solicitacao(solicitacao)
 
     def listar_solicitacoes(self) -> List[SolicitacaoDescarte]:
         """Retorna todas as solicitações, carregando do banco se necessário."""

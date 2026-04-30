@@ -50,7 +50,7 @@
                     <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Impacto" class="stat-icon-img">
                     <span class="stat-label">Impacto evitado</span>
                 </div>
-                <h3 class="stat-value">{{ impacto_evitado|round(1) }}</h3>
+                <h3 class="stat-value">{{ impacto_evitado|round(1) }} kg CO₂</h3>
             </div>
             <div class="stat-card-new">
                 <div class="stat-top">
@@ -110,14 +110,14 @@
                     <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Tier" class="stat-icon-img">
                     <span class="stat-label">Tier Atual</span>
                 </div>
-                <h3 class="stat-value tier-badge">Tier Prata</h3>
+                <h3 class="stat-value tier-badge">{{ tier_nome }}</h3>
             </div>
             <div class="stat-card-new">
                 <div class="stat-top">
                     <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Dispositivos" class="stat-icon-img">
-                    <span class="stat-label">{{ solicitacoes|length }} dispositivos</span>
+                    <span class="stat-label">Dispositivos reciclados</span>
                 </div>
-                <h3 class="stat-value">{{ solicitacoes|length }} dispositivos</h3>
+                <h3 class="stat-value">{{ solicitacoes|length }}</h3>
             </div>
             {% endif %}
         </div>
