@@ -1,4 +1,4 @@
-    """Testes para os Mixins de herança múltipla (LoggableMixin e NotificavelMixin)."""
+"""Testes para os Mixins de herança múltipla (LoggableMixin e NotificavelMixin)."""
 
 import pytest
 from ecotech.domain.mixins import LoggableMixin, NotificavelMixin
