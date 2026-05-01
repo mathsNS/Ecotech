@@ -76,7 +76,7 @@ def criar_app() -> Flask:
     
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        """Página de login com autenticação real por credencial e senha."""
+        """Tela de login."""
         if usuario_logado():
             return redirect(url_for('dashboard'))
 
@@ -99,7 +99,7 @@ def criar_app() -> Flask:
             session['user_nome'] = usuario_obj.nome
             session['user_tipo'] = usuario_obj.obter_tipo().split()[0].lower()
 
-            # normaliza o tipo da sessão para valores esperados pelo resto do sistema
+            # normaliza o tipo antes de salvar na sessão
             _tipo_map = {
                 'cidadão': 'cidadao',
                 'empresa': 'empresa',
@@ -152,7 +152,7 @@ def criar_app() -> Flask:
                 flash(str(e), 'error')
                 return render_template('criar_conta.html', tipo_selecionado=tipo)
 
-            # loga o usuário automaticamente após o cadastro
+            # login automático após cadastro
             session['user_id']   = usuario_obj.id
             session['user_nome'] = usuario_obj.nome
 

@@ -1,24 +1,11 @@
-"""
-Módulo de interfaces de repositório.
-
-Define contratos abstratos para persistência de dados, permitindo
-que as camadas de aplicação dependam de abstrações ao invés de
-implementações concretas (Dependency Inversion Principle).
-"""
+"""Interfaces abstratas de repositório."""
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Any
 
 
 class RepositorioBase(ABC):
-    """
-    Interface abstrata que define o contrato de persistência do sistema.
-
-    Todas as implementações concretas de armazenamento (SQLite, PostgreSQL,
-    em memória, etc.) devem herdar desta classe e implementar seus métodos.
-    Isso garante que a camada de aplicação não dependa de detalhes de
-    infraestrutura.
-    """
+    """Contrato base de persistência. Implementações concretas herdam desta classe."""
 
     # --- Usuários: salvar ---
 

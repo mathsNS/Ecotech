@@ -7,11 +7,7 @@ from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, R
 from ...domain.repositorio import RepositorioBase
 
 class Dados(RepositorioBase):
-    """Implementação concreta de RepositorioBase usando SQLite.
-
-    Gerencia a persistência de dados do sistema em banco de dados SQLite,
-    implementando todos os métodos definidos na interface abstrata.
-    """
+    """Implementação SQLite do RepositorioBase."""
 
     def __init__(self):
         self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
@@ -302,7 +298,7 @@ class Dados(RepositorioBase):
     # -------------------
 
     def desativar_usuario(self, id_usuario: str) -> None:
-        """Desativa um usuário (soft-delete: mantém dados, marca ativo = 0)."""
+        """Marca o usuário como inativo sem remover o registro."""
         with self.conn:
             self.conn.execute(
                 "UPDATE usuario SET ativo = 0 WHERE id = ?",
@@ -320,12 +316,7 @@ class Dados(RepositorioBase):
         return c.fetchone()
 
     def buscar_usuario_por_cpf(self, cpf: str):
-        """
-        Busca um cidadão pelo CPF.
-
-        Retorna a linha completa da tabela usuario com todos os campos,
-        incluindo password_hash, para uso na autenticação.
-        """
+        """Busca por CPF ativo, retorna row com password_hash."""
         c = self.conn.cursor()
         c.execute("""
             SELECT u.*
@@ -336,12 +327,7 @@ class Dados(RepositorioBase):
         return c.fetchone()
 
     def buscar_usuario_por_cnpj(self, cnpj: str):
-        """
-        Busca uma empresa pelo CNPJ.
-
-        Retorna a linha completa da tabela usuario com todos os campos,
-        incluindo password_hash, para uso na autenticação.
-        """
+        """Busca por CNPJ ativo, retorna row com password_hash."""
         c = self.conn.cursor()
         c.execute("""
             SELECT u.*
@@ -352,12 +338,7 @@ class Dados(RepositorioBase):
         return c.fetchone()
 
     def buscar_usuario_por_email(self, email: str):
-        """
-        Busca um usuário pelo email.
-
-        Utilizado no login de administradores, que não possuem CPF nem CNPJ.
-        Retorna a linha completa da tabela usuario incluindo password_hash.
-        """
+        """Busca por email ativo (usado no login de admin)."""
         c = self.conn.cursor()
         c.execute("SELECT * FROM usuario WHERE email = ? AND ativo = 1", (email,))
         return c.fetchone()
@@ -473,5 +454,5 @@ class Dados(RepositorioBase):
     # -------------------
 
     def seed(self):
-        """Mantido por compatibilidade. Seeding é gerenciado por _inicializar_dados_exemplo em web.py."""
+        # no-op — seed real está em _inicializar_dados_exemplo (web.py)
         pass

@@ -37,12 +37,7 @@ def _criar_estado_do_banco(nome_estado: str):
 
 
 class ServicoDescarte:
-    """Serviço de aplicação para gerenciar solicitações de descarte.
-
-    Orquestra as regras de negócio do domínio, coordenando usuários,
-    dispositivos, pontos de coleta e métodos de tratamento.
-    Depende da abstração RepositorioBase para persistência (DIP).
-    """
+    """Gerencia solicitações de descarte e coordena os objetos de domínio."""
     
     def __init__(self, dados: Optional[RepositorioBase] = None, servico_usuario=None, servico_ponto=None):
         self._dados = dados
@@ -212,10 +207,7 @@ class ServicoDescarte:
 
 
 class ServicoRelatorio:
-    """Serviço para geração de relatórios ambientais.
-
-    Consolida solicitações de descarte em relatórios de impacto.
-    """
+    """Gera relatórios ambientais a partir das solicitações de descarte."""
     
     def gerar_relatorio_periodo(
         self,
@@ -232,11 +224,7 @@ class ServicoRelatorio:
 
 
 class ServicoPontoColeta:
-    """Serviço para gerenciamento de pontos de coleta.
-
-    Gerencia o ciclo de vida de pontos de coleta com persistência
-    via RepositorioBase (DIP).
-    """
+    """Gerencia pontos de coleta, com cache em memória e persistência no banco."""
     
     def __init__(self, dados: Optional[RepositorioBase] = None):
         self._dados = dados
@@ -291,11 +279,7 @@ class ServicoPontoColeta:
 
 
 class ServicoUsuario:
-    """Serviço para gerenciamento de usuários.
-
-    Gerencia cadastro e consulta de usuários com persistência
-    via RepositorioBase (DIP).
-    """
+    """Gerencia cadastro, autenticação e consulta de usuários."""
     
     def __init__(self, dados: Optional[RepositorioBase] = None):
         self._dados = dados
@@ -338,18 +322,7 @@ class ServicoUsuario:
                 self._usuarios[u['id']] = usuario
     
     def criar_usuario(self, tipo: str, dados: Dict, senha: str = "") -> Usuario:
-        """
-        Cria e persiste um novo usuário do tipo especificado.
-
-        Args:
-            tipo: 'cidadao', 'empresa' ou 'administrador'.
-            dados: Dicionário com os atributos do usuário.
-            senha: Senha em texto plano. Será transformada em hash antes de
-                persisitir. Se omitida, nenhum hash é armazenado.
-
-        Returns:
-            Instância do usuário criado.
-        """
+        """Cria e persiste um usuário. Gera hash da senha se fornecida."""
         from .factories import UsuarioFactory
         
         if 'id' not in dados:
@@ -375,22 +348,7 @@ class ServicoUsuario:
         return self._usuarios.get(id)
 
     def autenticar(self, tipo: str, credencial: str, senha: str) -> Optional[Usuario]:
-        """
-        Autentica um usuário verificando credencial e senha.
-
-        A credencial varia por tipo de conta:
-        - Cidadão  → CPF (11 dígitos)
-        - Empresa   → CNPJ (14 dígitos)
-        - Admin     → email
-
-        Args:
-            tipo: 'cidadao', 'empresa' ou 'administrador'.
-            credencial: CPF, CNPJ ou email dependendo do tipo.
-            senha: Senha em texto plano para comparação com o hash.
-
-        Returns:
-            Instância do usuário autenticado, ou None se credenciais inválidas.
-        """
+        """Verifica credencial (CPF/CNPJ/email) e senha. Retorna o usuário ou None."""
         if not self._dados:
             return None
 

@@ -1,16 +1,4 @@
-"""
-Testes para a camada de persistência (Dados/RepositorioBase).
-
-Cobre:
-  - salvar e buscar cada tipo de entidade
-  - atualizar_solicitacao (estado e método de tratamento)
-  - atualizar_ocupacao_ponto
-  - desativar_usuario (soft-delete)
-  - transações: falha em um dos INSERTs não polui o banco
-  - PRAGMA foreign_keys ativo
-  - salvar_empresa persiste limite_mensal e descartado_mes reais
-  - salvar_solicitacao usa o estado real do objeto de domínio
-"""
+"""Testes da camada de persistência."""
 
 import sqlite3
 import pytest
@@ -21,13 +9,9 @@ from ecotech.domain.descarte import PontoColeta, SolicitacaoDescarte, ItemDescar
 from ecotech.infrastructure.persistence.dados import Dados
 
 
-# ---------------------------------------------------------------------------
-# Fixture: banco em memória isolado por teste
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def dados(tmp_path, monkeypatch):
-    """Cria uma instância de Dados usando um banco SQLite em arquivo temporário."""
+    """Banco SQLite temporário isolado por teste."""
     db_path = str(tmp_path / "test.db")
     _orig_connect = sqlite3.connect  # salva referência antes do patch
     monkeypatch.setattr(
@@ -37,9 +21,6 @@ def dados(tmp_path, monkeypatch):
     return Dados()
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _cidadao():
     return Cidadao("cid-1", "João Silva", "joao@test.com", "12345678909")
@@ -58,19 +39,13 @@ def _ponto():
     return PontoColeta("pnt-1", "Ecoponto Sul", "Rua A, 1", -7.2, -39.3, 500.0)
 
 
-# ---------------------------------------------------------------------------
 # PRAGMA foreign_keys
-# ---------------------------------------------------------------------------
-
 def test_pragma_foreign_keys_ativo(dados):
     row = dados.conn.execute("PRAGMA foreign_keys").fetchone()
     assert row[0] == 1, "PRAGMA foreign_keys deve estar ativo"
 
 
-# ---------------------------------------------------------------------------
 # Cidadão
-# ---------------------------------------------------------------------------
-
 def test_salvar_e_buscar_cidadao(dados):
     cid = _cidadao()
     dados.salvar_cidadao(cid, password_hash="hash_teste")
@@ -100,10 +75,7 @@ def test_salvar_cidadao_idempotente(dados):
     assert total == 1
 
 
-# ---------------------------------------------------------------------------
 # Empresa
-# ---------------------------------------------------------------------------
-
 def test_salvar_empresa_persiste_limite_mensal(dados):
     emp = _empresa()
     dados.salvar_empresa(emp)
@@ -124,10 +96,7 @@ def test_buscar_empresa_por_cnpj(dados):
     assert row["id"] == "emp-1"
 
 
-# ---------------------------------------------------------------------------
 # Administrador
-# ---------------------------------------------------------------------------
-
 def test_salvar_e_buscar_administrador(dados):
     adm = _admin()
     dados.salvar_administrador(adm, password_hash="admhash")
@@ -145,10 +114,7 @@ def test_buscar_admin_por_email(dados):
     assert row["id"] == "adm-1"
 
 
-# ---------------------------------------------------------------------------
 # Dispositivo
-# ---------------------------------------------------------------------------
-
 def test_salvar_e_buscar_dispositivo(dados):
     cel = _celular()
     dados.salvar_dispositivo(cel)
@@ -159,10 +125,7 @@ def test_salvar_e_buscar_dispositivo(dados):
     assert row["peso_kg"] == pytest.approx(0.194)
 
 
-# ---------------------------------------------------------------------------
 # Ponto de Coleta
-# ---------------------------------------------------------------------------
-
 def test_salvar_e_buscar_ponto(dados):
     pnt = _ponto()
     dados.salvar_ponto(pnt)
@@ -191,10 +154,7 @@ def test_buscar_todos_pontos_coleta(dados):
     assert len(pontos) == 2
 
 
-# ---------------------------------------------------------------------------
 # Solicitação salva com estado real do objeto
-# ---------------------------------------------------------------------------
-
 def test_salvar_solicitacao_usa_estado_real(dados):
     cid = _cidadao()
     pnt = _ponto()
@@ -230,10 +190,7 @@ def test_salvar_solicitacao_com_item(dados):
     assert itens[0]["observacoes"] == "tela quebrada"
 
 
-# ---------------------------------------------------------------------------
 # atualizar_solicitacao
-# ---------------------------------------------------------------------------
-
 def test_atualizar_estado_solicitacao(dados):
     cid = _cidadao()
     pnt = _ponto()
@@ -284,10 +241,7 @@ def test_atualizar_sem_metodo_preserva_metodo_anterior(dados):
     assert row["metodo_tratamento"] == "Reciclagem"  # preservado pelo COALESCE
 
 
-# ---------------------------------------------------------------------------
 # desativar_usuario (soft-delete)
-# ---------------------------------------------------------------------------
-
 def test_desativar_usuario(dados):
     cid = _cidadao()
     dados.salvar_cidadao(cid)
@@ -309,10 +263,7 @@ def test_desativar_usuario_some_do_buscar_por_cpf(dados):
     assert row is None
 
 
-# ---------------------------------------------------------------------------
 # buscar_solicitacoes_usuario
-# ---------------------------------------------------------------------------
-
 def test_buscar_solicitacoes_usuario(dados):
     cid = _cidadao()
     pnt = _ponto()
@@ -327,10 +278,7 @@ def test_buscar_solicitacoes_usuario(dados):
     assert len(rows) == 2
 
 
-# ---------------------------------------------------------------------------
 # Notificações
-# ---------------------------------------------------------------------------
-
 def test_salvar_e_buscar_notificacoes(dados):
     dados.salvar_cidadao(_cidadao())
     dados.salvar_notificacao("cid-1", "Solicitação aprovada")
@@ -340,10 +288,7 @@ def test_salvar_e_buscar_notificacoes(dados):
     assert len(notifs) == 2
 
 
-# ---------------------------------------------------------------------------
 # Contagens
-# ---------------------------------------------------------------------------
-
 def test_contar_usuarios(dados):
     dados.salvar_cidadao(_cidadao())
     dados.salvar_empresa(_empresa())
