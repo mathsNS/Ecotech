@@ -644,160 +644,340 @@ def criar_app() -> Flask:
 
 
 def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
-    """Cria os 3 perfis base e dados de demonstração para o sistema."""
+    """Cria perfis base e dados de demonstração para o sistema."""
 
     if dados.contar_usuarios() > 0:
-        return  # banco já populado, não sobrescrever
+        return
 
-    # ---- usuários base ----
+    # ---- contas credenciadas (login documentado) ----
     cidadao1 = servico_usuario.criar_usuario('cidadao', {
-        'id': 'user-1',
-        'nome': 'João Silva',
-        'email': 'joao@ecotech.com',
-        'cpf': '12345678909'
+        'id': 'user-1', 'nome': 'João Silva',
+        'email': 'joao@ecotech.com', 'cpf': '12345678909'
     }, senha='cidadao123')
 
-    empresa = servico_usuario.criar_usuario('empresa', {
-        'id': 'user-2',
-        'nome': 'Recicla Kariri',
-        'email': 'contato@recilakariri.com',
-        'cnpj': '11222333000181',
+    empresa1 = servico_usuario.criar_usuario('empresa', {
+        'id': 'user-2', 'nome': 'Recicla Kariri',
+        'email': 'contato@recilakariri.com', 'cnpj': '11222333000181',
         'razao_social': 'Recicla Kariri Reciclagem LTDA'
     }, senha='empresa123')
 
     servico_usuario.criar_usuario('administrador', {
-        'id': 'USR-ADM-001',
-        'nome': 'Admin Ecotech',
-        'email': 'admin@ecotech.com',
-        'nivel_acesso': 3
+        'id': 'USR-ADM-001', 'nome': 'Admin Ecotech',
+        'email': 'admin@ecotech.com', 'nivel_acesso': 3
     }, senha='admin123')
 
+    # ---- cidadãos adicionais ----
     cidadao2 = servico_usuario.criar_usuario('cidadao', {
-        'id': 'user-3',
-        'nome': 'Maria Santos',
-        'email': 'maria@example.com',
-        'cpf': '98765432100'
+        'id': 'user-3', 'nome': 'Ana Beatriz Ferreira',
+        'email': 'ana.ferreira@gmail.com', 'cpf': '98765432100'
+    })
+    cidadao3 = servico_usuario.criar_usuario('cidadao', {
+        'id': 'user-4', 'nome': 'Carlos Eduardo Mendes',
+        'email': 'carlos.mendes@outlook.com', 'cpf': '34945611840'
+    })
+    cidadao4 = servico_usuario.criar_usuario('cidadao', {
+        'id': 'user-5', 'nome': 'Fernanda Lima',
+        'email': 'fernanda.lima@yahoo.com.br', 'cpf': '47585901330'
+    })
+    cidadao5 = servico_usuario.criar_usuario('cidadao', {
+        'id': 'user-6', 'nome': 'Rafael Gonçalves',
+        'email': 'rafael.goncalves@hotmail.com', 'cpf': '70548478490'
+    })
+
+    # ---- empresas adicionais ----
+    empresa2 = servico_usuario.criar_usuario('empresa', {
+        'id': 'user-7', 'nome': 'TechLixo Soluções',
+        'email': 'contato@techlixo.com.br', 'cnpj': '14380200000121',
+        'razao_social': 'TechLixo Soluções Ambientais LTDA'
+    })
+    empresa3 = servico_usuario.criar_usuario('empresa', {
+        'id': 'user-8', 'nome': 'GreenCycle Nordeste',
+        'email': 'admin@greencycle.com.br', 'cnpj': '33000167000101',
+        'razao_social': 'GreenCycle Nordeste Reciclagem S.A.'
     })
 
     # ---- pontos de coleta ----
     ponto1 = servico_ponto.criar_ponto_coleta(
         'Centro de Coleta Lagoa Seca',
-        'R. Dr. Morato Saraiva, 1100 - Lagoa Seca',
-        -7.2138,
-        -39.3089,
-        1000.0
+        'R. Dr. Morato Saraiva, 1100 - Lagoa Seca, Juazeiro do Norte',
+        -7.2138, -39.3089, 1000.0
     )
-
     ponto2 = servico_ponto.criar_ponto_coleta(
-        'Centro de Coleta Cariri',
-        'Av. Padre Cícero, 500 - Centro',
-        -7.2123,
-        -39.3145,
-        2000.0
+        'Ecoponto Centro — Juazeiro do Norte',
+        'Av. Padre Cícero, 500 - Centro, Juazeiro do Norte',
+        -7.2123, -39.3145, 2000.0
+    )
+    ponto3 = servico_ponto.criar_ponto_coleta(
+        'Ecoponto UFCA',
+        'R. Olegário Emídio de Araújo, 1000 - Triângulo, Juazeiro do Norte',
+        -7.2204, -39.3156, 500.0
+    )
+    ponto4 = servico_ponto.criar_ponto_coleta(
+        'Centro de Reciclagem Crato',
+        'Av. Perimetral, 200 - São Miguel, Crato',
+        -7.2344, -39.4094, 1500.0
+    )
+    ponto5 = servico_ponto.criar_ponto_coleta(
+        'Ponto Verde Shopping Norte',
+        'Av. Tenente Raimundo Rocha, 1000 - Limoeiro, Juazeiro do Norte',
+        -7.2051, -39.3249, 800.0
     )
 
-    # ---- solicitações de exemplo ----
-
-    # solicitacao 1 - estado inicial (solicitado)
+    # ---- solicitações: João Silva ----
     sol1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
-    celular1 = DispositivoFactory.criar_celular('cel-001', 'iPhone 11', 0.194)
-    notebook1 = DispositivoFactory.criar_computador('comp-001', 'Dell Inspiron', 2.1)
-    servico_descarte.adicionar_item_solicitacao(sol1, celular1, 1, 'tela quebrada')
-    servico_descarte.adicionar_item_solicitacao(sol1, notebook1, 1, 'nao liga mais')
+    servico_descarte.adicionar_item_solicitacao(sol1,
+        DispositivoFactory.criar_celular('cel-001', 'iPhone 11', 0.194), 1, 'tela quebrada')
+    servico_descarte.adicionar_item_solicitacao(sol1,
+        DispositivoFactory.criar_computador('comp-001', 'Dell Inspiron 15 3000', 2.1), 1, 'não liga mais')
 
-    # solicitacao 2 - ja foi coletada (cidadao)
     sol2 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
-    tv1 = DispositivoFactory.criar_eletrodomestico('elet-001', 'TV Samsung 32"', 5.5)
-    servico_descarte.adicionar_item_solicitacao(sol2, tv1, 1)
-    servico_descarte.avancar_estado_solicitacao(sol2)  # coletado
+    servico_descarte.adicionar_item_solicitacao(sol2,
+        DispositivoFactory.criar_eletrodomestico('elet-001', 'TV Samsung 32" Smart', 5.5), 1)
+    servico_descarte.avancar_estado_solicitacao(sol2)
 
-    # solicitacao 3 - em processamento (empresa)
-    sol3 = servico_descarte.criar_solicitacao(empresa, ponto1)
-    celular2 = DispositivoFactory.criar_celular('cel-002', 'Samsung Galaxy S10', 0.175)
-    tablet1 = DispositivoFactory.criar_celular('cel-003', 'iPad Air', 0.460)
-    servico_descarte.adicionar_item_solicitacao(sol3, celular2, 3)
-    servico_descarte.adicionar_item_solicitacao(sol3, tablet1, 2)
-    metodo = MetodoTratamentoFactory.criar_reciclagem()
-    servico_descarte.definir_metodo_tratamento(sol3, metodo)
-    servico_descarte.avancar_estado_solicitacao(sol3)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol3)  # em processamento
+    sol3 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol3,
+        DispositivoFactory.criar_computador('comp-002', 'Monitor LG 24" Full HD', 3.2), 1)
+    servico_descarte.adicionar_item_solicitacao(sol3,
+        DispositivoFactory.criar_computador('comp-003', 'Teclado Mecânico Redragon', 0.8), 1)
+    m = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol3, m)
+    servico_descarte.avancar_estado_solicitacao(sol3)
+    servico_descarte.avancar_estado_solicitacao(sol3)
+    servico_descarte.avancar_estado_solicitacao(sol3)
 
-    # solicitacao 4 - finalizada / reciclada (cidadao)
-    sol4 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
-    monitor1 = DispositivoFactory.criar_computador('comp-002', 'Monitor LG 24"', 3.2)
-    teclado1 = DispositivoFactory.criar_computador('comp-003', 'Teclado Mecanico', 0.8)
-    servico_descarte.adicionar_item_solicitacao(sol4, monitor1, 1)
-    servico_descarte.adicionar_item_solicitacao(sol4, teclado1, 1)
-    metodo2 = MetodoTratamentoFactory.criar_reciclagem()
-    servico_descarte.definir_metodo_tratamento(sol4, metodo2)
-    servico_descarte.avancar_estado_solicitacao(sol4)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol4)  # em processamento
-    servico_descarte.avancar_estado_solicitacao(sol4)  # reciclado
+    sol4 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol4,
+        DispositivoFactory.criar_eletrodomestico('elet-002', 'Geladeira Brastemp Frost Free 360L', 45.0), 1, 'compressor queimado')
 
-    # solicitacao 5 - pendente com eletrodoméstico (cidadao)
-    sol5 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
-    geladeira = DispositivoFactory.criar_eletrodomestico('elet-002', 'Geladeira Brastemp', 45.0)
-    servico_descarte.adicionar_item_solicitacao(sol5, geladeira, 1, 'compressor queimado')
+    sol5 = servico_descarte.criar_solicitacao(cidadao1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol5,
+        DispositivoFactory.criar_computador('comp-004', 'Impressora HP LaserJet Pro M404n', 6.2), 2, 'cartucho vazando')
+    m2 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol5, m2)
+    servico_descarte.avancar_estado_solicitacao(sol5)
+    servico_descarte.avancar_estado_solicitacao(sol5)
+    servico_descarte.avancar_estado_solicitacao(sol5)
 
-    # solicitacao 6 - em processamento / reuso (empresa)
-    sol6 = servico_descarte.criar_solicitacao(empresa, ponto2)
-    pc1 = DispositivoFactory.criar_computador('comp-004', 'Desktop HP', 8.5)
-    servico_descarte.adicionar_item_solicitacao(sol6, pc1, 5, 'lote de computadores antigos')
-    metodo3 = MetodoTratamentoFactory.criar_reuso()
-    servico_descarte.definir_metodo_tratamento(sol6, metodo3)
-    servico_descarte.avancar_estado_solicitacao(sol6)  # coletado
-    servico_descarte.avancar_estado_solicitacao(sol6)  # em processamento
+    sol6 = servico_descarte.criar_solicitacao(cidadao1, ponto5)
+    servico_descarte.adicionar_item_solicitacao(sol6,
+        DispositivoFactory.criar_celular('cel-002', 'Samsung Galaxy A52', 0.189), 1)
+    servico_descarte.adicionar_item_solicitacao(sol6,
+        DispositivoFactory.criar_celular('cel-003', 'Xiaomi Redmi Note 11', 0.179), 1, 'bateria inchada')
+    m3 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol6, m3)
+    servico_descarte.avancar_estado_solicitacao(sol6)
+    servico_descarte.avancar_estado_solicitacao(sol6)
+    servico_descarte.avancar_estado_solicitacao(sol6)
 
-    # ---- histórico de entregas (João Silva) ----
-    dados.salvar_entrega(
-        '56492574920',
-        'user-1',
-        13.95,
-        'Recicla Kariri',
-        '2025-09-13',
-        '13:02',
-        'finalizado'
-    )
+    sol7 = servico_descarte.criar_solicitacao(cidadao1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol7,
+        DispositivoFactory.criar_eletrodomestico('elet-003', 'Air Fryer Mondial 4L', 3.8), 1, 'resistência queimada')
+    servico_descarte.adicionar_item_solicitacao(sol7,
+        DispositivoFactory.criar_eletrodomestico('elet-004', 'Liquidificador Arno Clic Pro', 1.6), 1)
+    m4 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol7, m4)
+    servico_descarte.avancar_estado_solicitacao(sol7)
+    servico_descarte.avancar_estado_solicitacao(sol7)
+    servico_descarte.avancar_estado_solicitacao(sol7)
 
-    dados.salvar_entrega(
-        '58293049159',
-        'user-1',
-        8.19,
-        'Recicla Kariri',
-        '2025-09-10',
-        '08:55',
-        'finalizado'
-    )
+    # ---- solicitações: Recicla Kariri ----
+    sol_rk1 = servico_descarte.criar_solicitacao(empresa1, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_rk1,
+        DispositivoFactory.criar_celular('cel-004', 'Samsung Galaxy S10', 0.175), 3)
+    servico_descarte.adicionar_item_solicitacao(sol_rk1,
+        DispositivoFactory.criar_celular('cel-005', 'iPad Air 3ª geração', 0.460), 2)
+    m5 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_rk1, m5)
+    servico_descarte.avancar_estado_solicitacao(sol_rk1)
+    servico_descarte.avancar_estado_solicitacao(sol_rk1)
 
-    dados.salvar_entrega(
-        '98358259431',
-        'user-1',
-        6.41,
-        'Recicla Kariri',
-        '2025-09-08',
-        '15:31',
-        'cancelado'
-    )
+    sol_rk2 = servico_descarte.criar_solicitacao(empresa1, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_rk2,
+        DispositivoFactory.criar_computador('comp-005', 'Desktop HP EliteDesk 800 G5', 8.5), 5, 'lote corporativo')
+    m6 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol_rk2, m6)
+    servico_descarte.avancar_estado_solicitacao(sol_rk2)
+    servico_descarte.avancar_estado_solicitacao(sol_rk2)
 
-    dados.salvar_entrega(
-        '47389088043',
-        'user-1',
-        27.65,
-        'Recicla Kariri',
-        '2025-09-03',
-        '16:44',
-        'finalizado'
-    )
+    sol_rk3 = servico_descarte.criar_solicitacao(empresa1, ponto4)
+    servico_descarte.adicionar_item_solicitacao(sol_rk3,
+        DispositivoFactory.criar_computador('comp-006', 'Servidor Dell PowerEdge R440', 12.0), 2, 'substituídos por novo modelo')
+    m7 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_rk3, m7)
+    servico_descarte.avancar_estado_solicitacao(sol_rk3)
+    servico_descarte.avancar_estado_solicitacao(sol_rk3)
+    servico_descarte.avancar_estado_solicitacao(sol_rk3)
 
-    dados.salvar_entrega(
-        '57463968973',
-        'user-1',
-        12.53,
-        'Recicla Kariri',
-        '2025-09-02',
-        '08:21',
-        'finalizado'
-    )
+    sol_rk4 = servico_descarte.criar_solicitacao(empresa1, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_rk4,
+        DispositivoFactory.criar_eletrodomestico('elet-005', 'Ar Condicionado Gree 12000BTU', 28.5), 4, 'gás refrigerante obsoleto')
+    m8 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_rk4, m8)
+    servico_descarte.avancar_estado_solicitacao(sol_rk4)
+    servico_descarte.avancar_estado_solicitacao(sol_rk4)
+    servico_descarte.avancar_estado_solicitacao(sol_rk4)
+
+    # ---- solicitações: Ana Beatriz ----
+    sol_ana1 = servico_descarte.criar_solicitacao(cidadao2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_ana1,
+        DispositivoFactory.criar_celular('cel-006', 'Motorola Moto G82', 0.173), 1)
+    servico_descarte.avancar_estado_solicitacao(sol_ana1)
+
+    sol_ana2 = servico_descarte.criar_solicitacao(cidadao2, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_ana2,
+        DispositivoFactory.criar_eletrodomestico('elet-006', 'Micro-ondas Electrolux MEF41', 11.0), 1, 'prato giratório quebrado')
+    m9 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_ana2, m9)
+    servico_descarte.avancar_estado_solicitacao(sol_ana2)
+    servico_descarte.avancar_estado_solicitacao(sol_ana2)
+    servico_descarte.avancar_estado_solicitacao(sol_ana2)
+
+    sol_ana3 = servico_descarte.criar_solicitacao(cidadao2, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_ana3,
+        DispositivoFactory.criar_celular('cel-007', 'Notebook Samsung Book', 1.5), 1, 'tela com manchas')
+
+    # ---- solicitações: Carlos Eduardo ----
+    sol_car1 = servico_descarte.criar_solicitacao(cidadao3, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_car1,
+        DispositivoFactory.criar_computador('comp-007', 'Notebook Lenovo ThinkPad E14', 1.85), 1)
+    servico_descarte.adicionar_item_solicitacao(sol_car1,
+        DispositivoFactory.criar_computador('comp-008', 'Mouse sem fio Logitech MX Master', 0.09), 2)
+
+    sol_car2 = servico_descarte.criar_solicitacao(cidadao3, ponto5)
+    servico_descarte.adicionar_item_solicitacao(sol_car2,
+        DispositivoFactory.criar_eletrodomestico('elet-007', 'Micro System Philips BTB2595', 4.5), 1, 'caixa de som danificada')
+    m10 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_car2, m10)
+    servico_descarte.avancar_estado_solicitacao(sol_car2)
+    servico_descarte.avancar_estado_solicitacao(sol_car2)
+    servico_descarte.avancar_estado_solicitacao(sol_car2)
+
+    # ---- solicitações: Fernanda Lima ----
+    sol_fer1 = servico_descarte.criar_solicitacao(cidadao4, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_fer1,
+        DispositivoFactory.criar_celular('cel-008', 'Samsung Galaxy Tab A7', 0.476), 1)
+    servico_descarte.adicionar_item_solicitacao(sol_fer1,
+        DispositivoFactory.criar_celular('cel-009', 'AirPods Pro 2ª geração', 0.061), 2, 'bateria viciada')
+    servico_descarte.avancar_estado_solicitacao(sol_fer1)
+
+    sol_fer2 = servico_descarte.criar_solicitacao(cidadao4, ponto4)
+    servico_descarte.adicionar_item_solicitacao(sol_fer2,
+        DispositivoFactory.criar_eletrodomestico('elet-008', 'Cafeteira Nespresso Vertuo', 2.3), 1, 'bomba de pressão com defeito')
+    m11 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_fer2, m11)
+    servico_descarte.avancar_estado_solicitacao(sol_fer2)
+    servico_descarte.avancar_estado_solicitacao(sol_fer2)
+    servico_descarte.avancar_estado_solicitacao(sol_fer2)
+
+    # ---- solicitações: Rafael Gonçalves ----
+    sol_raf1 = servico_descarte.criar_solicitacao(cidadao5, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_raf1,
+        DispositivoFactory.criar_computador('comp-009', 'PC Gamer Pichau Orion', 9.2), 1, 'fonte queimada')
+    servico_descarte.adicionar_item_solicitacao(sol_raf1,
+        DispositivoFactory.criar_celular('cel-010', 'Monitor Gamer ASUS 27" 144Hz', 4.8), 1, 'pixels mortos')
+    m12 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol_raf1, m12)
+    servico_descarte.avancar_estado_solicitacao(sol_raf1)
+    servico_descarte.avancar_estado_solicitacao(sol_raf1)
+    servico_descarte.avancar_estado_solicitacao(sol_raf1)
+
+    # ---- solicitações: TechLixo Soluções ----
+    sol_tl1 = servico_descarte.criar_solicitacao(empresa2, ponto4)
+    servico_descarte.adicionar_item_solicitacao(sol_tl1,
+        DispositivoFactory.criar_computador('comp-010', 'Switch Cisco Catalyst 2960', 4.5), 4, 'fim de vida útil')
+    servico_descarte.adicionar_item_solicitacao(sol_tl1,
+        DispositivoFactory.criar_computador('comp-011', 'Roteador Mikrotik CCR1009', 1.2), 6, 'substituição de infraestrutura')
+    m13 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_tl1, m13)
+    servico_descarte.avancar_estado_solicitacao(sol_tl1)
+    servico_descarte.avancar_estado_solicitacao(sol_tl1)
+    servico_descarte.avancar_estado_solicitacao(sol_tl1)
+
+    sol_tl2 = servico_descarte.criar_solicitacao(empresa2, ponto3)
+    servico_descarte.adicionar_item_solicitacao(sol_tl2,
+        DispositivoFactory.criar_eletrodomestico('elet-009', 'Nobreak APC Smart-UPS 1500VA', 22.0), 8, 'baterias sulfatadas')
+    m14 = MetodoTratamentoFactory.criar_reciclagem()
+    servico_descarte.definir_metodo_tratamento(sol_tl2, m14)
+    servico_descarte.avancar_estado_solicitacao(sol_tl2)
+    servico_descarte.avancar_estado_solicitacao(sol_tl2)
+    servico_descarte.avancar_estado_solicitacao(sol_tl2)
+
+    sol_tl3 = servico_descarte.criar_solicitacao(empresa2, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_tl3,
+        DispositivoFactory.criar_computador('comp-012', 'Workstation Dell Precision 5820', 18.0), 3, 'atualização de parque')
+    servico_descarte.avancar_estado_solicitacao(sol_tl3)
+
+    # ---- solicitações: GreenCycle Nordeste ----
+    sol_gc1 = servico_descarte.criar_solicitacao(empresa3, ponto2)
+    servico_descarte.adicionar_item_solicitacao(sol_gc1,
+        DispositivoFactory.criar_eletrodomestico('elet-010', 'TV LG 55" OLED C1', 17.8), 3, 'telas com defeito de fábrica')
+    servico_descarte.avancar_estado_solicitacao(sol_gc1)
+
+    sol_gc2 = servico_descarte.criar_solicitacao(empresa3, ponto5)
+    servico_descarte.adicionar_item_solicitacao(sol_gc2,
+        DispositivoFactory.criar_eletrodomestico('elet-011', 'Ar Condicionado Daikin Inverter 18000BTU', 35.0), 2, 'gás R22 obsoleto')
+    m15 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol_gc2, m15)
+    servico_descarte.avancar_estado_solicitacao(sol_gc2)
+    servico_descarte.avancar_estado_solicitacao(sol_gc2)
+    servico_descarte.avancar_estado_solicitacao(sol_gc2)
+
+    sol_gc3 = servico_descarte.criar_solicitacao(empresa3, ponto1)
+    servico_descarte.adicionar_item_solicitacao(sol_gc3,
+        DispositivoFactory.criar_computador('comp-013', 'Laptop Corporativo Lenovo ThinkPad T490', 1.6), 12, 'renovação de frota')
+    m16 = MetodoTratamentoFactory.criar_reuso()
+    servico_descarte.definir_metodo_tratamento(sol_gc3, m16)
+    servico_descarte.avancar_estado_solicitacao(sol_gc3)
+    servico_descarte.avancar_estado_solicitacao(sol_gc3)
+    servico_descarte.avancar_estado_solicitacao(sol_gc3)
+
+    # ---- histórico de entregas: João Silva ----
+    _entregas_joao = [
+        ('ENT-2026-0412', '2026-04-12', '09:14', 40.20, 'GreenCycle Nordeste', 'finalizado'),
+        ('ENT-2026-0328', '2026-03-28', '14:32', 12.40, 'TechLixo Soluções',   'finalizado'),
+        ('ENT-2026-0315', '2026-03-15', '11:05', 5.40,  'Recicla Kariri',       'finalizado'),
+        ('ENT-2026-0228', '2026-02-28', '16:50', 3.68,  'Recicla Kariri',       'cancelado'),
+        ('ENT-2026-0214', '2026-02-14', '08:22', 13.95, 'TechLixo Soluções',   'finalizado'),
+        ('ENT-2026-0130', '2026-01-30', '13:47', 8.19,  'GreenCycle Nordeste', 'finalizado'),
+        ('ENT-2026-0110', '2026-01-10', '10:03', 27.65, 'Recicla Kariri',       'finalizado'),
+        ('ENT-2025-1218', '2025-12-18', '15:31', 6.41,  'TechLixo Soluções',   'finalizado'),
+        ('ENT-2025-1205', '2025-12-05', '09:58', 12.53, 'Recicla Kariri',       'finalizado'),
+        ('ENT-2025-1122', '2025-11-22', '17:20', 4.10,  'GreenCycle Nordeste', 'cancelado'),
+        ('ENT-2025-1108', '2025-11-08', '08:45', 18.30, 'Recicla Kariri',       'finalizado'),
+        ('ENT-2025-1025', '2025-10-25', '13:02', 9.75,  'TechLixo Soluções',   'finalizado'),
+        ('ENT-2025-1010', '2025-10-10', '14:19', 22.80, 'GreenCycle Nordeste', 'finalizado'),
+        ('ENT-2025-0928', '2025-09-28', '10:30', 7.60,  'Recicla Kariri',       'finalizado'),
+        ('ENT-2025-0913', '2025-09-13', '13:02', 13.95, 'Recicla Kariri',       'finalizado'),
+    ]
+    for eid, data, hora, valor, empresa, status in _entregas_joao:
+        dados.salvar_entrega(eid, 'user-1', valor, empresa, data, hora, status)
+
+    # ---- notificações ----
+    _notifs = [
+        ('user-1', 'Sua solicitação foi recebida e aguarda coleta. Em breve entraremos em contato.'),
+        ('user-1', 'Parabéns! Você ganhou R$ 40,20 de incentivo pela coleta ENT-2026-0412.'),
+        ('user-1', 'Sua TV Samsung 32" foi coletada e está em processamento.'),
+        ('user-1', 'Missão concluída: você atingiu 5 descartes realizados! Continue assim.'),
+        ('user-1', 'Novo bônus disponível: ganhe 20% a mais neste fim de semana em coletas de eletrodomésticos.'),
+        ('user-1', 'Sua solicitação de saque foi processada. Valor creditado em até 2 dias úteis.'),
+        ('user-2', 'Lote de computadores Dell foi recebido no Ecoponto Centro. Processamento iniciado.'),
+        ('user-2', 'Relatório mensal disponível: 114 kg reciclados em março de 2026.'),
+        ('user-2', 'Seus servidores Dell PowerEdge foram reciclados com sucesso.'),
+        ('user-3', 'Sua solicitação de coleta do Motorola Moto G82 foi recebida.'),
+        ('user-3', 'Micro-ondas processado com sucesso. R$ 1,10 de incentivo creditado.'),
+        ('user-4', 'Coleta do Micro System Philips agendada. Aguarde confirmação.'),
+        ('user-4', 'Reciclagem concluída! Você evitou 0,5 kg de CO₂ com este descarte.'),
+        ('user-5', 'Seus AirPods Pro foram coletados no Ecoponto Centro.'),
+        ('user-5', 'Cafeteira Nespresso processada com sucesso via reciclagem.'),
+        ('user-6', 'PC Gamer e monitor retirados para reutilização. Obrigado pelo descarte responsável!'),
+        ('user-7', 'Lote de switches Cisco foi reciclado. Relatório de impacto disponível.'),
+        ('user-7', 'Novo ponto de coleta disponível próximo à sua área de operação.'),
+        ('user-8', 'Renovação de frota aprovada: 12 notebooks ThinkPad encaminhados para reuso.'),
+        ('user-8', 'Ar condicionados coletados e em processo de reutilização de componentes.'),
+    ]
+    for uid, msg in _notifs:
+        dados.salvar_notificacao(uid, msg)
 
 
 if __name__ == '__main__':
