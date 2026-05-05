@@ -98,7 +98,7 @@
 
             <div class="form-section">
                 <form method="POST" action="{{ url_for('saque') }}">
-                <input type="hidden" name="metodo" id="metodo_selecionado" value="Pix">
+                <input type="hidden" name="metodo" id="metodo_selecionado" value="Cartao">
                 <div class="form-group">
                     <label>Nome*</label>
                     <input type="text" name="nome" class="form-control" placeholder="Seu nome completo" value="{{ usuario.nome }}" required>

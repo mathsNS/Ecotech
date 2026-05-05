@@ -26,9 +26,10 @@
             </div>
 
             <!-- tier e progresso -->
+            {% set _tier_num = {'Bronze': 1, 'Prata': 2, 'Ouro': 3, 'Platina': 4} %}
             <div class="tier-section">
                 <div class="tier-badge">
-                    <span class="tier-number">{{ loop.index0 + 1 if tier_info.nome in ['Bronze','Prata','Ouro','Platina'] else 1 }}</span>
+                    <span class="tier-number">{{ _tier_num.get(tier_info.nome, 1) }}</span>
                     <span class="tier-name">Tier {{ tier_info.nome }}</span>
                 </div>
                 <div class="tier-progress">

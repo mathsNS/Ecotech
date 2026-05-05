@@ -465,35 +465,37 @@ class ServicoUsuario:
         """Carrega usuários do banco para o cache."""
         usuarios_db = self._dados.buscar_todos_usuarios()
         for u in usuarios_db:
-            # reconstroi objetos de usuario baseado no tipo
-            if u['tipo'] == 'cidadao':
-                dados_cidadao = self._dados.buscar_cidadao(u['id'])
-                if dados_cidadao:
-                    usuario = Cidadao(
-                        dados_cidadao['id'],
-                        dados_cidadao['nome'],
-                        dados_cidadao['email'],
-                        dados_cidadao['cpf']
+            try:
+                if u['tipo'] == 'cidadao':
+                    dados_cidadao = self._dados.buscar_cidadao(u['id'])
+                    if dados_cidadao:
+                        usuario = Cidadao(
+                            dados_cidadao['id'],
+                            dados_cidadao['nome'],
+                            dados_cidadao['email'],
+                            dados_cidadao['cpf']
+                        )
+                        self._usuarios[u['id']] = usuario
+                elif u['tipo'] == 'empresa':
+                    dados_empresa = self._dados.buscar_empresa(u['id'])
+                    if dados_empresa:
+                        usuario = Empresa(
+                            dados_empresa['id'],
+                            dados_empresa['nome'],
+                            dados_empresa['email'],
+                            dados_empresa['cnpj'],
+                            dados_empresa['razao_social']
+                        )
+                        self._usuarios[u['id']] = usuario
+                elif u['tipo'] == 'administrador':
+                    usuario = Administrador(
+                        u['id'],
+                        u['nome'],
+                        u['email']
                     )
                     self._usuarios[u['id']] = usuario
-            elif u['tipo'] == 'empresa':
-                dados_empresa = self._dados.buscar_empresa(u['id'])
-                if dados_empresa:
-                    usuario = Empresa(
-                        dados_empresa['id'],
-                        dados_empresa['nome'],
-                        dados_empresa['email'],
-                        dados_empresa['cnpj'],
-                        dados_empresa['razao_social']
-                    )
-                    self._usuarios[u['id']] = usuario
-            elif u['tipo'] == 'administrador':
-                usuario = Administrador(
-                    u['id'],
-                    u['nome'],
-                    u['email']
-                )
-                self._usuarios[u['id']] = usuario
+            except (ValueError, KeyError):
+                pass
     
     def criar_usuario(self, tipo: str, dados: Dict, senha: str = "") -> Usuario:
         """Cria e persiste um usuário. Gera hash da senha se fornecida."""

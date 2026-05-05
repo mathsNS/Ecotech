@@ -225,27 +225,15 @@ def criar_app() -> Flask:
         
         # dashboard para cidadão - busca entregas do histórico
         entregas_db = dados.buscar_entregas_usuario(usuario['id'])
-        
-        # converte e ordena entregas por data
+
         entregas = []
         for e in entregas_db:
-            # substitui abreviações de mês
-            data_str = e['data'].replace('Jan', '01').replace('Fev', '02').replace('Feb', '02')
-            data_str = data_str.replace('Mar', '03').replace('Abr', '04').replace('Apr', '04')
-            data_str = data_str.replace('Mai', '05').replace('May', '05').replace('Jun', '06')
-            data_str = data_str.replace('Jul', '07').replace('Ago', '08').replace('Aug', '08')
-            data_str = data_str.replace('Set', '09').replace('Sep', '09').replace('Out', '10')
-            data_str = data_str.replace('Oct', '10').replace('Nov', '11').replace('Dez', '12')
-            data_str = data_str.replace('Dec', '12')
-            
-            partes = data_str.split()
-            if len(partes) == 3:
-                data_ordenavel = f"{partes[2]}-{partes[1]}-{partes[0]} {e['hora']}"
-                data_formatada = f"{partes[0]}/{partes[1]}"  # dd/mm
-            else:
-                data_ordenavel = e['data'] + ' ' + e['hora']
+            try:
+                dt = datetime.strptime(e['data'], '%Y-%m-%d')
+                data_formatada = dt.strftime('%d/%m/%Y')
+            except (ValueError, TypeError):
                 data_formatada = e['data']
-            
+                dt = datetime.min
             entregas.append({
                 'valor': e['valor'],
                 'empresa': e['empresa'],
@@ -254,11 +242,10 @@ def criar_app() -> Flask:
                 'data_formatada': data_formatada,
                 'hora': e['hora'],
                 'status': e['status'],
-                '_data_ordenavel': data_ordenavel
+                '_dt': dt,
             })
-        
-        # ordena por data (mais recente primeiro)
-        entregas.sort(key=lambda x: x['_data_ordenavel'], reverse=True)
+
+        entregas.sort(key=lambda x: x['_dt'], reverse=True)
         
         # calcula porcentagens para barras de progresso
         progresso = servico_descarte.calcular_progresso(solicitacoes_usuario)
@@ -300,14 +287,17 @@ def criar_app() -> Flask:
                 peso_kg           = float(request.form.get('peso_kg', 1.0))
                 quantidade        = int(request.form.get('quantidade', 1))
                 observacoes       = request.form.get('observacoes_endereco', '').strip()
+                ponto_id          = request.form.get('ponto_id', '').strip()
 
                 usuario_obj = servico_usuario.buscar_usuario(usuario['id'])
                 if not usuario_obj:
                     flash('Usuário não encontrado.', 'error')
                     return redirect(url_for('nova_solicitacao'))
 
-                pontos_disponiveis = servico_ponto.listar_pontos()
-                ponto = pontos_disponiveis[0] if pontos_disponiveis else None
+                ponto = servico_ponto.buscar_ponto(ponto_id) if ponto_id else None
+                if ponto is None:
+                    pontos_disponiveis = servico_ponto.listar_pontos()
+                    ponto = pontos_disponiveis[0] if pontos_disponiveis else None
 
                 solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
 
@@ -323,11 +313,10 @@ def criar_app() -> Flask:
             except ValueError as e:
                 flash(str(e), 'error')
         
-        # data minima para agendamento eh hoje
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
-        
-        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje)
+        pontos_coleta_lista = servico_ponto.listar_pontos()
+        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje, pontos=pontos_coleta_lista)
     
     @app.route('/pontos-coleta')
     def pontos_coleta():
@@ -390,30 +379,15 @@ def criar_app() -> Flask:
         
         # busca entregas do usuario no banco de dados
         entregas_db = dados.buscar_entregas_usuario(usuario['id'])
-        
-        # converte para o formato esperado pelo template
-        from datetime import datetime
-        import locale
-        
+
         entregas = []
         for e in entregas_db:
-            # substitui abreviacoes pt e ing
-            data_str = e['data'].replace('Jan', '01').replace('Fev', '02').replace('Feb', '02')
-            data_str = data_str.replace('Mar', '03').replace('Abr', '04').replace('Apr', '04')
-            data_str = data_str.replace('Mai', '05').replace('May', '05').replace('Jun', '06')
-            data_str = data_str.replace('Jul', '07').replace('Ago', '08').replace('Aug', '08')
-            data_str = data_str.replace('Set', '09').replace('Sep', '09').replace('Out', '10')
-            data_str = data_str.replace('Oct', '10').replace('Nov', '11').replace('Dez', '12')
-            data_str = data_str.replace('Dec', '12')
-            
-            partes = data_str.split()
-            if len(partes) == 3:
-                data_ordenavel = f"{partes[2]}-{partes[1]}-{partes[0]} {e['hora']}"
-                data_formatada = f"{partes[0]}/{partes[1]}"  # dd/mm
-            else:
-                data_ordenavel = e['data'] + ' ' + e['hora']
+            try:
+                dt = datetime.strptime(e['data'], '%Y-%m-%d')
+                data_formatada = dt.strftime('%d/%m/%Y')
+            except (ValueError, TypeError):
                 data_formatada = e['data']
-            
+                dt = datetime.min
             entregas.append({
                 'valor': e['valor'],
                 'empresa': e['empresa'],
@@ -422,12 +396,11 @@ def criar_app() -> Flask:
                 'data_formatada': data_formatada,
                 'hora': e['hora'],
                 'status': e['status'],
-                '_data_ordenavel': data_ordenavel
+                '_dt': dt,
             })
-        
-        # ordena por data (mais recente primeiro)
-        entregas.sort(key=lambda x: x['_data_ordenavel'], reverse=True)
-        
+
+        entregas.sort(key=lambda x: x['_dt'], reverse=True)
+
         return render_template(
             'ultimas_entregas.html',
             usuario=usuario,
@@ -575,27 +548,45 @@ def criar_app() -> Flask:
             ]
             titulo_relatorio = f"Relatório de {usuario['nome']}"
         
-        # gera relatorio usando o servico
+        # lê filtro de período (GET params)
+        data_inicio_str = request.args.get('data_inicio', '').strip()
+        data_fim_str    = request.args.get('data_fim', '').strip()
+        data_inicio_dt  = None
+        data_fim_dt     = None
+        try:
+            if data_inicio_str:
+                data_inicio_dt = datetime.strptime(data_inicio_str, '%Y-%m-%d')
+            if data_fim_str:
+                data_fim_dt = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        except ValueError:
+            pass
+
         relatorio = servico_relatorio.gerar_relatorio_periodo(
             titulo_relatorio,
-            solicitacoes_para_relatorio
+            solicitacoes_para_relatorio,
+            data_inicio=data_inicio_dt,
+            data_fim=data_fim_dt
         )
-        
-        # pega metricas do relatorio
+
         metricas = relatorio.gerar_relatorio()
-        
-        # filtra solicitacoes finalizadas para mostrar na tabela
+
+        # filtra solicitacoes finalizadas para mostrar na tabela (respeitando o filtro de data)
+        estados_finais = {'Reciclado', 'Reutilizado', 'Descartado'}
         solicitacoes_finalizadas = [
             s for s in solicitacoes_para_relatorio
-            if s.estado.obter_nome() in ['Reciclado', 'Reutilizado', 'Descartado']
+            if s.estado.obter_nome() in estados_finais
+            and (data_inicio_dt is None or s._data_criacao >= data_inicio_dt)
+            and (data_fim_dt    is None or s._data_criacao <= data_fim_dt)
         ]
-        
+
         return render_template(
             'relatorios.html',
             usuario=usuario,
             metricas=metricas,
             solicitacoes=solicitacoes_finalizadas,
-            is_admin=usuario['tipo'] == 'administrador'
+            is_admin=usuario['tipo'] == 'administrador',
+            data_inicio_str=data_inicio_str,
+            data_fim_str=data_fim_str,
         )
     
     @app.route('/usuarios')
@@ -763,7 +754,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'user-1',
         13.95,
         'Recicla Kariri',
-        '13 Set 2025',
+        '2025-09-13',
         '13:02',
         'finalizado'
     )
@@ -773,7 +764,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'user-1',
         8.19,
         'Recicla Kariri',
-        '10 Set 2025',
+        '2025-09-10',
         '08:55',
         'finalizado'
     )
@@ -783,7 +774,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'user-1',
         6.41,
         'Recicla Kariri',
-        '08 Set 2025',
+        '2025-09-08',
         '15:31',
         'cancelado'
     )
@@ -793,7 +784,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'user-1',
         27.65,
         'Recicla Kariri',
-        '03 Set 2025',
+        '2025-09-03',
         '16:44',
         'finalizado'
     )
@@ -803,7 +794,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'user-1',
         12.53,
         'Recicla Kariri',
-        '02 Set 2025',
+        '2025-09-02',
         '08:21',
         'finalizado'
     )

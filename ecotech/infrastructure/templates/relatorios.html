@@ -10,6 +10,22 @@
             <div>
                 <h1>Relatórios Ambientais</h1>
             </div>
+            <form method="GET" class="filtro-periodo">
+                <div class="filtro-group">
+                    <label for="data_inicio">De</label>
+                    <input type="date" id="data_inicio" name="data_inicio" class="filtro-input"
+                           value="{{ data_inicio_str }}">
+                </div>
+                <div class="filtro-group">
+                    <label for="data_fim">Até</label>
+                    <input type="date" id="data_fim" name="data_fim" class="filtro-input"
+                           value="{{ data_fim_str }}">
+                </div>
+                <button type="submit" class="btn-filtrar">Filtrar</button>
+                {% if data_inicio_str or data_fim_str %}
+                <a href="{{ url_for('relatorios') }}" class="btn-limpar">Limpar</a>
+                {% endif %}
+            </form>
         </div>
 
         <!-- cards metricas principais -->
@@ -151,4 +167,15 @@
         </div>
     </div>
 </div>
+
+<style>
+.relatorios-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.filtro-periodo { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.filtro-group { display: flex; flex-direction: column; gap: 4px; }
+.filtro-group label { font-size: 12px; font-weight: 600; color: #6b7280; }
+.filtro-input { border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; color: #111827; }
+.btn-filtrar { background: #10b981; color: white; border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-filtrar:hover { background: #059669; }
+.btn-limpar { color: #6b7280; font-size: 13px; text-decoration: underline; }
+</style>
 {% endblock %}
