@@ -17,7 +17,7 @@
             <div class="profile-stats-inline">
                 <div class="stat-inline">
                     <img src="{{ url_for('static', filename='images/medalha.png') }}" alt="Tier" class="stat-icon-small">
-                    <span class="stat-value">2º</span>
+                    <span class="stat-value">{{ rank }}º</span>
                 </div>
                 <div class="stat-inline">
                     <img src="{{ url_for('static', filename='images/estrela.png') }}" alt="Pontos" class="stat-icon-small">
@@ -28,16 +28,20 @@
             <!-- tier e progresso -->
             <div class="tier-section">
                 <div class="tier-badge">
-                    <span class="tier-number">1</span>
-                    <span class="tier-name">Tier prata</span>
+                    <span class="tier-number">{{ loop.index0 + 1 if tier_info.nome in ['Bronze','Prata','Ouro','Platina'] else 1 }}</span>
+                    <span class="tier-name">Tier {{ tier_info.nome }}</span>
                 </div>
                 <div class="tier-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: 84%;"></div>
+                        <div class="progress-fill" style="width: {{ tier_info.progresso_pct }}%;"></div>
                     </div>
                     <div class="progress-info">
-                        <span>126/150</span>
-                        <span class="next-tier">Próximo tier: Ouro</span>
+                        <span>{{ pontos }}{% if tier_info.meta %}/{{ tier_info.meta }}{% endif %}</span>
+                        {% if tier_info.proximo_nome != '—' %}
+                        <span class="next-tier">Próximo tier: {{ tier_info.proximo_nome }}</span>
+                        {% else %}
+                        <span class="next-tier">Tier máximo!</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -46,33 +50,24 @@
             <div class="conquistas-section">
                 <h3>Conquistas</h3>
                 <div class="conquistas-badges">
-                    <div class="conquista-circle active">
-                        <img src="{{ url_for('static', filename='images/medalha.png') }}" alt="5 pontos">
-                        <span class="conquista-number">5</span>
+                    {% for c in conquistas %}
+                    <div class="conquista-circle {{ 'active' if c.ativa }}" title="{{ c.label }}">
+                        <img src="{{ url_for('static', filename='images/' + c.icone + '.png') }}" alt="{{ c.label }}">
+                        <span class="conquista-number">{{ c.valor }}</span>
                     </div>
-                    <div class="conquista-circle active">
-                        <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="10 pontos">
-                        <span class="conquista-number">10</span>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
-            <!-- placar amigos -->
+            <!-- placar -->
             <div class="leaderboard-section">
-                <h3>Placar dos Amigos</h3>
+                <h3>Sua posição</h3>
                 <div class="leaderboard-list">
                     <div class="leaderboard-item-new highlight">
-                        <span class="rank-number">1</span>
+                        <span class="rank-number">{{ rank }}</span>
                         <div class="player-info">
-                            <strong>Você</strong>
+                            <strong>{{ usuario.nome }}</strong>
                             <span class="points-small">{{ pontos }} pontos</span>
-                        </div>
-                    </div>
-                    <div class="leaderboard-item-new">
-                        <span class="rank-number">2</span>
-                        <div class="player-info">
-                            <strong>Pedro Santos</strong>
-                            <span class="points-small">200 pontos</span>
                         </div>
                     </div>
                 </div>

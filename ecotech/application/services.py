@@ -18,7 +18,14 @@ from ..domain.repositorio import RepositorioBase
 
 class ServicoDescarte:
     """Gerencia solicitações de descarte e coordena os objetos de domínio."""
-    
+
+    _TIERS = [
+        (0,    'Bronze',  300,  'Prata'),
+        (300,  'Prata',   600,  'Ouro'),
+        (600,  'Ouro',    1200, 'Platina'),
+        (1200, 'Platina', None, None),
+    ]
+
     def __init__(self, dados: Optional[RepositorioBase] = None, servico_usuario=None, servico_ponto=None):
         self._dados = dados
         self._servico_usuario = servico_usuario
@@ -229,6 +236,20 @@ class ServicoDescarte:
             'processando': sum(1 for s in solicitacoes if s.estado.obter_nome() == 'Em Processamento'),
             'finalizadas': sum(1 for s in solicitacoes if s.estado.obter_nome() in _finais),
         }
+
+    @staticmethod
+    def calcular_info_tier(pontos: int) -> dict:
+        """Retorna nome, meta, proximo_nome e progresso_pct do tier atual."""
+        for minimo, nome, meta, proximo in reversed(ServicoDescarte._TIERS):
+            if pontos >= minimo:
+                progresso_pct = min(round((pontos / meta) * 100), 100) if meta else 100
+                return {
+                    'nome': nome,
+                    'meta': meta,
+                    'proximo_nome': proximo or '—',
+                    'progresso_pct': progresso_pct,
+                }
+        return {'nome': 'Bronze', 'meta': 300, 'proximo_nome': 'Prata', 'progresso_pct': 0}
 
 
 class ServicoRelatorio:

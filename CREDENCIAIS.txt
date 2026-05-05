@@ -1,0 +1,41 @@
+============================================================
+  ECOTECH — contas padrao
+============================================================
+
+------------------------------------------------------------
+  CIDADÃO
+------------------------------------------------------------
+  Nome:   João Silva
+  E-mail: joao@ecotech.com
+  CPF:    123.456.789-09
+  Senha:  cidadao123
+
+------------------------------------------------------------
+  EMPRESA
+------------------------------------------------------------
+  Nome:         Recicla Kariri
+  Razão Social: Recicla Kariri Reciclagem LTDA
+  E-mail:       contato@recilakariri.com
+  CNPJ:         11.222.333/0001-81
+  Senha:        empresa123
+
+------------------------------------------------------------
+  ADMINISTRADOR
+------------------------------------------------------------
+  Nome:   Admin Ecotech
+  E-mail: admin@ecotech.com
+  Senha:  admin123
+
+============================================================
+  COMO FAZER LOGIN
+============================================================
+
+  1. Acesse /login
+  2. Selecione o tipo de conta (Cidadão / Empresa / Administrador)
+  3. Cidadão  → informe o CPF   (apenas dígitos: 12345678909)
+     Empresa  → informe o CNPJ  (apenas dígitos: 11222333000181)
+     Admin    → informe o e-mail (admin@ecotech.com)
+  4. Informe a senha correspondente acima
+  5. Clique em "Entrar"
+
+============================================================

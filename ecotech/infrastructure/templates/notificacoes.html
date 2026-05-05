@@ -10,84 +10,25 @@
     </div>
 
     <div class="notifications-container">
-<!-- credito finalizado -->
-<div class="notification-card notification-success">
-    <div class="notification-badge success">
-        <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Crédito">
+{% for n in notificacoes %}
+<div class="notification-card notification-{{ n.tipo }}">
+    <div class="notification-badge {{ n.tipo }}">
+        <img src="{{ url_for('static', filename='images/notif-' + n.icone + '.png') }}" alt="">
     </div>
-
     <div class="notification-body">
         <div class="notification-header">
-            <h3>Sua coleta foi finalizada e você recebeu R$ 13,95!</h3>
-            <span class="notification-dot unread"></span>
+            <h3>{{ n.titulo }}</h3>
+            <span class="notification-dot {{ 'unread' if not n.lida }}"></span>
         </div>
-
-        <p class="notification-message">
-            Mais detalhes em
-            <a href="{{ url_for('ultimas_entregas') }}" class="notification-link">
-                últimas entregas
-            </a>
-        </p>
-
-        <span class="notification-timestamp">13:02</span>
+        <p class="notification-message">{{ n.mensagem }}</p>
+        <span class="notification-timestamp">{{ n.data.strftime('%d/%m/%Y %H:%M') }}</span>
     </div>
 </div>
-
-        <!-- saque via pix -->
-        <div class="notification-card notification-success">
-            <div class="notification-badge success">
-                <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="PIX">
-            </div>
-            <div class="notification-body">
-                <div class="notification-header">
-                    <h3>Saque efetuado!</h3>
-                </div>
-                <p class="notification-message">Você transferiu R$ 6,50 via PIX</p>
-                <span class="notification-timestamp">Hoje</span>
-            </div>
-        </div>
-
-        <!-- atualizacao do mapa -->
-        <div class="notification-card notification-info">
-            <div class="notification-badge info">
-                <img src="{{ url_for('static', filename='images/notif-mapa.png') }}" alt="Mapa">
-            </div>
-            <div class="notification-body">
-                <div class="notification-header">
-                    <h3>Mapa de pontos atualizado</h3>
-                </div>
-                <p class="notification-message">Novos pontos de coleta foram adicionados perto de você.</p>
-                <span class="notification-timestamp">Ontem</span>
-            </div>
-        </div>
-
-        <!-- oferta de empresa proxima -->
-        <div class="notification-card notification-warning">
-            <div class="notification-badge warning">
-                <img src="{{ url_for('static', filename='images/notif-oferta.png') }}" alt="Oferta">
-            </div>
-            <div class="notification-body">
-                <div class="notification-header">
-                    <h3>Promoção especial disponível!</h3>
-                </div>
-                <p class="notification-message">Descarte 3 aparelhos e ganhe bônus em créditos.</p>
-                <span class="notification-timestamp">3 dias atrás</span>
-            </div>
-        </div>
-
-        <!-- status da coleta -->
-        <div class="notification-card notification-primary">
-            <div class="notification-badge primary">
-                <img src="{{ url_for('static', filename='images/notif-coleta.png') }}" alt="Coleta">
-            </div>
-            <div class="notification-body">
-                <div class="notification-header">
-                    <h3>Sua solicitação de coleta foi iniciada</h3>
-                </div>
-                <p class="notification-message">Sua solicitação agendada foi iniciada. Aguarde a coleta.</p>
-                <span class="notification-timestamp">1 semana atrás</span>
-            </div>
-        </div>
+{% else %}
+<div class="empty-state">
+    <p>Nenhuma notificação no momento.</p>
+</div>
+{% endfor %}
     </div>
 </div>
 

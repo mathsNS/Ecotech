@@ -120,7 +120,14 @@
                                 <td>
                                     <button 
                                         class="btn-action btn-details" 
-                                        onclick="abrirDetalhes('{{ sol.id }}')"
+                                        onclick="abrirDetalhes(this)"
+                                        data-id="{{ sol.id }}"
+                                        data-usuario="{{ sol.usuario.nome }}"
+                                        data-ponto="{{ sol.ponto_coleta.nome if sol.ponto_coleta else 'A definir' }}"
+                                        data-estado="{{ sol.estado.obter_nome() }}"
+                                        data-peso="{{ sol.calcular_peso_total()|round(2) }}"
+                                        data-data="{{ sol.data_criacao.strftime('%d/%m/%Y') }}"
+                                        data-itens="{{ sol.itens|length }}"
                                         title="Ver detalhes">
                                         Ver Detalhes
                                     </button>
@@ -149,7 +156,13 @@
             <button class="modal-close" onclick="fecharModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <p>Em breve</p>
+            <div class="detail-row"><strong>ID:</strong> <span id="modal-id"></span></div>
+            <div class="detail-row"><strong>Usuário:</strong> <span id="modal-usuario"></span></div>
+            <div class="detail-row"><strong>Ponto de coleta:</strong> <span id="modal-ponto"></span></div>
+            <div class="detail-row"><strong>Estado:</strong> <span id="modal-estado"></span></div>
+            <div class="detail-row"><strong>Peso total:</strong> <span id="modal-peso"></span> kg</div>
+            <div class="detail-row"><strong>Data:</strong> <span id="modal-data"></span></div>
+            <div class="detail-row"><strong>Itens:</strong> <span id="modal-itens"></span></div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="fecharModal()">Fechar</button>
@@ -159,8 +172,15 @@
 
 <script>
 // funcoes basicas do modal
-function abrirDetalhes(id) {
-    // placeholder - vai buscar detalhes via api depois
+function abrirDetalhes(btn) {
+    const d = btn.dataset;
+    document.getElementById('modal-id').textContent      = d.id;
+    document.getElementById('modal-usuario').textContent = d.usuario;
+    document.getElementById('modal-ponto').textContent   = d.ponto;
+    document.getElementById('modal-estado').textContent  = d.estado;
+    document.getElementById('modal-peso').textContent    = d.peso;
+    document.getElementById('modal-data').textContent    = d.data;
+    document.getElementById('modal-itens').textContent   = d.itens + ' item(ns)';
     document.getElementById('modal-detalhes').style.display = 'flex';
 }
 

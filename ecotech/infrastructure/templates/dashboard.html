@@ -96,7 +96,7 @@
                     <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Saldo" class="stat-icon-img">
                     <span class="stat-label">Saldo acumulado</span>
                 </div>
-                <h3 class="stat-value">R$ {{ "%.2f"|format(total_descartado * 5.5)|replace('.', ',') }}</h3>
+                <h3 class="stat-value">R$ {{ "%.2f"|format(saldo_acumulado)|replace('.', ',') }}</h3>
             </div>
             <div class="stat-card-new">
                 <div class="stat-top">
@@ -136,7 +136,7 @@
                         <div class="progress-bar-container">
                             <div class="progress-bar-fill" data-progress="{{ progresso_missao }}"></div>
                         </div>
-                        <p class="progress-text">{{ solicitacoes|length }} / 15</p>
+                        <p class="progress-text">{{ solicitacoes|length }} / {{ meta_missao }}</p>
                         <div class="mission-reward">
                             <span class="reward-badge">+150 pontos</span>
                             <span class="reward-stars">★ ★ ★ ★</span>
@@ -150,14 +150,14 @@
                     <h2 class="section-title-dash">Próximas recompensas</h2>
                     <div class="rewards-content">
                         <div class="tier-badge-large">
-                            <img src="{{ url_for('static', filename='images/icon-rank_ouro.png') }}" alt="Tier Ouro" class="tier-icon">
-                            <span class="tier-name">Tier Ouro</span>
+                            <img src="{{ url_for('static', filename='images/icon-rank_ouro.png') }}" alt="Próximo Tier" class="tier-icon">
+                            <span class="tier-name">{{ proximo_tier_nome }}</span>
                         </div>
                         <div class="tier-progress">
                             <div class="tier-progress-bar">
                                 <div class="tier-progress-fill" data-progress="{{ progresso_tier }}"></div>
                             </div>
-                            <p class="tier-progress-text">{{ pontos_acumulados }} / 1200 pontos</p>
+                            <p class="tier-progress-text">{{ pontos_acumulados }} / {{ meta_tier }} pontos</p>
                         </div>
                         <ul class="rewards-benefits">
                             <li class="benefit-item">
