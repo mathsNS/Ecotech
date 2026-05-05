@@ -160,6 +160,28 @@ class Dados(RepositorioBase):
         )
         """)
 
+        # Tabela de Saques
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS saque (
+            id TEXT PRIMARY KEY,
+            id_usuario TEXT,
+            valor REAL,
+            metodo TEXT,
+            data TEXT,
+            hora TEXT,
+            status TEXT,
+            FOREIGN KEY(id_usuario) REFERENCES usuario(id)
+        )
+        """)
+
+        # Índices para otimizar buscas frequentes
+        c.execute("CREATE INDEX IF NOT EXISTS idx_solicitacao_usuario ON solicitacao_descarte(id_usuario)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_item_solicitacao ON item_descarte(id_solicitacao)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_notificacao_usuario ON notificacao(id_usuario)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_entrega_usuario ON entrega(id_usuario)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_rastreamento_solicitacao ON historico_rastreamento(id_solicitacao)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_saque_usuario ON saque(id_usuario)")
+
         self.conn.commit()
 
     # -------------------
@@ -269,6 +291,32 @@ class Dados(RepositorioBase):
             INSERT OR REPLACE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
+
+    def salvar_saque(self, id_saque: str, id_usuario: str, valor: float,
+                     metodo: str, data: str, hora: str, status: str) -> None:
+        """Registra uma solicitação de saque."""
+        with self.conn:
+            self.conn.execute("""
+            INSERT OR IGNORE INTO saque (id, id_usuario, valor, metodo, data, hora, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (id_saque, id_usuario, valor, metodo, data, hora, status))
+
+    def buscar_saques_usuario(self, id_usuario: str):
+        """Retorna todos os saques de um usuário."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM saque WHERE id_usuario = ? ORDER BY data DESC", (id_usuario,))
+        return c.fetchall()
+
+    def buscar_total_sacado_usuario(self, id_usuario: str) -> float:
+        """Retorna o total já sacado (status pendente ou finalizado) por um usuário."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT COALESCE(SUM(valor), 0.0) as total
+            FROM saque
+            WHERE id_usuario = ? AND status IN ('pendente', 'finalizado')
+        """, (id_usuario,))
+        row = c.fetchone()
+        return float(row['total']) if row else 0.0
 
     # -------------------
     # ATUALIZAR
@@ -448,6 +496,28 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) as total FROM solicitacao_descarte")
         return c.fetchone()['total']
+
+    def buscar_todos_cidadaos_admin(self):
+        """Retorna lista com id, nome, email, data_cadastro, cpf e pontos de todos os cidadãos."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.id, u.nome, u.email, u.data_cadastro, ci.cpf, ci.pontos
+            FROM usuario u
+            JOIN cidadao ci ON u.id = ci.id_usuario
+            WHERE u.tipo = 'cidadao'
+        """)
+        return [dict(row) for row in c.fetchall()]
+
+    def buscar_todos_empresas_admin(self):
+        """Retorna lista com id, nome, email, data_cadastro, cnpj e descartado_mes de todas as empresas."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT u.id, u.nome, u.email, u.data_cadastro, e.cnpj, e.descartado_mes
+            FROM usuario u
+            JOIN empresa e ON u.id = e.id_usuario
+            WHERE u.tipo = 'empresa'
+        """)
+        return [dict(row) for row in c.fetchall()]
 
     # -------------------
     # SEED

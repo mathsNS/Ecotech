@@ -13,27 +13,7 @@ from ..domain.descarte import (
 )
 from ..domain.tratamento import MetodoTratamento
 from ..domain.relatorio import RelatorioAmbiental
-from ..domain.estados import (
-    Solicitado, Coletado, EmProcessamento,
-    Reciclado, Reutilizado, Descartado, Cancelado
-)
 from ..domain.repositorio import RepositorioBase
-
-
-def _criar_estado_do_banco(nome_estado: str):
-    """Converte string do banco para instância de estado."""
-    mapa_estados = {
-        'SOLICITADO': Solicitado,
-        'COLETADO': Coletado,
-        'EM_PROCESSAMENTO': EmProcessamento,
-        'RECICLADO': Reciclado,
-        'REUTILIZADO': Reutilizado,
-        'DESCARTADO': Descartado,
-        'CANCELADO': Cancelado
-    }
-    
-    classe_estado = mapa_estados.get(nome_estado, Solicitado)
-    return classe_estado()
 
 
 class ServicoDescarte:
@@ -55,8 +35,8 @@ class ServicoDescarte:
         if not self._servico_usuario or not self._servico_ponto or not self._dados:
             return  # precisa dos servicos pra reconstruir
         
-        from .factories import DispositivoFactory
-        
+        from .factories import DispositivoFactory, EstadoFactory
+
         solicitacoes_db = self._dados.buscar_todas_solicitacoes()
         
         for row in solicitacoes_db:
@@ -72,7 +52,7 @@ class ServicoDescarte:
                 solicitacao = SolicitacaoDescarte(row['id'], usuario, ponto)
                 
                 # reconstroi o estado correto do banco
-                estado = _criar_estado_do_banco(row['estado'])
+                estado = EstadoFactory.criar_do_banco(row['estado'])
                 solicitacao._estado = estado
                 
                 # carrega data_criacao do banco 
@@ -127,6 +107,8 @@ class ServicoDescarte:
         ponto_coleta: Optional[PontoColeta] = None
     ) -> SolicitacaoDescarte:
         """Cria uma nova solicitação com ID único."""
+        if not usuario.pode_solicitar_descarte():
+            raise ValueError("usuario nao pode realizar descarte no momento")
         id_solicitacao = str(uuid.uuid4())
         solicitacao = SolicitacaoDescarte(id_solicitacao, usuario, ponto_coleta)
         self._solicitacoes[id_solicitacao] = solicitacao
@@ -180,19 +162,22 @@ class ServicoDescarte:
         """Define qual método de tratamento será usado."""
         solicitacao.metodo_tratamento = metodo
         if self._dados:
-            self._dados.atualizar_solicitacao(solicitacao)
+            estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
+            self._dados.atualizar_solicitacao(solicitacao.id, estado, metodo.obter_nome())
 
     def avancar_estado_solicitacao(self, solicitacao: SolicitacaoDescarte):
         """Avança para o próximo estado (padrão State)."""
         solicitacao.avancar_estado()
         if self._dados:
-            self._dados.atualizar_solicitacao(solicitacao)
+            estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
+            self._dados.atualizar_solicitacao(solicitacao.id, estado)
 
     def cancelar_solicitacao(self, solicitacao: SolicitacaoDescarte, motivo: str = ""):
         """Cancela uma solicitação com motivo opcional."""
         solicitacao.cancelar(motivo)
         if self._dados:
-            self._dados.atualizar_solicitacao(solicitacao)
+            estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
+            self._dados.atualizar_solicitacao(solicitacao.id, estado)
 
     def listar_solicitacoes(self) -> List[SolicitacaoDescarte]:
         """Retorna todas as solicitações, carregando do banco se necessário."""
@@ -205,6 +190,46 @@ class ServicoDescarte:
         """Busca uma solicitação pelo ID."""
         return self._solicitacoes.get(id)
 
+    @staticmethod
+    def calcular_metricas(solicitacoes: List[SolicitacaoDescarte]) -> dict:
+        """Retorna peso_total, impacto_total, pontos e total_processadas para a lista dada."""
+        _finais = {'Reciclado', 'Reutilizado', 'Descartado'}
+        peso_total = sum(s.calcular_peso_total() for s in solicitacoes)
+        return {
+            'peso_total': peso_total,
+            'impacto_total': sum(s.calcular_impacto_total() for s in solicitacoes),
+            'pontos': int(peso_total * 10),
+            'total_processadas': sum(1 for s in solicitacoes if s.estado.obter_nome() in _finais),
+        }
+
+    @staticmethod
+    def calcular_progresso(solicitacoes: List[SolicitacaoDescarte],
+                           meta_missao: int = 15, meta_tier: int = 1200) -> dict:
+        """Retorna progresso_missao e progresso_tier como inteiros 0–100."""
+        pontos = int(sum(s.calcular_peso_total() for s in solicitacoes) * 10)
+        return {
+            'progresso_missao': min(round((len(solicitacoes) / meta_missao) * 100), 100),
+            'progresso_tier': min(round((pontos / meta_tier) * 100), 100),
+        }
+
+    @staticmethod
+    def filtrar_por_estado(solicitacoes: List[SolicitacaoDescarte], estado: str = '') -> List[SolicitacaoDescarte]:
+        """Filtra a lista pelo nome do estado (case-insensitive, substring). Sem filtro devolve tudo."""
+        if not estado:
+            return solicitacoes
+        return [s for s in solicitacoes if estado.lower() in s.estado.obter_nome().lower()]
+
+    @staticmethod
+    def calcular_stats_estados(solicitacoes: List[SolicitacaoDescarte]) -> dict:
+        """Conta solicitações por grupo de estado."""
+        _finais = {'Reciclado', 'Reutilizado', 'Descartado'}
+        return {
+            'pendentes':   sum(1 for s in solicitacoes if s.estado.obter_nome() == 'Solicitado'),
+            'em_coleta':   sum(1 for s in solicitacoes if s.estado.obter_nome() == 'Coletado'),
+            'processando': sum(1 for s in solicitacoes if s.estado.obter_nome() == 'Em Processamento'),
+            'finalizadas': sum(1 for s in solicitacoes if s.estado.obter_nome() in _finais),
+        }
+
 
 class ServicoRelatorio:
     """Gera relatórios ambientais a partir das solicitações de descarte."""
@@ -212,15 +237,143 @@ class ServicoRelatorio:
     def gerar_relatorio_periodo(
         self,
         titulo: str,
-        solicitacoes: List[SolicitacaoDescarte]
+        solicitacoes: List[SolicitacaoDescarte],
+        data_inicio: Optional[datetime] = None,
+        data_fim: Optional[datetime] = None
     ) -> RelatorioAmbiental:
         """Cria relatório consolidando as solicitações do período."""
         relatorio = RelatorioAmbiental(titulo)
-        
+
         for solicitacao in solicitacoes:
+            if data_inicio and solicitacao._data_criacao < data_inicio:
+                continue
+            if data_fim and solicitacao._data_criacao > data_fim:
+                continue
             relatorio.adicionar_solicitacao(solicitacao)
-            
+
         return relatorio
+
+
+class ServicoSaque:
+    """Gerencia o saldo de pontos do usuário e solicitações de saque."""
+
+    TAXA_PONTOS_POR_KG = 10       # pontos ganhos por kg descartado
+    TAXA_REAIS_POR_PONTO = 0.01   # R$ por ponto (100 pts = R$ 1,00)
+
+    def __init__(self, dados: Optional[RepositorioBase] = None):
+        self._dados = dados
+
+    def calcular_pontos(self, solicitacoes: List[SolicitacaoDescarte], id_usuario: str) -> int:
+        """Retorna os pontos acumulados com base no peso total descartado."""
+        peso_total = sum(
+            s.calcular_peso_total()
+            for s in solicitacoes
+            if s.usuario.id == id_usuario
+        )
+        return int(peso_total * self.TAXA_PONTOS_POR_KG)
+
+    def calcular_saldo_disponivel(
+        self,
+        solicitacoes: List[SolicitacaoDescarte],
+        id_usuario: str
+    ) -> float:
+        """
+        Calcula o saldo disponível em R$ para saque.
+
+        Fórmula: (pontos_acumulados × 0,01) − total_já_sacado
+        """
+        pontos = self.calcular_pontos(solicitacoes, id_usuario)
+        saldo_bruto = round(pontos * self.TAXA_REAIS_POR_PONTO, 2)
+
+        total_sacado = 0.0
+        if self._dados:
+            total_sacado = self._dados.buscar_total_sacado_usuario(id_usuario)
+
+        return max(0.0, round(saldo_bruto - total_sacado, 2))
+
+    def solicitar_saque(
+        self,
+        id_usuario: str,
+        valor: float,
+        metodo: str,
+        saldo_disponivel: float
+    ) -> Dict:
+        """
+        Registra uma solicitação de saque.
+
+        Raises:
+            ValueError: Se o valor for inválido ou exceder o saldo disponível.
+        """
+        if valor <= 0:
+            raise ValueError("O valor do saque deve ser positivo.")
+        if valor > saldo_disponivel:
+            raise ValueError(
+                f"Saldo insuficiente. Disponível: R$ {saldo_disponivel:.2f}"
+            )
+
+        id_saque = str(uuid.uuid4())[:12]
+        agora = datetime.now()
+        data = agora.strftime('%d %b %Y')
+        hora = agora.strftime('%H:%M')
+
+        if self._dados:
+            self._dados.salvar_saque(
+                id_saque, id_usuario, valor, metodo, data, hora, 'pendente'
+            )
+
+        return {
+            'id': id_saque,
+            'valor': valor,
+            'metodo': metodo,
+            'data': data,
+            'hora': hora,
+            'status': 'pendente',
+        }
+
+    def listar_saques(self, id_usuario: str) -> List[Dict]:
+        """Retorna o histórico de saques do usuário."""
+        if not self._dados:
+            return []
+        rows = self._dados.buscar_saques_usuario(id_usuario)
+        return [dict(r) for r in rows]
+
+
+class ServicoAutenticacao:
+    """Gerencia autenticação e ciclo de vida seguro da sessão."""
+
+    TIPOS_VALIDOS = ('cidadao', 'empresa', 'administrador')
+
+    _TIPO_NORMALIZACAO = {
+        'cidadão': 'cidadao',
+        'empresa': 'empresa',
+        'administrador': 'administrador',
+    }
+
+    def __init__(self, servico_usuario: 'ServicoUsuario'):
+        self._servico_usuario = servico_usuario
+
+    def autenticar(self, tipo: str, credencial: str, senha: str) -> Optional[Usuario]:
+        """
+        Valida credencial e senha. Retorna o objeto Usuario ou None.
+
+        Args:
+            tipo: 'cidadao', 'empresa' ou 'administrador'.
+            credencial: CPF (cidadao), CNPJ (empresa) ou e-mail (administrador).
+            senha: Senha em texto claro (comparada ao hash armazenado).
+        """
+        if tipo not in self.TIPOS_VALIDOS:
+            return None
+        return self._servico_usuario.autenticar(tipo, credencial, senha)
+
+    def criar_dados_sessao(self, usuario: Usuario) -> Dict:
+        """Gera o dicionário de dados a serem gravados na sessão Flask."""
+        tipo_raw = usuario.obter_tipo().split()[0].lower()
+        tipo_normalizado = self._TIPO_NORMALIZACAO.get(tipo_raw, tipo_raw)
+        return {
+            'user_id': usuario.id,
+            'user_nome': usuario.nome,
+            'user_tipo': tipo_normalizado,
+        }
 
 
 class ServicoPontoColeta:

@@ -172,6 +172,22 @@ class RepositorioBase(ABC):
         """Retorna todas as entregas de um usuário."""
         ...
 
+    @abstractmethod
+    def salvar_saque(self, id_saque: str, id_usuario: str, valor: float,
+                     metodo: str, data: str, hora: str, status: str) -> None:
+        """Persiste uma solicitação de saque."""
+        ...
+
+    @abstractmethod
+    def buscar_saques_usuario(self, id_usuario: str) -> List[Any]:
+        """Retorna todos os saques de um usuário."""
+        ...
+
+    @abstractmethod
+    def buscar_total_sacado_usuario(self, id_usuario: str) -> float:
+        """Retorna o total já sacado (pendente ou finalizado) por um usuário."""
+        ...
+
     # --- Contagens ---
 
     @abstractmethod
@@ -182,4 +198,14 @@ class RepositorioBase(ABC):
     @abstractmethod
     def contar_solicitacoes(self) -> int:
         """Retorna o total de solicitações registradas."""
+        ...
+
+    @abstractmethod
+    def buscar_todos_cidadaos_admin(self) -> List[Any]:
+        """Retorna dados completos de todos os cidadãos para visão administrativa."""
+        ...
+
+    @abstractmethod
+    def buscar_todos_empresas_admin(self) -> List[Any]:
+        """Retorna dados completos de todas as empresas para visão administrativa."""
         ...

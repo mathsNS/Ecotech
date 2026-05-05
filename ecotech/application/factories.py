@@ -21,6 +21,10 @@ from ..domain.tratamento import (
     DescarteControlado
 )
 from ..domain.descarte import PontoColeta
+from ..domain.estados import (
+    Solicitado, Coletado, EmProcessamento,
+    Reciclado, Reutilizado, Descartado, Cancelado
+)
 
 
 class DispositivoFactory:
@@ -165,3 +169,23 @@ class PontoColetaFactory:
     def criar_ponto(dados: Dict[str, Any]) -> PontoColeta:
         """Cria um ponto de coleta a partir de um dicionário de dados."""
         return PontoColetaFactory.criar_ponto_coleta(**dados)
+
+
+class EstadoFactory:
+    """Converte strings do banco em instâncias de estado."""
+
+    _MAPA = {
+        'SOLICITADO': Solicitado,
+        'COLETADO': Coletado,
+        'EM_PROCESSAMENTO': EmProcessamento,
+        'RECICLADO': Reciclado,
+        'REUTILIZADO': Reutilizado,
+        'DESCARTADO': Descartado,
+        'CANCELADO': Cancelado,
+    }
+
+    @staticmethod
+    def criar_do_banco(nome_estado: str):
+        """Retorna instância de estado pelo nome. Usa Solicitado como fallback."""
+        classe = EstadoFactory._MAPA.get(nome_estado, Solicitado)
+        return classe()

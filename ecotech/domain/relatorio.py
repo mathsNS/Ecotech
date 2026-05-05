@@ -68,6 +68,17 @@ class RelatorioAmbiental:
             impacto_total += sol.impacto_evitado_db
         return round(impacto_total, 2)
 
+    def calcular_eficiencia_reciclagem(self) -> float:
+        """Percentual do peso reciclado/reutilizado sobre o total processado."""
+        total = sum(
+            sol.calcular_peso_total() for sol in self._solicitacoes
+            if isinstance(sol.estado, (Reciclado, Reutilizado, Descartado))
+        )
+        if total == 0:
+            return 0.0
+        tratado = self.calcular_total_peso_reciclado() + self.calcular_total_peso_reutilizado()
+        return round((tratado / total) * 100, 2)
+
     def gerar_relatorio(self) -> Dict:
         """Retorna dicionário com todas as métricas consolidadas."""
         return {
@@ -77,7 +88,8 @@ class RelatorioAmbiental:
             "peso_reciclado_kg": self.calcular_total_peso_reciclado(),
             "peso_reutilizado_kg": self.calcular_total_peso_reutilizado(),
             "peso_descartado_kg": self.calcular_total_peso_descartado(),
-            "impacto_evitado": self.calcular_impacto_evitado()
+            "impacto_evitado": self.calcular_impacto_evitado(),
+            "eficiencia_reciclagem_pct": self.calcular_eficiencia_reciclagem()
         }
 
     def __str__(self) -> str:
