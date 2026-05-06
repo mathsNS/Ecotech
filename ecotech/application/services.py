@@ -246,7 +246,7 @@ class ServicoDescarte:
                 return {
                     'nome': nome,
                     'meta': meta,
-                    'proximo_nome': proximo or '—',
+                    'proximo_nome': proximo or '-',
                     'progresso_pct': progresso_pct,
                 }
         return {'nome': 'Bronze', 'meta': 300, 'proximo_nome': 'Prata', 'progresso_pct': 0}

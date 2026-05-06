@@ -69,7 +69,7 @@ def test_salvar_cidadao_por_cpf(dados):
 def test_salvar_cidadao_idempotente(dados):
     cid = _cidadao()
     dados.salvar_cidadao(cid)
-    dados.salvar_cidadao(cid)  # INSERT OR IGNORE — não deve explodir
+    dados.salvar_cidadao(cid)  # INSERT OR IGNORE, nao deve explodir
 
     total = dados.contar_usuarios()
     assert total == 1

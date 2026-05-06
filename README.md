@@ -34,19 +34,19 @@ ecotech/
 ├── domain/              # Regras de negócio e entidades
 │   ├── usuarios.py      # Hierarquia Usuario → Cidadao, Empresa, Administrador
 │   ├── dispositivos.py  # Hierarquia DispositivoEletronico → Celular, Computador, Eletrodomestico
-│   ├── estados.py       # State Pattern — 7 estados de solicitação
-│   ├── tratamento.py    # Strategy Pattern — Reciclagem, Reuso, DescarteControlado
+│   ├── estados.py       # State Pattern, 7 estados de solicitação
+│   ├── tratamento.py    # Strategy Pattern, Reciclagem, Reuso, DescarteControlado
 │   ├── descarte.py      # PontoColeta, SolicitacaoDescarte, ItemDescarte, RastreamentoEntrega
-│   ├── relatorio.py     # RelatorioAmbiental — métricas consolidadas
+│   ├── relatorio.py     # RelatorioAmbiental, métricas consolidadas
 │   ├── mixins.py        # LoggableMixin, NotificavelMixin (herança múltipla)
-│   └── repositorio.py   # RepositorioBase (interface abstrata — DIP)
+│   └── repositorio.py   # RepositorioBase (interface abstrata, DIP)
 ├── application/         # Lógica de aplicação (serviços e factories)
 │   ├── factories.py     # DispositivoFactory, UsuarioFactory, MetodoTratamentoFactory, PontoColetaFactory
 │   └── services.py      # ServicoDescarte, ServicoPontoColeta, ServicoUsuario
 └── infrastructure/      # Camada de infraestrutura (persistência e web)
     ├── web.py           # Rotas Flask
     ├── persistence/
-    │   └── dados.py     # Dados(RepositorioBase) — implementação SQLite
+    │   └── dados.py     # Dados(RepositorioBase), implementação SQLite
     ├── templates/
     └── static/
 ```
@@ -60,31 +60,31 @@ ecotech/
 **Hierarquias Implementadas (herança simples):**
 
 Usuários:
-- `Usuario` (classe abstrata base — ABC)
+- `Usuario` (classe abstrata base, ABC)
 - `Cidadao`, `Empresa`, `Administrador` (implementações concretas)
 
 Dispositivos Eletrônicos:
-- `DispositivoEletronico` (classe abstrata — ABC)
+- `DispositivoEletronico` (classe abstrata, ABC)
 - `Celular`, `Computador`, `Eletrodomestico` (tipos específicos com polimorfismo em `calcular_impacto_ambiental` e `calcular_valor_revenda`)
 
 Estados de Solicitação (State Pattern):
-- `EstadoDescarte` (classe abstrata — ABC)
+- `EstadoDescarte` (classe abstrata, ABC)
 - `Solicitado`, `Coletado`, `EmProcessamento`, `Reciclado`, `Reutilizado`, `Descartado`, `Cancelado`
 
 Métodos de Tratamento (Strategy Pattern):
-- `MetodoTratamento` (classe abstrata — ABC)
+- `MetodoTratamento` (classe abstrata, ABC)
 - `Reciclagem`, `Reuso`, `DescarteControlado`
 
 Persistência (DIP):
-- `RepositorioBase` (interface abstrata — ABC, definida no domínio)
+- `RepositorioBase` (interface abstrata, ABC, definida no domínio)
 - `Dados` (implementação concreta em infrastructure)
 
-**Herança Múltipla — Mixins:**
+**Herança Múltipla via Mixins:**
 
 O projeto utiliza herança múltipla através de Mixins para adicionar comportamentos transversais sem acoplamento:
 
-- `LoggableMixin` — registra logs com timestamp em qualquer entidade. Utilizado por `PontoColeta` e `SolicitacaoDescarte`.
-- `NotificavelMixin` — emite e gerencia notificações. Utilizado por `SolicitacaoDescarte`.
+- `LoggableMixin`: registra logs com timestamp em qualquer entidade. Utilizado por `PontoColeta` e `SolicitacaoDescarte`.
+- `NotificavelMixin`: emite e gerencia notificações. Utilizado por `SolicitacaoDescarte`.
 
 Exemplo: `SolicitacaoDescarte(LoggableMixin, NotificavelMixin)` herda de dois Mixins sem conflito de MRO, pois cada Mixin inicializa seus atributos através de métodos `__init_log__()` / `__init_notificacoes__()` chamados explicitamente.
 

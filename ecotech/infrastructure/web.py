@@ -54,7 +54,7 @@ def criar_app() -> Flask:
     # carrega solicitacoes do banco de dados
     servico_descarte._carregar_solicitacoes_do_banco()
     
-    # dados exemplo — só roda no processo pai (não no filho do reloader)
+    # dados exemplo, só roda no processo pai (não no filho do reloader)
     import os
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
@@ -705,7 +705,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         -7.2138, -39.3089, 1000.0
     )
     ponto2 = servico_ponto.criar_ponto_coleta(
-        'Ecoponto Centro — Juazeiro do Norte',
+        'Ecoponto Centro, Juazeiro do Norte',
         'Av. Padre Cícero, 500 - Centro, Juazeiro do Norte',
         -7.2123, -39.3145, 2000.0
     )

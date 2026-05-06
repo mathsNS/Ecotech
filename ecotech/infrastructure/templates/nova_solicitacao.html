@@ -144,7 +144,7 @@
                             <label for="ponto_id">Ponto de coleta <span class="required">*</span></label>
                             <select id="ponto_id" name="ponto_id" class="form-control-new" required>
                                 {% for p in pontos %}
-                                <option value="{{ p.id }}">{{ p.nome }} — {{ p.endereco }}</option>
+                                <option value="{{ p.id }}">{{ p.nome }}, {{ p.endereco }}</option>
                                 {% endfor %}
                             </select>
                         </div>
