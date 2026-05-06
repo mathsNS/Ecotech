@@ -54,8 +54,10 @@ def criar_app() -> Flask:
     # carrega solicitacoes do banco de dados
     servico_descarte._carregar_solicitacoes_do_banco()
     
-    # dados exemplo
-    _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
+    # dados exemplo — só roda no processo pai (não no filho do reloader)
+    import os
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
     
     # verifica login
     def usuario_logado():
