@@ -290,7 +290,6 @@ def criar_app() -> Flask:
                 quantidade        = int(request.form.get('quantidade', 1))
                 observacoes       = request.form.get('observacoes_endereco', '').strip()
                 ponto_id          = request.form.get('ponto_id', '').strip()
-                metodo            = request.form.get('metodo_tratamento', 'reciclagem').strip()
 
                 usuario_obj = servico_usuario.buscar_usuario(usuario['id'])
                 if not usuario_obj:
@@ -310,16 +309,18 @@ def criar_app() -> Flask:
                 )
                 servico_descarte.adicionar_item_solicitacao(solicitacao, dispositivo, quantidade, observacoes)
 
-                try:
-                    metodo_obj = MetodoTratamentoFactory.criar_metodo(metodo)
-                    servico_descarte.definir_metodo_tratamento(solicitacao, metodo_obj)
-                except ValueError:
-                    pass
-
                 dados.salvar_notificacao(
                     usuario['id'],
                     f'Sua solicitação de descarte do {nome_dispositivo} foi recebida e aguarda coleta.'
                 )
+
+                # notificar a empresa dona do ponto selecionado
+                ponto_raw = dados.buscar_ponto_coleta(ponto_id) if ponto_id else None
+                if ponto_raw and ponto_raw['id_empresa']:
+                    dados.salvar_notificacao(
+                        ponto_raw['id_empresa'],
+                        f'Nova solicitação de coleta recebida de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para aceitar ou recusar.'
+                    )
 
                 flash('Solicitação criada com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
@@ -329,8 +330,8 @@ def criar_app() -> Flask:
         
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
-        pontos_coleta_lista = servico_ponto.listar_pontos()
-        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje, pontos=pontos_coleta_lista)
+        pontos_display = dados.buscar_pontos_para_selecao()
+        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje, pontos=pontos_display)
     
     @app.route('/pontos-coleta')
     def pontos_coleta():
@@ -768,6 +769,28 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'Av. Tenente Raimundo Rocha, 1000 - Limoeiro, Juazeiro do Norte',
         -7.2051, -39.3249, 800.0
     )
+
+    # ---- pontos vinculados às empresas ----
+    ponto_empresa1 = servico_ponto.criar_ponto_coleta(
+        'Recicla Kariri - Centro de Triagem',
+        'Av. Leão Sampaio, 600 - Triângulo, Juazeiro do Norte, CE',
+        -7.2192, -39.3287, 3000.0
+    )
+    dados.vincular_empresa_a_ponto(ponto_empresa1.id, empresa1.id)
+
+    ponto_empresa2 = servico_ponto.criar_ponto_coleta(
+        'TechLixo Soluções - Unidade JDN',
+        'R. São Pedro, 1250 - São José, Juazeiro do Norte, CE',
+        -7.2071, -39.3152, 2500.0
+    )
+    dados.vincular_empresa_a_ponto(ponto_empresa2.id, empresa2.id)
+
+    ponto_empresa3 = servico_ponto.criar_ponto_coleta(
+        'GreenCycle Nordeste - Planta Crato',
+        'Av. Contorno Norte, 850 - Vila Alta, Crato, CE',
+        -7.2295, -39.4187, 4000.0
+    )
+    dados.vincular_empresa_a_ponto(ponto_empresa3.id, empresa3.id)
 
     # ---- solicitações: João Silva ----
     sol1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)

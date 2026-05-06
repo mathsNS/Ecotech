@@ -144,7 +144,11 @@
                             <label for="ponto_id">Ponto de coleta <span class="required">*</span></label>
                             <select id="ponto_id" name="ponto_id" class="form-control-new" required>
                                 {% for p in pontos %}
-                                <option value="{{ p.id }}">{{ p.nome }}, {{ p.endereco }}</option>
+                                <option value="{{ p['id'] }}">
+                                    {% if p['id_empresa'] %}🏭 {{ p['nome'] }} — {{ p['endereco'] }}
+                                    {% else %}📍 {{ p['nome'] }} — {{ p['endereco'] }}
+                                    {% endif %}
+                                </option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -214,15 +218,6 @@
                                 <label for="horario_coleta">Horário aproximado <span class="required">*</span></label>
                                 <input type="time" id="horario_coleta" name="horario_coleta" class="form-control-new" required>
                             </div>
-                        </div>
-
-                        <div class="form-group-new">
-                            <label for="metodo_tratamento">Método de tratamento <span class="required">*</span></label>
-                            <select id="metodo_tratamento" name="metodo_tratamento" class="form-control-new" required>
-                                <option value="reciclagem">Reciclagem</option>
-                                <option value="reuso">Reuso</option>
-                                <option value="descarte_controlado">Descarte Controlado</option>
-                            </select>
                         </div>
 
                         <div class="schedule-info">

@@ -108,6 +108,12 @@ class Dados(RepositorioBase):
             ocupacao_atual_kg REAL 
         )
         """)
+        # migracao incremental: adiciona id_empresa se nao existir
+        try:
+            c.execute("ALTER TABLE ponto_coleta ADD COLUMN id_empresa TEXT")
+            self.conn.commit()
+        except Exception:
+            pass  # coluna ja existe
 
         # Tabelas de Descarte
         c.execute("""
@@ -497,8 +503,49 @@ class Dados(RepositorioBase):
         c.execute("SELECT COUNT(*) as total FROM solicitacao_descarte")
         return c.fetchone()['total']
 
+    def vincular_empresa_a_ponto(self, id_ponto: str, id_empresa: str) -> None:
+        """Associa uma empresa a um ponto de coleta."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE ponto_coleta SET id_empresa = ? WHERE id = ?",
+                (id_empresa, id_ponto)
+            )
+
+    def buscar_pontos_para_selecao(self):
+        """Retorna pontos de coleta enriquecidos com nome da empresa."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT pc.id, pc.nome, pc.endereco, pc.id_empresa,
+                   COALESCE(u.nome, '') as nome_empresa
+            FROM ponto_coleta pc
+            LEFT JOIN usuario u ON pc.id_empresa = u.id
+            WHERE pc.ativo = 1
+            ORDER BY pc.id_empresa IS NULL, pc.nome
+        """)
+        return [dict(row) for row in c.fetchall()]
+
+    def vincular_empresa_a_ponto(self, id_ponto: str, id_empresa: str) -> None:
+        """Associa uma empresa a um ponto de coleta."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE ponto_coleta SET id_empresa = ? WHERE id = ?",
+                (id_empresa, id_ponto)
+            )
+
+    def buscar_pontos_para_selecao(self):
+        """Retorna pontos de coleta enriquecidos com nome da empresa."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT pc.id, pc.nome, pc.endereco, pc.id_empresa,
+                   COALESCE(u.nome, '') as nome_empresa
+            FROM ponto_coleta pc
+            LEFT JOIN usuario u ON pc.id_empresa = u.id
+            WHERE pc.ativo = 1
+            ORDER BY pc.id_empresa IS NULL, pc.nome
+        """)
+        return [dict(row) for row in c.fetchall()]
+
     def buscar_todos_cidadaos_admin(self):
-        """Retorna lista com id, nome, email, data_cadastro, cpf e pontos de todos os cidadãos."""
         c = self.conn.cursor()
         c.execute("""
             SELECT u.id, u.nome, u.email, u.data_cadastro, ci.cpf, ci.pontos
@@ -524,5 +571,5 @@ class Dados(RepositorioBase):
     # -------------------
 
     def seed(self):
-        # no-op — seed real está em _inicializar_dados_exemplo (web.py)
+        # no-op seed real está em _inicializar_dados_exemplo (web.py)
         pass
