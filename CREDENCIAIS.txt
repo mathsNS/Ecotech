@@ -1,23 +1,47 @@
 ============================================================
-  ECOTECH — contas padrao
+  ECOTECH — contas de acesso
 ============================================================
 
 ------------------------------------------------------------
-  CIDADÃO
+  CIDADÃOS
 ------------------------------------------------------------
   Nome:   João Silva
-  E-mail: joao@ecotech.com
-  CPF:    123.456.789-09
+  CPF:    123.456.789-09  (login: 12345678909)
   Senha:  cidadao123
 
+  Nome:   Ana Beatriz Ferreira
+  CPF:    987.654.321-00  (login: 98765432100)
+  Senha:  ana123
+
+  Nome:   Carlos Eduardo Mendes
+  CPF:    349.456.118-40  (login: 34945611840)
+  Senha:  carlos123
+
+  Nome:   Fernanda Lima
+  CPF:    475.859.013-30  (login: 47585901330)
+  Senha:  fernanda123
+
+  Nome:   Rafael Gonçalves
+  CPF:    705.484.784-90  (login: 70548478490)
+  Senha:  rafael123
+
 ------------------------------------------------------------
-  EMPRESA
+  EMPRESAS
 ------------------------------------------------------------
   Nome:         Recicla Kariri
   Razão Social: Recicla Kariri Reciclagem LTDA
-  E-mail:       contato@recilakariri.com
-  CNPJ:         11.222.333/0001-81
+  CNPJ:         11.222.333/0001-81  (login: 11222333000181)
   Senha:        empresa123
+
+  Nome:         TechLixo Soluções
+  Razão Social: TechLixo Soluções Ambientais LTDA
+  CNPJ:         14.380.200/0001-21  (login: 14380200000121)
+  Senha:        techlixo123
+
+  Nome:         GreenCycle Nordeste
+  Razão Social: GreenCycle Nordeste Reciclagem S.A.
+  CNPJ:         33.000.167/0001-01  (login: 33000167000101)
+  Senha:        greencycle123
 
 ------------------------------------------------------------
   ADMINISTRADOR
@@ -32,8 +56,8 @@
 
   1. Acesse /login
   2. Selecione o tipo de conta (Cidadão / Empresa / Administrador)
-  3. Cidadão  → informe o CPF   (apenas dígitos: 12345678909)
-     Empresa  → informe o CNPJ  (apenas dígitos: 11222333000181)
+  3. Cidadão  → informe o CPF   (apenas dígitos, sem pontos/traço)
+     Empresa  → informe o CNPJ  (apenas dígitos, sem pontos/barras)
      Admin    → informe o e-mail (admin@ecotech.com)
   4. Informe a senha correspondente acima
   5. Clique em "Entrar"

@@ -670,31 +670,31 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
     cidadao2 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-3', 'nome': 'Ana Beatriz Ferreira',
         'email': 'ana.ferreira@gmail.com', 'cpf': '98765432100'
-    })
+    }, senha='ana123')
     cidadao3 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-4', 'nome': 'Carlos Eduardo Mendes',
         'email': 'carlos.mendes@outlook.com', 'cpf': '34945611840'
-    })
+    }, senha='carlos123')
     cidadao4 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-5', 'nome': 'Fernanda Lima',
         'email': 'fernanda.lima@yahoo.com.br', 'cpf': '47585901330'
-    })
+    }, senha='fernanda123')
     cidadao5 = servico_usuario.criar_usuario('cidadao', {
         'id': 'user-6', 'nome': 'Rafael Gonçalves',
         'email': 'rafael.goncalves@hotmail.com', 'cpf': '70548478490'
-    })
+    }, senha='rafael123')
 
     # ---- empresas adicionais ----
     empresa2 = servico_usuario.criar_usuario('empresa', {
         'id': 'user-7', 'nome': 'TechLixo Soluções',
         'email': 'contato@techlixo.com.br', 'cnpj': '14380200000121',
         'razao_social': 'TechLixo Soluções Ambientais LTDA'
-    })
+    }, senha='techlixo123')
     empresa3 = servico_usuario.criar_usuario('empresa', {
         'id': 'user-8', 'nome': 'GreenCycle Nordeste',
         'email': 'admin@greencycle.com.br', 'cnpj': '33000167000101',
         'razao_social': 'GreenCycle Nordeste Reciclagem S.A.'
-    })
+    }, senha='greencycle123')
 
     # ---- pontos de coleta ----
     ponto1 = servico_ponto.criar_ponto_coleta(
