@@ -686,6 +686,8 @@ def criar_app() -> Flask:
         dados.desativar_usuario(id_usuario)
         return jsonify({'ok': True})
 
+    return app
+
 
 def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
     """Cria perfis base e dados de demonstração para o sistema."""
