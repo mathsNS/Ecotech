@@ -78,7 +78,7 @@
                             <td>
                                 <div class="action-buttons">
                                     <button class="btn-action-small btn-edit" title="Editar">✏️</button>
-                                    <button class="btn-action-small btn-delete" title="Excluir">🗑️</button>
+                                    <button class="btn-action-small btn-delete" data-id="{{ c['id'] }}" title="Excluir">🗑️</button>
                                 </div>
                             </td>
                         </tr>
@@ -122,7 +122,7 @@
                             <td>
                                 <div class="action-buttons">
                                     <button class="btn-action-small btn-edit" title="Editar">✏️</button>
-                                    <button class="btn-action-small btn-delete" title="Excluir">🗑️</button>
+                                    <button class="btn-action-small btn-delete" data-id="{{ e['id'] }}" title="Excluir">🗑️</button>
                                 </div>
                             </td>
                         </tr>
@@ -135,7 +135,6 @@
 </div>
 
 <script>
-// edicao/exclusao de usuarios (apenas alertas por enquanto)
 document.querySelectorAll('.btn-edit').forEach(btn => {
     btn.addEventListener('click', function() {
         alert('Função de edição em desenvolvimento');
@@ -144,9 +143,19 @@ document.querySelectorAll('.btn-edit').forEach(btn => {
 
 document.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', function() {
-        if (confirm('Tem certeza que deseja excluir este usuário?')) {
-            alert('Função de exclusão em desenvolvimento');
-        }
+        const id = this.dataset.id;
+        if (!confirm('Tem certeza que deseja desativar este usuário?')) return;
+        fetch('/usuarios/' + id + '/desativar', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    this.closest('tr').style.opacity = '0.4';
+                    this.disabled = true;
+                } else {
+                    alert('Erro ao desativar usuário.');
+                }
+            })
+            .catch(() => alert('Erro de comunicação com o servidor.'));
     });
 });
 </script>

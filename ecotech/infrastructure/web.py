@@ -290,6 +290,7 @@ def criar_app() -> Flask:
                 quantidade        = int(request.form.get('quantidade', 1))
                 observacoes       = request.form.get('observacoes_endereco', '').strip()
                 ponto_id          = request.form.get('ponto_id', '').strip()
+                metodo            = request.form.get('metodo_tratamento', 'reciclagem').strip()
 
                 usuario_obj = servico_usuario.buscar_usuario(usuario['id'])
                 if not usuario_obj:
@@ -308,6 +309,17 @@ def criar_app() -> Flask:
                     {'id': str(__import__('uuid').uuid4()), 'nome': nome_dispositivo, 'peso_kg': peso_kg}
                 )
                 servico_descarte.adicionar_item_solicitacao(solicitacao, dispositivo, quantidade, observacoes)
+
+                try:
+                    metodo_obj = MetodoTratamentoFactory.criar_metodo(metodo)
+                    servico_descarte.definir_metodo_tratamento(solicitacao, metodo_obj)
+                except ValueError:
+                    pass
+
+                dados.salvar_notificacao(
+                    usuario['id'],
+                    f'Sua solicitação de descarte do {nome_dispositivo} foi recebida e aguarda coleta.'
+                )
 
                 flash('Solicitação criada com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
@@ -636,13 +648,43 @@ def criar_app() -> Flask:
     
     @app.route('/api/solicitacoes')
     def api_solicitacoes():
-        """API para listar solicitações."""
+        """API para listar solicitações do usuário logado."""
         if not usuario_logado():
             return jsonify({'error': 'Not authenticated'}), 401
-        
-        return jsonify([])
+
+        usuario = dados_usuario()
+        todas = servico_descarte.listar_solicitacoes()
+
+        if usuario['tipo'] == 'administrador':
+            lista = todas
+        else:
+            lista = [s for s in todas if s.usuario.id == usuario['id']]
+
+        resultado = []
+        for s in lista:
+            resultado.append({
+                'id': s.id,
+                'usuario': s.usuario.nome,
+                'ponto': s.ponto_coleta.nome if s.ponto_coleta else None,
+                'estado': s.estado.obter_nome(),
+                'peso_kg': s.calcular_peso_total(),
+                'itens': len(s.itens),
+            })
+
+        return jsonify(resultado)
     
-    return app
+    @app.route('/usuarios/<id_usuario>/desativar', methods=['POST'])
+    def desativar_usuario(id_usuario):
+        """Desativar usuário (apenas admin)."""
+        if not usuario_logado():
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        dados.desativar_usuario(id_usuario)
+        return jsonify({'ok': True})
 
 
 def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados):
