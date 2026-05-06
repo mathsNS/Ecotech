@@ -64,7 +64,7 @@
                     </div>
                 </div>
 
-                <form method="POST" class="solicitation-form-new">
+                <form method="POST" class="solicitation-form-new" novalidate>
                     <!-- etapa 1: informações do dispositivo -->
                     <div class="step-content active" data-step-content="1">
                         <div class="form-section-new">
@@ -130,55 +130,76 @@
                     </div>
                     </div>
 
-                    <!-- etapa 2: endereco de coleta -->
+                    <!-- etapa 2: dados da coleta (layout muda conforme tipo_coleta) -->
                     <div class="step-content" data-step-content="2">
                         <div class="form-section-new">
+
+                        <!-- hidden fields -->
+                        <input type="hidden" name="tipo_coleta" value="{{ tipo_coleta }}">
+                        {% if tipo_coleta == 'entrega_ponto' and ponto_selecionado %}
+                        <input type="hidden" name="ponto_id" value="{{ ponto_selecionado['id'] }}">
+                        {% endif %}
+
+                        {% if tipo_coleta == 'entrega_ponto' and ponto_selecionado %}
+                        <!-- layout: entrega no ponto -->
                         <div class="section-header-icon">
                             <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                             </svg>
-                            <h3>Endereço de Coleta</h3>
+                            <h3>Entrega no Ponto de Coleta</h3>
+                        </div>
+
+                        <div class="ponto-info-card">
+                            <div class="ponto-info-nome">{{ ponto_selecionado['nome'] }}</div>
+                            <div class="ponto-info-endereco">&#128205; {{ ponto_selecionado['endereco'] }}</div>
                         </div>
 
                         <div class="form-group-new">
-                            <label for="ponto_id">Ponto de coleta <span class="required">*</span></label>
-                            <select id="ponto_id" name="ponto_id" class="form-control-new" required>
-                                {% for p in pontos %}
-                                <option value="{{ p['id'] }}">
-                                    {% if p['id_empresa'] %}🏭 {{ p['nome'] }} — {{ p['endereco'] }}
-                                    {% else %}📍 {{ p['nome'] }} — {{ p['endereco'] }}
-                                    {% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <label for="nome_contato">Seu nome completo <span class="required">*</span></label>
+                            <input type="text" id="nome_contato" name="nome_contato" class="form-control-new"
+                                   placeholder="Quem vai entregar o resíduo" required>
                         </div>
 
                         <div class="form-group-new">
-                            <label for="endereco">Endereço completo <span class="required">*</span></label>
-                            <input type="text" id="endereco" name="endereco" class="form-control-new" 
-                                   placeholder="Ex: Rua Dr. Mauro Sampaio, 1100 - Lagoa Seca" required>
+                            <label for="observacoes_endereco">Observações</label>
+                            <textarea id="observacoes_endereco" name="observacoes_endereco" class="form-control-new"
+                                      rows="2" placeholder="Alguma informação adicional..."></textarea>
                         </div>
 
-                        <div class="form-grid-2">
-                            <div class="form-group-new">
-                                <label for="ponto_referencia">Ponto de referência</label>
-                                <input type="text" id="ponto_referencia" name="ponto_referencia" class="form-control-new" 
-                                       placeholder="Ex: Perto do banco, rua da delegacia, etc.">
-                            </div>
-
-                            <div class="form-group-new">
-                                <label for="nome_completo">Nome completo</label>
-                                <input type="text" id="nome_completo" name="nome_completo" class="form-control-new" 
-                                       placeholder="Nome de quem receberá a coleta">
-                            </div>
+                        {% else %}
+                        <!-- layout: coleta domiciliar -->
+                        <div class="section-header-icon">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                            </svg>
+                            <h3>Endereço para Coleta</h3>
                         </div>
 
                         <div class="form-group-new">
-                            <label for="observacoes_endereco">Observações sobre o endereço</label>
-                            <textarea id="observacoes_endereco" name="observacoes_endereco" class="form-control-new" 
-                                      rows="3" placeholder="Alguma informação adicional que possa ajudar na coleta..."></textarea>
+                            <label for="endereco_coleta">Seu endereço completo <span class="required">*</span></label>
+                            <input type="text" id="endereco_coleta" name="endereco_coleta" class="form-control-new"
+                                   placeholder="Rua, número, bairro, cidade" required>
                         </div>
-                        
+
+                        <div class="form-group-new">
+                            <label for="ponto_referencia">Ponto de referência</label>
+                            <input type="text" id="ponto_referencia" name="ponto_referencia" class="form-control-new"
+                                   placeholder="Ex: Próximo ao Banco do Brasil">
+                        </div>
+
+                        <div class="form-group-new">
+                            <label for="nome_contato">Nome de quem estará em casa</label>
+                            <input type="text" id="nome_contato" name="nome_contato" class="form-control-new"
+                                   placeholder="Quem receberá a equipe de coleta">
+                        </div>
+
+                        <div class="form-group-new">
+                            <label for="observacoes_endereco">Observações</label>
+                            <textarea id="observacoes_endereco" name="observacoes_endereco" class="form-control-new"
+                                      rows="2" placeholder="Informações adicionais para a coleta..."></textarea>
+                        </div>
+                        {% endif %}
+
                         <!-- botoes navegacao etapa 2 -->
                         <div class="step-navigation">
                             <button type="button" class="btn-prev-step">
@@ -224,7 +245,7 @@
                             <svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/>
                             </svg>
-                            <span>Funcionários qualificados irão até você no dia agendado! Se possível, confirme se estará disponível no endereço informado.</span>
+                            <span id="schedule-info-text">Funcionários qualificados irão até você no dia agendado! Se possível, confirme se estará disponível no endereço informado.</span>
                         </div>
                         
                         <!-- botoes navegacao etapa 3 -->
@@ -298,18 +319,38 @@
 </div>
 
 <script>
-// navegacao entre etapas
+const tipoColeta = "{{ tipo_coleta }}";
 let currentStep = 1;
 const totalSteps = 3;
 
+// campos obrigatorios por passo
+const requiredByStep = {
+    1: ['nome', 'peso_kg', 'quantidade'],
+    2: tipoColeta === 'entrega_ponto' ? ['nome_contato'] : ['endereco_coleta'],
+    3: ['data_coleta', 'horario_coleta']
+};
+
+function validarPasso(step) {
+    const ids = requiredByStep[step] || [];
+    let ok = true;
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!el.value || !el.value.trim()) {
+            el.style.borderColor = '#ef4444';
+            ok = false;
+        } else {
+            el.style.borderColor = '';
+        }
+    });
+    return ok;
+}
+
 function updateStepper() {
-    // atualizar círculos e linhas
     document.querySelectorAll('.stepper-step').forEach((step, index) => {
         const stepNumber = index + 1;
         const stepStatus = step.querySelector('.step-status');
-        
         step.classList.remove('active', 'completed');
-        
         if (stepNumber < currentStep) {
             step.classList.add('completed');
             stepStatus.textContent = 'Concluído';
@@ -320,50 +361,37 @@ function updateStepper() {
             stepStatus.textContent = 'Pendente';
         }
     });
-    
-    // atualizar conteudo visivel
-    document.querySelectorAll('.step-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    
-    const activeContent = document.querySelector(`[data-step-content="${currentStep}"]`);
-    if (activeContent) {
-        activeContent.classList.add('active');
+    document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+    const active = document.querySelector(`[data-step-content="${currentStep}"]`);
+    if (active) active.classList.add('active');
+
+    // atualiza texto informativo da etapa 3
+    const scheduleInfo = document.getElementById('schedule-info-text');
+    if (scheduleInfo) {
+        scheduleInfo.textContent = tipoColeta === 'entrega_ponto'
+            ? 'Você deverá comparecer ao ponto de coleta no dia e horário agendados com o material embalado.'
+            : 'Funcionários qualificados irão até você no dia agendado! Confirme que estará disponível no endereço.';
     }
 }
 
-// botoes de navegacao
 document.querySelectorAll('.btn-next-step').forEach(btn => {
     btn.addEventListener('click', () => {
-        if (currentStep < totalSteps) {
-            currentStep++;
-            updateStepper();
-        }
+        if (!validarPasso(currentStep)) return;
+        if (currentStep < totalSteps) { currentStep++; updateStepper(); }
     });
 });
 
 document.querySelectorAll('.btn-prev-step').forEach(btn => {
     btn.addEventListener('click', () => {
-        if (currentStep > 1) {
-            currentStep--;
-            updateStepper();
-        }
+        if (currentStep > 1) { currentStep--; updateStepper(); }
     });
 });
 
-// click direto nos steps
 document.querySelectorAll('.stepper-step').forEach((step, index) => {
     step.style.cursor = 'pointer';
-    step.addEventListener('click', () => {
-        currentStep = index + 1;
-        updateStepper();
-    });
+    step.addEventListener('click', () => { currentStep = index + 1; updateStepper(); });
 });
 
-// inicializar
 updateStepper();
-
-// campos adicionais
-const tipoDispositivo = document.getElementById('tipo_dispositivo');
 </script>
 {% endblock %}

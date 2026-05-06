@@ -52,7 +52,7 @@
             
             {% if usuario %}
             <div class="point-actions">
-                <a href="{{ url_for('nova_solicitacao') }}" class="btn btn-primary btn-sm">
+                <a href="{{ url_for('nova_solicitacao', tipo='entrega_ponto', ponto_id=ponto.id) }}" class="btn btn-primary btn-sm">
                     Selecionar este ponto
                 </a>
             </div>

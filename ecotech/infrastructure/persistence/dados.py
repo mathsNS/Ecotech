@@ -129,6 +129,17 @@ class Dados(RepositorioBase):
             FOREIGN KEY(id_ponto_coleta) REFERENCES ponto_coleta(id)
         )
         """)
+        # migracoes incrementais em solicitacao_descarte
+        for col in (
+            "ALTER TABLE solicitacao_descarte ADD COLUMN tipo_coleta TEXT DEFAULT 'domiciliar'",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN endereco_coleta TEXT",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN nome_contato TEXT",
+        ):
+            try:
+                c.execute(col)
+                self.conn.commit()
+            except Exception:
+                pass
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS item_descarte (
@@ -533,17 +544,30 @@ class Dados(RepositorioBase):
             )
 
     def buscar_pontos_para_selecao(self):
-        """Retorna pontos de coleta enriquecidos com nome da empresa."""
+        """Retorna apenas pontos vinculados a empresas para o select do formulario."""
         c = self.conn.cursor()
         c.execute("""
             SELECT pc.id, pc.nome, pc.endereco, pc.id_empresa,
                    COALESCE(u.nome, '') as nome_empresa
             FROM ponto_coleta pc
-            LEFT JOIN usuario u ON pc.id_empresa = u.id
+            JOIN usuario u ON pc.id_empresa = u.id
             WHERE pc.ativo = 1
-            ORDER BY pc.id_empresa IS NULL, pc.nome
+            ORDER BY pc.nome
         """)
         return [dict(row) for row in c.fetchall()]
+
+    def atualizar_detalhes_coleta(
+        self, id_sol: str, tipo_coleta: str,
+        endereco_coleta: str, nome_contato: str, data_agendamento: str
+    ) -> None:
+        """Salva tipo, endereco, nome de contato e data agendada na solicitacao."""
+        with self.conn:
+            self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET tipo_coleta=?, endereco_coleta=?, nome_contato=?, data_agendamento=?
+                WHERE id=?
+            """, (tipo_coleta, endereco_coleta or None, nome_contato or None,
+                  data_agendamento or None, id_sol))
 
     def buscar_todos_cidadaos_admin(self):
         c = self.conn.cursor()

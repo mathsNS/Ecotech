@@ -120,7 +120,7 @@ class ServicoDescarte:
         solicitacao = SolicitacaoDescarte(id_solicitacao, usuario, ponto_coleta)
         self._solicitacoes[id_solicitacao] = solicitacao
         
-        if ponto_coleta and self._dados:
+        if self._dados:
             self._dados.salvar_solicitacao(solicitacao)
         
         return solicitacao

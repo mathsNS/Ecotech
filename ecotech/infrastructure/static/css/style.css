@@ -2721,6 +2721,86 @@ PAGINA DE RELATORIOS
     transform: translateX(-2px);
 }
 
+/* --- tipo de coleta cards (nova solicitacao) --- */
+.tipo-coleta-group {
+    display: flex;
+    gap: 12px;
+}
+
+.tipo-coleta-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--background-alt);
+    user-select: none;
+}
+
+.tipo-coleta-card input[type="radio"] {
+    display: none;
+}
+
+.tipo-coleta-card.tipo-selected {
+    border-color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.tipo-coleta-card:hover {
+    border-color: var(--primary-light);
+}
+
+.tipo-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.tipo-titulo {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    text-align: center;
+}
+
+.tipo-desc {
+    font-size: 12px;
+    color: var(--text-light);
+    text-align: center;
+}
+
+.empresa-endereco-info {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-light);
+    min-height: 18px;
+}
+
+/* card de ponto selecionado (entrega no ponto) */
+.ponto-info-card {
+    background: var(--secondary-color);
+    border: 1.5px solid var(--primary-light);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+}
+
+.ponto-info-nome {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--primary-dark);
+    margin-bottom: 4px;
+}
+
+.ponto-info-endereco {
+    font-size: 13px;
+    color: var(--text-light);
+}
+
 .solicitation-form-new {
     display: flex;
     flex-direction: column;

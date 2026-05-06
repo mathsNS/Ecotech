@@ -284,12 +284,18 @@ def criar_app() -> Flask:
         
         if request.method == 'POST':
             try:
-                tipo_dispositivo = request.form.get('tipo_dispositivo', 'celular')
+                tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
                 nome_dispositivo  = request.form.get('nome', '').strip()
                 peso_kg           = float(request.form.get('peso_kg', 1.0))
                 quantidade        = int(request.form.get('quantidade', 1))
                 observacoes       = request.form.get('observacoes_endereco', '').strip()
                 ponto_id          = request.form.get('ponto_id', '').strip()
+                tipo_coleta       = request.form.get('tipo_coleta', 'domiciliar').strip()
+                endereco_coleta   = request.form.get('endereco_coleta', '').strip()
+                nome_contato      = request.form.get('nome_contato', '').strip()
+                data_coleta       = request.form.get('data_coleta', '').strip()
+                horario_coleta    = request.form.get('horario_coleta', '').strip()
+                data_agendamento  = f"{data_coleta} {horario_coleta}".strip() if data_coleta else None
 
                 usuario_obj = servico_usuario.buscar_usuario(usuario['id'])
                 if not usuario_obj:
@@ -297,9 +303,11 @@ def criar_app() -> Flask:
                     return redirect(url_for('nova_solicitacao'))
 
                 ponto = servico_ponto.buscar_ponto(ponto_id) if ponto_id else None
-                if ponto is None:
+                if ponto is None and tipo_coleta == 'entrega_ponto':
+                    # sem ponto válido para entrega, usa o primeiro disponível
                     pontos_disponiveis = servico_ponto.listar_pontos()
                     ponto = pontos_disponiveis[0] if pontos_disponiveis else None
+                # para domiciliar, ponto fica None (empresa é atribuída depois)
 
                 solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
 
@@ -309,18 +317,31 @@ def criar_app() -> Flask:
                 )
                 servico_descarte.adicionar_item_solicitacao(solicitacao, dispositivo, quantidade, observacoes)
 
+                dados.atualizar_detalhes_coleta(
+                    solicitacao.id, tipo_coleta, endereco_coleta, nome_contato, data_agendamento
+                )
+
                 dados.salvar_notificacao(
                     usuario['id'],
                     f'Sua solicitação de descarte do {nome_dispositivo} foi recebida e aguarda coleta.'
                 )
 
-                # notificar a empresa dona do ponto selecionado
-                ponto_raw = dados.buscar_ponto_coleta(ponto_id) if ponto_id else None
-                if ponto_raw and ponto_raw['id_empresa']:
-                    dados.salvar_notificacao(
-                        ponto_raw['id_empresa'],
-                        f'Nova solicitação de coleta recebida de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para aceitar ou recusar.'
-                    )
+                # notificar empresa(s)
+                if tipo_coleta == 'entrega_ponto' and ponto_id:
+                    ponto_raw = dados.buscar_ponto_coleta(ponto_id)
+                    if ponto_raw and ponto_raw['id_empresa']:
+                        dados.salvar_notificacao(
+                            ponto_raw['id_empresa'],
+                            f'Nova solicitação de entrega recebida de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para confirmar.'
+                        )
+                else:
+                    # domiciliar: notifica todas as empresas
+                    for p in dados.buscar_pontos_para_selecao():
+                        if p['id_empresa']:
+                            dados.salvar_notificacao(
+                                p['id_empresa'],
+                                f'Nova solicitação de coleta domiciliar de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para aceitar.'
+                            )
 
                 flash('Solicitação criada com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
@@ -330,8 +351,19 @@ def criar_app() -> Flask:
         
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
-        pontos_display = dados.buscar_pontos_para_selecao()
-        return render_template('nova_solicitacao.html', usuario=usuario, today=hoje, pontos=pontos_display)
+        tipo_coleta_param = request.args.get('tipo', 'domiciliar')
+        ponto_id_param    = request.args.get('ponto_id', '')
+        # para entrega_ponto, busca dados do ponto selecionado
+        ponto_selecionado = None
+        if tipo_coleta_param == 'entrega_ponto' and ponto_id_param:
+            ponto_selecionado = dados.buscar_ponto_coleta(ponto_id_param)
+        return render_template(
+            'nova_solicitacao.html',
+            usuario=usuario,
+            today=hoje,
+            tipo_coleta=tipo_coleta_param,
+            ponto_selecionado=ponto_selecionado,
+        )
     
     @app.route('/pontos-coleta')
     def pontos_coleta():
@@ -743,34 +775,7 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         'razao_social': 'GreenCycle Nordeste Reciclagem S.A.'
     }, senha='greencycle123')
 
-    # ---- pontos de coleta ----
-    ponto1 = servico_ponto.criar_ponto_coleta(
-        'Centro de Coleta Lagoa Seca',
-        'R. Dr. Morato Saraiva, 1100 - Lagoa Seca, Juazeiro do Norte',
-        -7.2138, -39.3089, 1000.0
-    )
-    ponto2 = servico_ponto.criar_ponto_coleta(
-        'Ecoponto Centro, Juazeiro do Norte',
-        'Av. Padre Cícero, 500 - Centro, Juazeiro do Norte',
-        -7.2123, -39.3145, 2000.0
-    )
-    ponto3 = servico_ponto.criar_ponto_coleta(
-        'Ecoponto UFCA',
-        'R. Olegário Emídio de Araújo, 1000 - Triângulo, Juazeiro do Norte',
-        -7.2204, -39.3156, 500.0
-    )
-    ponto4 = servico_ponto.criar_ponto_coleta(
-        'Centro de Reciclagem Crato',
-        'Av. Perimetral, 200 - São Miguel, Crato',
-        -7.2344, -39.4094, 1500.0
-    )
-    ponto5 = servico_ponto.criar_ponto_coleta(
-        'Ponto Verde Shopping Norte',
-        'Av. Tenente Raimundo Rocha, 1000 - Limoeiro, Juazeiro do Norte',
-        -7.2051, -39.3249, 800.0
-    )
-
-    # ---- pontos vinculados às empresas ----
+    # ---- pontos de coleta vinculados às empresas ----
     ponto_empresa1 = servico_ponto.criar_ponto_coleta(
         'Recicla Kariri - Centro de Triagem',
         'Av. Leão Sampaio, 600 - Triângulo, Juazeiro do Norte, CE',
@@ -791,6 +796,13 @@ def _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte,
         -7.2295, -39.4187, 4000.0
     )
     dados.vincular_empresa_a_ponto(ponto_empresa3.id, empresa3.id)
+
+    # aliases para o seed (pontos distribuídos entre as 3 empresas)
+    ponto1 = ponto_empresa1  # João Silva, Ana, Carlos → Recicla Kariri
+    ponto2 = ponto_empresa1
+    ponto3 = ponto_empresa2  # Rafael, Ana → TechLixo
+    ponto4 = ponto_empresa3  # Fernanda, TechLixo → GreenCycle
+    ponto5 = ponto_empresa2
 
     # ---- solicitações: João Silva ----
     sol1 = servico_descarte.criar_solicitacao(cidadao1, ponto1)
