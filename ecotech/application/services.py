@@ -179,6 +179,14 @@ class ServicoDescarte:
             estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
             self._dados.atualizar_solicitacao(solicitacao.id, estado)
 
+            # se atingiu estado final positivo, credita pontos ao cidadão
+            if estado in ('RECICLADO', 'REUTILIZADO'):
+                peso = solicitacao.calcular_peso_total()
+                pontos = int(peso * 10)  # 10 pts/kg
+                id_usuario = solicitacao.usuario.id
+                solicitacao.usuario.adicionar_pontos(pontos)
+                self._dados.atualizar_pontos_cidadao(id_usuario, pontos)
+
     def cancelar_solicitacao(self, solicitacao: SolicitacaoDescarte, motivo: str = ""):
         """Cancela uma solicitação com motivo opcional."""
         solicitacao.cancelar(motivo)

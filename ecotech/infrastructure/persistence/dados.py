@@ -370,6 +370,14 @@ class Dados(RepositorioBase):
                 (id_usuario,)
             )
 
+    def atualizar_pontos_cidadao(self, id_usuario: str, pontos_a_adicionar: int) -> None:
+        """Incrementa os pontos do cidadão no banco."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE cidadao SET pontos = pontos + ? WHERE id_usuario = ?",
+                (pontos_a_adicionar, id_usuario)
+            )
+
     # -------------------
     # BUSCAR
     # -------------------
