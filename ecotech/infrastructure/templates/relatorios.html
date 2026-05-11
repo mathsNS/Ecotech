@@ -7,8 +7,22 @@
     <div class="container">
         <!-- header -->
         <div class="relatorios-header">
-            <div>
+            <div class="relatorios-titulo-row">
                 <h1>Relatórios Ambientais</h1>
+                <div class="relatorios-acoes">
+                    {% if plano_empresa in ('professional', 'enterprise') or is_admin %}
+                    <a href="{{ url_for('exportar_csv') }}" class="btn-export">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/></svg>
+                        Exportar CSV
+                    </a>
+                    {% elif plano_empresa == 'free' %}
+                    <a href="{{ url_for('planos') }}" class="btn-export btn-export-locked" title="Disponível no plano Professional">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>
+                        Exportar CSV
+                        <span class="lock-badge">Pro</span>
+                    </a>
+                    {% endif %}
+                </div>
             </div>
             <form method="GET" class="filtro-periodo">
                 <div class="filtro-group">
@@ -164,11 +178,66 @@
                 </div>
                 {% endif %}
             </div>
+
+            <!-- secao PNRS/Compliance -->
+            {% if plano_empresa or is_admin %}
+            <div class="section">
+                <div class="section-header">
+                    <h2>Conformidade PNRS</h2>
+                    {% if plano_empresa in ('professional', 'enterprise') or is_admin %}
+                    <span class="count-badge">Disponível</span>
+                    {% else %}
+                    <a href="{{ url_for('planos') }}" class="plan-upgrade-badge">Upgrade para Pro</a>
+                    {% endif %}
+                </div>
+                {% if plano_empresa in ('professional', 'enterprise') or is_admin %}
+                <div class="pnrs-grid">
+                    <div class="pnrs-card">
+                        <h4>Destinação adequada</h4>
+                        <p class="pnrs-value">
+                            {% set total = metricas.peso_reciclado_kg + metricas.peso_reutilizado_kg + metricas.peso_descartado_kg %}
+                            {% if total > 0 %}{{ ((metricas.peso_reciclado_kg + metricas.peso_reutilizado_kg) / total * 100)|round(1) }}%{% else %}0%{% endif %}
+                        </p>
+                        <p class="pnrs-desc">Reciclado + Reutilizado</p>
+                    </div>
+                    <div class="pnrs-card">
+                        <h4>Peso total gerenciado</h4>
+                        <p class="pnrs-value">{{ (metricas.peso_reciclado_kg + metricas.peso_reutilizado_kg + metricas.peso_descartado_kg)|round(2) }} kg</p>
+                        <p class="pnrs-desc">No período selecionado</p>
+                    </div>
+                    <div class="pnrs-card">
+                        <h4>Solicitações atendidas</h4>
+                        <p class="pnrs-value">{{ metricas.total_solicitacoes }}</p>
+                        <p class="pnrs-desc">Conforme Art. 33 da PNRS</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="feature-locked-block">
+                    <svg width="32" height="32" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>
+                    <div>
+                        <p class="locked-title">Relatório PNRS disponível no plano Professional</p>
+                        <p class="locked-desc">Gere relatórios de conformidade com a Política Nacional de Resíduos Sólidos, incluindo destinação adequada e rastreabilidade.</p>
+                    </div>
+                    <a href="{{ url_for('planos') }}" class="btn btn-primary" style="flex-shrink:0;">Ver planos</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
 
 <style>
+.relatorios-titulo-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.relatorios-acoes { display: flex; gap: 8px; }
+.btn-export { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #10b981; color: white; text-decoration: none; position: relative; }
+.btn-export:hover { background: #059669; }
+.btn-export-locked { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+.btn-export-locked:hover { background: #f3f4f6; }
+.lock-badge { background: #6366f1; color: white; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; }
+.plan-upgrade-badge { background: #6366f1; color: white; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; text-decoration: none; }
+.plan-upgrade-badge:hover { background: #4f46e5; }
 .relatorios-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .filtro-periodo { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .filtro-group { display: flex; flex-direction: column; gap: 4px; }
@@ -177,5 +246,13 @@
 .btn-filtrar { background: #10b981; color: white; border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-filtrar:hover { background: #059669; }
 .btn-limpar { color: #6b7280; font-size: 13px; text-decoration: underline; }
+.pnrs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
+.pnrs-card { background: var(--background-alt); border-radius: var(--radius-md); padding: 20px; text-align: center; }
+.pnrs-card h4 { font-size: 13px; color: var(--text-light); margin-bottom: 8px; font-weight: 500; }
+.pnrs-value { font-size: 28px; font-weight: 700; color: var(--primary-dark); margin-bottom: 4px; }
+.pnrs-desc { font-size: 12px; color: var(--text-light); }
+.feature-locked-block { display: flex; align-items: center; gap: 20px; background: var(--background-alt); border: 1.5px dashed var(--border-color); border-radius: var(--radius-lg); padding: 24px; margin-top: 16px; flex-wrap: wrap; }
+.locked-title { font-weight: 600; color: var(--text-dark); margin-bottom: 4px; }
+.locked-desc { font-size: 13px; color: var(--text-light); }
 </style>
 {% endblock %}

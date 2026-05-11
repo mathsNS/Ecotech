@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Planos - EcoTech{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Planos EcoTech</h1>
+        <p>Escolha o plano ideal para sua empresa</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="planos-grid">
+
+        <!-- Free -->
+        <div class="plano-card {% if plano_atual == 'free' %}plano-ativo{% endif %}">
+            <div class="plano-header">
+                <img src="{{ url_for('static', filename='images/plano-free.png') }}" alt="Free" class="plano-icon">
+                <span class="plano-badge">Gratuito</span>
+                <h2 class="plano-nome">Free</h2>
+                <div class="plano-preco">
+                    <span class="preco-valor">R$ 0</span>
+                    <span class="preco-periodo">/mês</span>
+                </div>
+            </div>
+            <ul class="plano-features">
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Até 30 solicitações/mês</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Notificações básicas</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Histórico de coletas</li>
+                <li class="feature-off"><svg width="16" height="16" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg> Relatório PNRS/Compliance</li>
+                <li class="feature-off"><svg width="16" height="16" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg> Exportação de dados</li>
+                <li class="feature-off"><svg width="16" height="16" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg> Dashboard ESG</li>
+                <li class="feature-off"><svg width="16" height="16" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg> Suporte prioritário</li>
+            </ul>
+            {% if plano_atual == 'free' %}
+            <div class="plano-atual-label">Plano atual</div>
+            {% else %}
+            <form method="POST">
+                <input type="hidden" name="plano" value="free">
+                <button type="submit" class="btn-plano btn-plano-secundario">Fazer downgrade</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Professional -->
+        <div class="plano-card plano-destaque {% if plano_atual == 'professional' %}plano-ativo{% endif %}">
+            <div class="plano-badge-destaque">Mais popular</div>
+            <div class="plano-header">
+                <img src="{{ url_for('static', filename='images/plano-pro.png') }}" alt="Professional" class="plano-icon">
+                <span class="plano-badge">Recomendado</span>
+                <h2 class="plano-nome">Professional</h2>
+                <div class="plano-preco">
+                    <span class="preco-valor">R$ 249</span>
+                    <span class="preco-periodo">/mês</span>
+                </div>
+            </div>
+            <ul class="plano-features">
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Solicitações ilimitadas</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Notificações avançadas</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Histórico completo</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Relatório PNRS/Compliance PDF</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Exportação CSV/Excel</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Dashboard ESG básico</li>
+                <li class="feature-off"><svg width="16" height="16" fill="#d1d5db" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg> API de integração</li>
+            </ul>
+            {% if plano_atual == 'professional' %}
+            <div class="plano-atual-label">Plano atual</div>
+            {% else %}
+            <form method="POST">
+                <input type="hidden" name="plano" value="professional">
+                <button type="submit" class="btn-plano btn-plano-principal">
+                    {% if plano_atual == 'free' %}Fazer upgrade{% else %}Fazer downgrade{% endif %}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Enterprise -->
+        <div class="plano-card {% if plano_atual == 'enterprise' %}plano-ativo{% endif %}">
+            <div class="plano-header">
+                <img src="{{ url_for('static', filename='images/plano-enterprise.png') }}" alt="Enterprise" class="plano-icon">
+                <span class="plano-badge">Completo</span>
+                <h2 class="plano-nome">Enterprise</h2>
+                <div class="plano-preco">
+                    <span class="preco-valor">R$ 599</span>
+                    <span class="preco-periodo">/mês</span>
+                </div>
+            </div>
+            <ul class="plano-features">
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Tudo do Professional</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> API de integração</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Dashboard ESG avançado</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Múltiplos pontos de coleta</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Relatórios automáticos mensais</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Analytics regional</li>
+                <li class="feature-on"><svg width="16" height="16" fill="#10b981" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg> Suporte dedicado (SLA)</li>
+            </ul>
+            {% if plano_atual == 'enterprise' %}
+            <div class="plano-atual-label">Plano atual</div>
+            {% else %}
+            <form method="POST">
+                <input type="hidden" name="plano" value="enterprise">
+                <button type="submit" class="btn-plano btn-plano-principal">Fazer upgrade</button>
+            </form>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <div class="planos-nota">
+        <svg width="16" height="16" fill="#6b7280" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/>
+        </svg>
+        <span>Em ambiente de demonstração, a troca de plano é imediata e sem cobrança. Em produção, será integrado ao gateway de pagamento.</span>
+    </div>
+</div>
+{% endblock %}

@@ -115,6 +115,13 @@ class Dados(RepositorioBase):
         except Exception:
             pass  # coluna ja existe
 
+        # migracao incremental: adiciona plano na tabela empresa
+        try:
+            c.execute("ALTER TABLE empresa ADD COLUMN plano TEXT DEFAULT 'free'")
+            self.conn.commit()
+        except Exception:
+            pass  # coluna ja existe
+
         # Tabelas de Descarte
         c.execute("""
         CREATE TABLE IF NOT EXISTS solicitacao_descarte (
@@ -376,6 +383,24 @@ class Dados(RepositorioBase):
             self.conn.execute(
                 "UPDATE cidadao SET pontos = pontos + ? WHERE id_usuario = ?",
                 (pontos_a_adicionar, id_usuario)
+            )
+
+    def buscar_plano_empresa(self, id_usuario: str) -> str:
+        """Retorna o plano atual da empresa ('free', 'professional', 'enterprise')."""
+        c = self.conn.cursor()
+        c.execute("SELECT plano FROM empresa WHERE id_usuario = ?", (id_usuario,))
+        row = c.fetchone()
+        return row['plano'] if row and row['plano'] else 'free'
+
+    def atualizar_plano_empresa(self, id_usuario: str, plano: str) -> None:
+        """Atualiza o plano da empresa."""
+        planos_validos = {'free', 'professional', 'enterprise'}
+        if plano not in planos_validos:
+            raise ValueError(f"Plano inválido: {plano}")
+        with self.conn:
+            self.conn.execute(
+                "UPDATE empresa SET plano = ? WHERE id_usuario = ?",
+                (plano, id_usuario)
             )
 
     # -------------------

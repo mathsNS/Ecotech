@@ -26,6 +26,9 @@
                 {% if usuario.tipo == 'administrador' %}
                 <a href="{{ url_for('usuarios') }}" class="nav-item {% if request.endpoint == 'usuarios' %}active{% endif %}">Usuários</a>
                 {% endif %}
+                {% if usuario.tipo == 'empresa' %}
+                <a href="{{ url_for('planos') }}" class="nav-item {% if request.endpoint == 'planos' %}active{% endif %}">Planos</a>
+                {% endif %}
             </div>
             
             <!-- bloco direito icones -->

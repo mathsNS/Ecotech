@@ -305,6 +305,18 @@
                         <a href="{{ url_for('saque') }}" class="btn btn-action">Sacar</a>
                     </div>
                     {% endif %}
+                    {% if is_empresa %}
+                    <div class="action-card-new">
+                        <div class="action-icon-circle">
+                            <img src="{{ url_for('static', filename='images/plano-pro.png') }}" alt="Planos">
+                        </div>
+                        <div class="action-text-content">
+                            <h3 class="action-title-new">Gerenciar plano</h3>
+                            <p class="action-subtitle-new">Veja e atualize seu plano EcoTech</p>
+                        </div>
+                        <a href="{{ url_for('planos') }}" class="btn btn-action">Ver planos</a>
+                    </div>
+                    {% endif %}
                 </div>
                 </div>
             </div>

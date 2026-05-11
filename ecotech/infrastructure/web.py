@@ -5,7 +5,9 @@ Este módulo implementa a interface web usando Flask,
 baseada no design mobile fornecido.
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+import csv
+import io
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from datetime import datetime
 from typing import Optional
 
@@ -454,6 +456,25 @@ def criar_app() -> Flask:
             entregas=entregas
         )
     
+    @app.route('/planos', methods=['GET', 'POST'])
+    def planos():
+        """Página de planos para empresas."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            flash('Apenas empresas podem acessar os planos.', 'error')
+            return redirect(url_for('dashboard'))
+
+        if request.method == 'POST':
+            novo_plano = request.form.get('plano', 'free')
+            dados.atualizar_plano_empresa(usuario['id'], novo_plano)
+            flash('Plano atualizado com sucesso!', 'success')
+            return redirect(url_for('planos'))
+
+        plano_atual = dados.buscar_plano_empresa(usuario['id'])
+        return render_template('planos.html', usuario=usuario, plano_atual=plano_atual)
+
     @app.route('/saque', methods=['GET', 'POST'])
     def saque():
         """Página de saque/carteira."""
@@ -572,13 +593,78 @@ def criar_app() -> Flask:
             filtro_atual=filtro_estado,
             is_admin=usuario['tipo'] == 'administrador'
         )
-    
+
+    @app.route('/operacoes/<id_sol>/avancar', methods=['POST'])
+    def avancar_estado(id_sol):
+        """Avança o estado de uma solicitação. Empresa/admin only."""
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] not in ('empresa', 'administrador'):
+            return jsonify({'erro': 'Acesso não autorizado'}), 403
+
+        # verifica limite de 30 sol/mês para empresas Free
+        if usuario['tipo'] == 'empresa':
+            plano = dados.buscar_plano_empresa(usuario['id'])
+            if plano == 'free':
+                mes_atual = datetime.now().month
+                ano_atual = datetime.now().year
+                todas = servico_descarte.listar_solicitacoes()
+                # conta solicitações que a empresa avançou este mês (estado != Solicitado)
+                processadas_mes = sum(
+                    1 for s in todas
+                    if s.estado.obter_nome() not in ('Solicitado', 'Cancelado')
+                    and s._data_criacao.month == mes_atual
+                    and s._data_criacao.year == ano_atual
+                )
+                if processadas_mes >= 30:
+                    return jsonify({
+                        'erro': 'Limite de 30 solicitações/mês atingido. Faça upgrade para o plano Professional.',
+                        'upgrade': True
+                    }), 403
+
+        # busca a solicitação
+        todas = servico_descarte.listar_solicitacoes()
+        sol = next((s for s in todas if s.id == id_sol), None)
+        if sol is None:
+            return jsonify({'erro': 'Solicitação não encontrada'}), 404
+
+        if not sol.estado.pode_avancar():
+            return jsonify({'erro': 'Esta solicitação já está em estado final'}), 400
+
+        # se EmProcessamento, exige método de tratamento
+        estado_atual = sol.estado.obter_nome()
+        if estado_atual == 'Em Processamento':
+            metodo_str = request.form.get('metodo', '').strip()
+            if not metodo_str:
+                return jsonify({'erro': 'Informe o método de tratamento'}), 400
+            metodo_map = {
+                'reciclagem': MetodoTratamentoFactory.criar_reciclagem(),
+                'reuso':      MetodoTratamentoFactory.criar_reuso(),
+                'descarte':   MetodoTratamentoFactory.criar_descarte_seguro(),
+            }
+            metodo = metodo_map.get(metodo_str.lower())
+            if metodo is None:
+                return jsonify({'erro': f'Método inválido: {metodo_str}'}), 400
+            servico_descarte.definir_metodo_tratamento(sol, metodo)
+
+        servico_descarte.avancar_estado_solicitacao(sol)
+
+        novo_estado = sol.estado.obter_nome()
+        dados.salvar_notificacao(
+            sol.usuario.id,
+            f'Sua solicitação foi atualizada para: {novo_estado}.'
+        )
+
+        return jsonify({'novo_estado': novo_estado, 'pode_avancar': sol.estado.pode_avancar()})
+
     @app.route('/relatorios')
     def relatorios():
         """Página de relatórios ambientais."""
         if not usuario_logado():
             return redirect(url_for('login'))
-        
+
         usuario = dados_usuario()
         
         # busca todas as solicitacoes
@@ -626,6 +712,8 @@ def criar_app() -> Flask:
             and (data_fim_dt    is None or s._data_criacao <= data_fim_dt)
         ]
 
+        plano_empresa = dados.buscar_plano_empresa(usuario['id']) if usuario['tipo'] == 'empresa' else None
+
         return render_template(
             'relatorios.html',
             usuario=usuario,
@@ -634,8 +722,54 @@ def criar_app() -> Flask:
             is_admin=usuario['tipo'] == 'administrador',
             data_inicio_str=data_inicio_str,
             data_fim_str=data_fim_str,
+            plano_empresa=plano_empresa,
         )
     
+    @app.route('/relatorios/exportar-csv')
+    def exportar_csv():
+        """Exporta solicitações finalizadas como CSV (Professional+ apenas)."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        usuario = dados_usuario()
+        if usuario['tipo'] == 'empresa':
+            plano = dados.buscar_plano_empresa(usuario['id'])
+            if plano == 'free':
+                flash('Exportação de dados disponível apenas nos planos Professional e Enterprise.', 'error')
+                return redirect(url_for('relatorios'))
+        elif usuario['tipo'] not in ('administrador',):
+            flash('Acesso não autorizado.', 'error')
+            return redirect(url_for('relatorios'))
+
+        todas_solicitacoes = servico_descarte.listar_solicitacoes()
+        if usuario['tipo'] == 'administrador':
+            solicitacoes = todas_solicitacoes
+        else:
+            solicitacoes = [s for s in todas_solicitacoes if s.usuario.id == usuario['id']]
+
+        estados_finais = {'Reciclado', 'Reutilizado', 'Descartado'}
+        finalizadas = [s for s in solicitacoes if s.estado.obter_nome() in estados_finais]
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Usuario', 'Peso (kg)', 'Impacto CO2 (kg)', 'Metodo', 'Estado', 'Data'])
+        for s in finalizadas:
+            writer.writerow([
+                s.id,
+                s.usuario.nome,
+                round(s.calcular_peso_total(), 2),
+                round(s.calcular_impacto_total(), 2),
+                s.metodo_tratamento.obter_nome() if s.metodo_tratamento else '',
+                s.estado.obter_nome(),
+                s._data_criacao.strftime('%d/%m/%Y') if s._data_criacao else '',
+            ])
+
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=relatorio_ecotech.csv'}
+        )
+
     @app.route('/usuarios')
     def usuarios():
         """Página de usuários (apenas admin)."""

@@ -59,6 +59,12 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# SQLite databases (includes ecotech.db)
+*.db
+
+# Controle interno de pendências
+PENDENCIAS.txt
+
 # Flask stuff:
 instance/
 .webassets-cache

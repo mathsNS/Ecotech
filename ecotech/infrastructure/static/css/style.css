@@ -3207,3 +3207,167 @@ input[type="time"].form-control-new::-webkit-calendar-picker-indicator {
         justify-content: center;
     }
 }
+
+/* --- planos --- */
+.planos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin: 32px 0;
+}
+
+.plano-card {
+    background: var(--background);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    position: relative;
+    transition: box-shadow 0.2s;
+}
+
+.plano-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.plano-destaque {
+    border-color: var(--primary-color);
+}
+
+.plano-ativo {
+    border-color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.plano-badge-destaque {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 16px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.plano-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.plano-icon {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    margin-bottom: 12px;
+}
+
+.plano-badge {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.plano-nome {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 8px 0 12px;
+}
+
+.plano-preco {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+}
+
+.preco-valor {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--primary-dark);
+}
+
+.preco-periodo {
+    font-size: 14px;
+    color: var(--text-light);
+}
+
+.plano-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.plano-features li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.plano-features .feature-off {
+    color: var(--text-light);
+}
+
+.btn-plano {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-plano-principal {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-plano-principal:hover {
+    background: var(--primary-dark);
+}
+
+.btn-plano-secundario {
+    background: var(--background-alt);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+}
+
+.btn-plano-secundario:hover {
+    background: var(--border-color);
+}
+
+.plano-atual-label {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-color);
+    padding: 12px;
+    background: white;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--primary-color);
+}
+
+.planos-nota {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+    .planos-grid { grid-template-columns: 1fr; }
+}

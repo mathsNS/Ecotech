@@ -148,7 +148,7 @@
     </div>
 </div>
 
-<!-- modal de detalhes (placeholder) -->
+<!-- modal de detalhes -->
 <div id="modal-detalhes" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -159,10 +159,28 @@
             <div class="detail-row"><strong>ID:</strong> <span id="modal-id"></span></div>
             <div class="detail-row"><strong>Usuário:</strong> <span id="modal-usuario"></span></div>
             <div class="detail-row"><strong>Ponto de coleta:</strong> <span id="modal-ponto"></span></div>
-            <div class="detail-row"><strong>Estado:</strong> <span id="modal-estado"></span></div>
+            <div class="detail-row"><strong>Estado:</strong> <span id="modal-estado" class="status-badge"></span></div>
             <div class="detail-row"><strong>Peso total:</strong> <span id="modal-peso"></span> kg</div>
             <div class="detail-row"><strong>Data:</strong> <span id="modal-data"></span></div>
             <div class="detail-row"><strong>Itens:</strong> <span id="modal-itens"></span></div>
+
+            {% if is_admin or usuario.tipo == 'empresa' %}
+            <!-- secao avanco de estado — visivel apenas quando pode avançar -->
+            <div id="avanco-section" style="display:none; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <div id="metodo-row" style="display:none; margin-bottom: 12px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Método de tratamento</label>
+                    <select id="metodo-select" class="filter-select" style="width:100%;">
+                        <option value="reciclagem">Reciclagem</option>
+                        <option value="reuso">Reuso</option>
+                        <option value="descarte">Descarte Seguro</option>
+                    </select>
+                </div>
+                <button id="btn-avancar" class="btn btn-primary" style="width:100%;" onclick="avancarEstado()">
+                    Avançar Estado
+                </button>
+                <p id="avancar-msg" style="font-size:13px; margin-top:8px; display:none;"></p>
+            </div>
+            {% endif %}
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="fecharModal()">Fechar</button>
@@ -171,16 +189,35 @@
 </div>
 
 <script>
-// funcoes basicas do modal
+const ESTADOS_FINAIS = ['Reciclado', 'Reutilizado', 'Descartado', 'Cancelado'];
+let _solIdAtual = '';
+
 function abrirDetalhes(btn) {
     const d = btn.dataset;
+    _solIdAtual = d.id;
+
     document.getElementById('modal-id').textContent      = d.id;
     document.getElementById('modal-usuario').textContent = d.usuario;
     document.getElementById('modal-ponto').textContent   = d.ponto;
-    document.getElementById('modal-estado').textContent  = d.estado;
     document.getElementById('modal-peso').textContent    = d.peso;
     document.getElementById('modal-data').textContent    = d.data;
     document.getElementById('modal-itens').textContent   = d.itens + ' item(ns)';
+
+    const estadoEl = document.getElementById('modal-estado');
+    estadoEl.textContent = d.estado;
+    estadoEl.className   = 'status-badge status-' + d.estado.toLowerCase().replace(/ /g, '-');
+
+    const avancoSection = document.getElementById('avanco-section');
+    const metodoRow     = document.getElementById('metodo-row');
+    const msg           = document.getElementById('avancar-msg');
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+
+    if (avancoSection) {
+        const podeAvancar = !ESTADOS_FINAIS.includes(d.estado);
+        avancoSection.style.display = podeAvancar ? 'block' : 'none';
+        if (metodoRow) metodoRow.style.display = d.estado === 'Em Processamento' ? 'block' : 'none';
+    }
+
     document.getElementById('modal-detalhes').style.display = 'flex';
 }
 
@@ -188,12 +225,73 @@ function fecharModal() {
     document.getElementById('modal-detalhes').style.display = 'none';
 }
 
-// fecha modal clicando fora
+function avancarEstado() {
+    const btn  = document.getElementById('btn-avancar');
+    const msg  = document.getElementById('avancar-msg');
+    const metodoSelect = document.getElementById('metodo-select');
+
+    const body = new URLSearchParams();
+    const estadoAtual = document.getElementById('modal-estado').textContent;
+    if (estadoAtual === 'Em Processamento' && metodoSelect) {
+        body.append('metodo', metodoSelect.value);
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Processando...';
+
+    fetch('/operacoes/' + _solIdAtual + '/avancar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString()
+    })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        msg.style.display = 'block';
+        if (ok) {
+            const estadoEl = document.getElementById('modal-estado');
+            estadoEl.textContent = data.novo_estado;
+            estadoEl.className   = 'status-badge status-' + data.novo_estado.toLowerCase().replace(/ /g, '-');
+            msg.style.color   = '#10b981';
+            msg.textContent   = 'Estado atualizado para: ' + data.novo_estado;
+            btn.textContent   = 'Avançar Estado';
+            btn.disabled      = !data.pode_avancar;
+            if (!data.pode_avancar) {
+                document.getElementById('avanco-section').style.display = 'none';
+            }
+            // atualiza o badge na linha da tabela
+            document.querySelectorAll('[data-id="' + _solIdAtual + '"]').forEach(el => {
+                const row = el.closest('tr');
+                if (row) {
+                    const badge = row.querySelector('.status-badge');
+                    if (badge) {
+                        badge.textContent = data.novo_estado;
+                        badge.className   = 'status-badge status-' + data.novo_estado.toLowerCase().replace(/ /g, '-');
+                    }
+                    el.dataset.estado = data.novo_estado;
+                }
+            });
+        } else {
+            msg.style.color  = '#ef4444';
+            msg.textContent  = data.erro || 'Erro ao avançar estado.';
+            if (data.upgrade) {
+                msg.innerHTML = data.erro + ' <a href="/planos" style="color:#6366f1;font-weight:600;">Ver planos</a>';
+            }
+            btn.textContent = 'Avançar Estado';
+            btn.disabled    = false;
+        }
+    })
+    .catch(() => {
+        msg.style.display = 'block';
+        msg.style.color   = '#ef4444';
+        msg.textContent   = 'Erro de conexão. Tente novamente.';
+        btn.textContent   = 'Avançar Estado';
+        btn.disabled      = false;
+    });
+}
+
 window.onclick = function(event) {
     const modal = document.getElementById('modal-detalhes');
-    if (event.target == modal) {
-        fecharModal();
-    }
+    if (event.target == modal) fecharModal();
 }
 </script>
 {% endblock %}
