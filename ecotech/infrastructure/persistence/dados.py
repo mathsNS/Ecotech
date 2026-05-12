@@ -403,6 +403,20 @@ class Dados(RepositorioBase):
                 (plano, id_usuario)
             )
 
+    def atualizar_usuario(self, id_usuario: str, nome: str, email: str, password_hash: str = None) -> None:
+        """Atualiza nome e email do usuário. Se password_hash fornecido, atualiza também a senha."""
+        with self.conn:
+            if password_hash:
+                self.conn.execute(
+                    "UPDATE usuario SET nome = ?, email = ?, password_hash = ? WHERE id = ?",
+                    (nome, email, password_hash, id_usuario)
+                )
+            else:
+                self.conn.execute(
+                    "UPDATE usuario SET nome = ?, email = ? WHERE id = ?",
+                    (nome, email, id_usuario)
+                )
+
     # -------------------
     # BUSCAR
     # -------------------

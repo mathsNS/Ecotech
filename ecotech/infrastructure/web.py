@@ -10,6 +10,7 @@ import io
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from datetime import datetime
 from typing import Optional
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from ..application.services import (
     ServicoDescarte,
@@ -214,6 +215,27 @@ def criar_app() -> Flask:
         if usuario['tipo'] == 'empresa':
             metricas_sistema = servico_descarte.calcular_metricas(todas_solicitacoes)
 
+            # --- ESG ---
+            _ESTADOS_FINAIS = {'Reciclado', 'Reutilizado', 'Descartado'}
+            sols_finais = [s for s in solicitacoes_usuario if s.estado.obter_nome() in _ESTADOS_FINAIS]
+            sols_reciclados = [s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Reciclado']
+            co2_evitado = round(metricas_usuario['peso_total'] * 3.0, 1)
+            taxa_reciclagem = round((len(sols_reciclados) / len(sols_finais) * 100), 1) if sols_finais else 0.0
+
+            # tonelagem por categoria de dispositivo
+            _MAPA_CATEGORIA = {
+                'Celular': 'Celulares', 'Computador': 'Computadores',
+                'Eletrodomestico': 'Eletrodomésticos', 'Eletrodoméstico': 'Eletrodomésticos',
+            }
+            por_categoria: dict = {}
+            for sol in solicitacoes_usuario:
+                for item in sol.itens:
+                    tipo = type(item.dispositivo).__name__
+                    nome_cat = _MAPA_CATEGORIA.get(tipo, tipo)
+                    por_categoria[nome_cat] = round(
+                        por_categoria.get(nome_cat, 0.0) + item.calcular_peso_total(), 2
+                    )
+
             return render_template(
                 'dashboard.html',
                 usuario=usuario,
@@ -223,6 +245,9 @@ def criar_app() -> Flask:
                 pontos_acumulados=metricas_usuario['pontos'],
                 total_sistema=metricas_sistema['peso_total'],
                 total_processadas=metricas_sistema['total_processadas'],
+                co2_evitado=co2_evitado,
+                taxa_reciclagem=taxa_reciclagem,
+                por_categoria=por_categoria,
                 is_empresa=True,
                 is_admin=False
             )
@@ -548,16 +573,66 @@ def criar_app() -> Flask:
             for m, lbl, ico in _milestones
         ]
 
+        row_usuario = dados.buscar_usuario(usuario['id'])
+        email_usuario = row_usuario['email'] if row_usuario else ''
+
         return render_template(
             'perfil.html',
             usuario=usuario,
+            email_usuario=email_usuario,
             total_solicitacoes=len(solicitacoes_usuario),
             pontos=metricas['pontos'],
             tier_info=tier_info,
             rank=rank,
             conquistas=conquistas,
         )
-    
+
+    @app.route('/perfil/editar', methods=['POST'])
+    def perfil_editar():
+        """Atualiza nome, email e/ou senha do usuário logado."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+
+        usuario = dados_usuario()
+        nome  = request.form.get('nome',  '').strip()
+        email = request.form.get('email', '').strip()
+        senha_atual   = request.form.get('senha_atual',   '')
+        nova_senha     = request.form.get('nova_senha',    '')
+        confirma_senha = request.form.get('confirma_senha', '')
+
+        if not nome or not email:
+            flash('Nome e e-mail são obrigatórios.', 'error')
+            return redirect(url_for('perfil'))
+
+        # verifica se o e-mail já pertence a outro usuário
+        row_email = dados.buscar_usuario_por_email(email)
+        if row_email and row_email['id'] != usuario['id']:
+            flash('Este e-mail já está em uso por outro usuário.', 'error')
+            return redirect(url_for('perfil'))
+
+        password_hash = None
+        if nova_senha:
+            # verifica senha atual antes de permitir troca
+            row = dados.buscar_usuario(usuario['id'])
+            if not row or not check_password_hash(row['password_hash'] or '', senha_atual):
+                flash('Senha atual incorreta.', 'error')
+                return redirect(url_for('perfil'))
+            if nova_senha != confirma_senha:
+                flash('A nova senha e a confirmação não coincidem.', 'error')
+                return redirect(url_for('perfil'))
+            if len(nova_senha) < 6:
+                flash('A nova senha deve ter pelo menos 6 caracteres.', 'error')
+                return redirect(url_for('perfil'))
+            password_hash = generate_password_hash(nova_senha)
+
+        dados.atualizar_usuario(usuario['id'], nome, email, password_hash)
+
+        # atualiza a sessão com o novo nome
+        session['user_nome'] = nome
+
+        flash('Perfil atualizado com sucesso!', 'success')
+        return redirect(url_for('perfil'))
+
     @app.route('/operacoes')
     def operacoes():
         """Página de operações para gerenciamento de solicitações."""
@@ -642,7 +717,7 @@ def criar_app() -> Flask:
             metodo_map = {
                 'reciclagem': MetodoTratamentoFactory.criar_reciclagem(),
                 'reuso':      MetodoTratamentoFactory.criar_reuso(),
-                'descarte':   MetodoTratamentoFactory.criar_descarte_seguro(),
+                'descarte':   MetodoTratamentoFactory.criar_descarte_controlado(),
             }
             metodo = metodo_map.get(metodo_str.lower())
             if metodo is None:
@@ -652,9 +727,23 @@ def criar_app() -> Flask:
         servico_descarte.avancar_estado_solicitacao(sol)
 
         novo_estado = sol.estado.obter_nome()
+
+        # feature flag Enterprise: cidadão recebe 50% de bônus nos pontos
+        # quando uma empresa Enterprise finaliza a solicitação
+        _estados_finais_set = {'Reciclado', 'Reutilizado', 'Descartado'}
+        bonus_msg = ''
+        if novo_estado in _estados_finais_set and usuario['tipo'] == 'empresa':
+            plano_atual = dados.buscar_plano_empresa(usuario['id'])
+            if plano_atual == 'enterprise':
+                peso = sol.calcular_peso_total()
+                bonus = int(peso * 10 * 0.5)  # 50% extra
+                if bonus > 0:
+                    dados.atualizar_pontos_cidadao(sol.usuario.id, bonus)
+                    bonus_msg = f' Bônus Enterprise: +{bonus} pontos extras!'
+
         dados.salvar_notificacao(
             sol.usuario.id,
-            f'Sua solicitação foi atualizada para: {novo_estado}.'
+            f'Sua solicitação foi atualizada para: {novo_estado}.{bonus_msg}'
         )
 
         return jsonify({'novo_estado': novo_estado, 'pode_avancar': sol.estado.pode_avancar()})

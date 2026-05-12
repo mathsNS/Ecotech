@@ -321,6 +321,63 @@
                 </div>
             </div>
         </div>
+
+        {% if is_empresa %}
+        <!-- Bloco ESG — visível apenas para empresa -->
+        <div class="esg-section">
+            <h2 class="section-title-dash">Impacto ESG</h2>
+            <div class="esg-grid">
+                <!-- CO2 -->
+                <div class="esg-card">
+                    <div class="esg-icon-wrap">
+                        <img src="{{ url_for('static', filename='images/planta.png') }}" alt="CO2" class="esg-icon">
+                    </div>
+                    <div class="esg-info">
+                        <span class="esg-label">CO₂ evitado (est.)</span>
+                        <strong class="esg-valor">{{ co2_evitado }} kg</strong>
+                        <span class="esg-sub">≈ 3 kg CO₂/kg de e-lixo</span>
+                    </div>
+                </div>
+                <!-- Taxa reciclagem -->
+                <div class="esg-card">
+                    <div class="esg-icon-wrap">
+                        <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Reciclagem" class="esg-icon">
+                    </div>
+                    <div class="esg-info">
+                        <span class="esg-label">Taxa de reciclagem</span>
+                        <strong class="esg-valor">{{ taxa_reciclagem }}%</strong>
+                        <span class="esg-sub">das sol. finalizadas</span>
+                    </div>
+                </div>
+                <!-- Peso total processado -->
+                <div class="esg-card">
+                    <div class="esg-icon-wrap">
+                        <img src="{{ url_for('static', filename='images/dispositivo.png') }}" alt="Peso" class="esg-icon">
+                    </div>
+                    <div class="esg-info">
+                        <span class="esg-label">Peso total processado</span>
+                        <strong class="esg-valor">{{ total_descartado|round(2) }} kg</strong>
+                        <span class="esg-sub">{{ "%.2f"|format(total_descartado / 1000) }} toneladas</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if por_categoria %}
+            <div class="esg-categorias">
+                <h3 style="font-size:14px; font-weight:600; margin-bottom:10px; color:var(--text-secondary);">Por categoria</h3>
+                <div class="esg-cat-grid">
+                    {% for cat, peso in por_categoria.items() %}
+                    <div class="esg-cat-item">
+                        <span class="esg-cat-nome">{{ cat }}</span>
+                        <span class="esg-cat-peso">{{ peso }} kg</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
     </div>
 </div>
 

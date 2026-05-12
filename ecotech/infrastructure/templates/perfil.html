@@ -77,8 +77,56 @@
             <!-- botoes -->
             <div class="profile-actions-new">
                 <a href="{{ url_for('saque') }}" class="btn btn-collect">Coletar pontos</a>
+                <button type="button" class="btn btn-secondary" onclick="toggleEditarPerfil()">Editar perfil</button>
                 <a href="{{ url_for('logout') }}" class="btn btn-logout">Sair da conta</a>
             </div>
+
+            <!-- formulario de edicao (oculto por padrão) -->
+            <div id="editar-perfil-form" style="display:none; margin-top:24px; border-top:1px solid var(--border-color); padding-top:20px;">
+                <h3 style="margin-bottom:16px;">Editar perfil</h3>
+                <form method="POST" action="{{ url_for('perfil_editar') }}">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Nome</label>
+                        <input type="text" name="nome" value="{{ usuario.nome }}" required
+                               class="filter-select" style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">E-mail</label>
+                        <input type="email" name="email" value="{{ email_usuario }}" required
+                               class="filter-select" style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <hr style="margin:16px 0; border-color:var(--border-color);">
+                    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Deixe em branco para não alterar a senha.</p>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Senha atual</label>
+                        <input type="password" name="senha_atual"
+                               class="filter-select" style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Nova senha</label>
+                        <input type="password" name="nova_senha" minlength="6"
+                               class="filter-select" style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:16px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Confirmar nova senha</label>
+                        <input type="password" name="confirma_senha" minlength="6"
+                               class="filter-select" style="width:100%; box-sizing:border-box;">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Salvar alterações</button>
+                </form>
+            </div>
+
+<script>
+function toggleEditarPerfil() {
+    const f = document.getElementById('editar-perfil-form');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+{% if 'Perfil atualizado' in get_flashed_messages()|join %}
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('editar-perfil-form').style.display = 'none';
+});
+{% endif %}
+</script>
         </div>
     </div>
 </div>

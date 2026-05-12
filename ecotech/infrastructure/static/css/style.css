@@ -3371,3 +3371,108 @@ input[type="time"].form-control-new::-webkit-calendar-picker-indicator {
 @media (max-width: 900px) {
     .planos-grid { grid-template-columns: 1fr; }
 }
+
+/* =========================================================
+   ESG DASHBOARD
+   ========================================================= */
+
+.esg-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+}
+
+.esg-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.esg-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.esg-icon-wrap {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.esg-icon {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+}
+
+.esg-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.esg-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.esg-valor {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.esg-sub {
+    font-size: 11px;
+    color: var(--text-light, #9ca3af);
+}
+
+.esg-categorias {
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+}
+
+.esg-cat-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.esg-cat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99, 102, 241, 0.08);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.esg-cat-nome {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.esg-cat-peso {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .esg-grid { grid-template-columns: 1fr; }
+}
