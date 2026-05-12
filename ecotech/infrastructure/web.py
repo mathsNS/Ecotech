@@ -26,6 +26,7 @@ from ..application.factories import (
     MetodoTratamentoFactory
 )
 from ..domain.usuarios import Usuario
+from ..domain.dispositivos import EstadoProduto
 from ..infrastructure.persistence.dados import Dados
 
 
@@ -189,6 +190,7 @@ def criar_app() -> Flask:
         
         if usuario['tipo'] == 'administrador':
             metricas = servico_descarte.calcular_metricas(todas_solicitacoes)
+            receita_ecotech_total = dados.buscar_receita_total_ecotech()
 
             return render_template(
                 'dashboard.html',
@@ -199,6 +201,7 @@ def criar_app() -> Flask:
                 pontos_acumulados=0,
                 total_sistema=metricas['peso_total'],
                 total_processadas=metricas['total_processadas'],
+                receita_ecotech_total=receita_ecotech_total,
                 is_empresa=False,
                 is_admin=True
             )
@@ -237,6 +240,8 @@ def criar_app() -> Flask:
                         por_categoria.get(nome_cat, 0.0) + item.calcular_peso_total(), 2
                     )
 
+            saldo_empresa = dados.buscar_saldo_empresa(usuario['id'])
+
             return render_template(
                 'dashboard.html',
                 usuario=usuario,
@@ -249,6 +254,7 @@ def criar_app() -> Flask:
                 co2_evitado=co2_evitado,
                 taxa_reciclagem=taxa_reciclagem,
                 por_categoria=por_categoria,
+                saldo_empresa=saldo_empresa,
                 is_empresa=True,
                 is_admin=False
             )
@@ -327,6 +333,7 @@ def criar_app() -> Flask:
         if request.method == 'POST':
             try:
                 tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
+                subcategoria      = request.form.get('subcategoria', '').strip()
                 nome_dispositivo  = request.form.get('nome', '').strip()
                 peso_kg           = float(request.form.get('peso_kg', 1.0))
                 quantidade        = int(request.form.get('quantidade', 1))
@@ -355,7 +362,7 @@ def criar_app() -> Flask:
 
                 dispositivo = DispositivoFactory.criar_dispositivo(
                     tipo_dispositivo,
-                    {'id': str(__import__('uuid').uuid4()), 'nome': nome_dispositivo, 'peso_kg': peso_kg}
+                    {'id': str(__import__('uuid').uuid4()), 'nome': nome_dispositivo, 'peso_kg': peso_kg, 'subcategoria': subcategoria}
                 )
                 servico_descarte.adicionar_item_solicitacao(solicitacao, dispositivo, quantidade, observacoes)
 
@@ -859,7 +866,7 @@ def criar_app() -> Flask:
         if not sol.estado.pode_avancar():
             return jsonify({'erro': 'Esta solicitação já está em estado final'}), 400
 
-        # se EmProcessamento, exige método de tratamento
+        # se EmProcessamento, exige método de tratamento e avalia o produto
         estado_atual = sol.estado.obter_nome()
         if estado_atual == 'Em Processamento':
             metodo_str = request.form.get('metodo', '').strip()
@@ -875,6 +882,37 @@ def criar_app() -> Flask:
                 return jsonify({'erro': f'Método inválido: {metodo_str}'}), 400
             servico_descarte.definir_metodo_tratamento(sol, metodo)
 
+            # avaliação do produto
+            estado_produto = request.form.get('estado_produto', 'funcionando').strip()
+            valor_proposto_str = request.form.get('valor_proposto', '').strip()
+            justificativa = request.form.get('justificativa', '').strip()
+            valor_proposto = float(valor_proposto_str) if valor_proposto_str else None
+
+            # calcula valor total avaliado somando todos os itens
+            valor_total_avaliado = 0.0
+            for item in sol.itens:
+                subcategoria = item.dispositivo.subcategoria or 'smartphone_medio'
+                preco_row = dados.buscar_preco_subcategoria(subcategoria)
+                if preco_row:
+                    vb = float(preco_row['valor_base_funcionando'])
+                    vm = float(preco_row['valor_minimo_sucata'])
+                else:
+                    vb, vm = item.dispositivo.calcular_valor_revenda(), 0.0
+                if valor_proposto is not None:
+                    resultado_override = ServicoDescarte.validar_override(valor_proposto, vb, vm)
+                    valor_item = resultado_override['valor_aplicado']
+                    status_override = resultado_override['status']
+                else:
+                    valor_item = item.dispositivo.calcular_valor_avaliado(
+                        EstadoProduto(estado_produto), vb, vm
+                    )
+                    status_override = 'nenhum'
+                valor_total_avaliado += valor_item * item.quantidade
+
+            dados.atualizar_avaliacao_solicitacao(
+                sol.id, estado_produto, valor_total_avaliado, justificativa, status_override
+            )
+
         servico_descarte.avancar_estado_solicitacao(sol)
 
         novo_estado = sol.estado.obter_nome()
@@ -885,21 +923,35 @@ def criar_app() -> Flask:
         notificacao_msg = ''
         bonus_msg = ''
         if novo_estado in _estados_finais_set:
-            # pontos base para cidadão (serviço já credita; aqui calcula mensagem)
             if sol.usuario.obter_tipo() == 'Cidadão':
-                pontos_base = int(sol.calcular_peso_total() * 10)
-                notificacao_msg = f'+{pontos_base} pontos creditados!'
-
-                # calcula crédito financeiro = 10% do valor de reciclagem dos itens
-                valor_revenda_total = sum(
-                    item.dispositivo.calcular_valor_revenda() * item.quantidade
-                    for item in sol.itens
-                )
+                # usa valor avaliado gravado no banco se disponível, senão fallback legacy
+                avaliacao_row = dados.buscar_avaliacao_solicitacao(sol.id)
+                if avaliacao_row and avaliacao_row['valor_proposto']:
+                    valor_revenda_total = float(avaliacao_row['valor_proposto'])
+                else:
+                    valor_revenda_total = sum(
+                        item.dispositivo.calcular_valor_revenda() * item.quantidade
+                        for item in sol.itens
+                    )
                 credito = round(valor_revenda_total * 0.1, 2)
                 nome_empresa = usuario['nome'] if usuario['tipo'] == 'empresa' else 'EcoTech'
                 dados.salvar_entrega_para_solicitacao(sol.id, sol.usuario.id, credito, nome_empresa)
+                # pontos = valor_final × 10% em R$ ÷ TAXA_REAIS_POR_PONTO
+                pontos_credito = int(credito / servico_saque.TAXA_REAIS_POR_PONTO)
+                dados.atualizar_pontos_cidadao(sol.usuario.id, pontos_credito)
+                sol.usuario.adicionar_pontos(pontos_credito)
+                notificacao_msg = f'+{pontos_credito} pontos creditados!'
                 if credito > 0:
                     notificacao_msg += f' Crédito de R$ {credito:.2f} liberado na carteira!'
+
+                # parcelas EcoTech e empresa
+                plano_empresa = dados.buscar_plano_empresa(usuario['id']) if usuario['tipo'] == 'empresa' else 'free'
+                taxa_ecotech = ServicoDescarte.TAXAS_ECOTECH.get(plano_empresa, 0.08)
+                valor_ecotech = round(valor_revenda_total * taxa_ecotech, 2)
+                valor_empresa = round(valor_revenda_total * (1.0 - 0.10 - taxa_ecotech), 2)
+                if usuario['tipo'] == 'empresa':
+                    dados.atualizar_saldo_empresa(usuario['id'], valor_empresa)
+                dados.registrar_receita_ecotech(sol.id, valor_ecotech)
 
             # bônus Enterprise para o cidadão que submeteu
             if usuario['tipo'] == 'empresa':
@@ -1149,6 +1201,181 @@ def criar_app() -> Flask:
 
         dados.desativar_usuario(id_usuario)
         return jsonify({'ok': True})
+
+    @app.route('/admin/overrides')
+    def admin_overrides():
+        """Fila de overrides de valor aguardando aprovação do admin."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('dashboard'))
+
+        pendentes_raw = dados.buscar_overrides_pendentes()
+
+        from datetime import datetime
+
+        def _fmt(data_str):
+            if not data_str:
+                return '-'
+            try:
+                return datetime.strptime(data_str, '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M')
+            except Exception:
+                return data_str
+
+        _estado_labels = {
+            'funcionando': 'Funcionando',
+            'defeito_leve': 'Defeito Leve',
+            'defeito_grave': 'Defeito Grave',
+            'sucata': 'Sucata',
+        }
+
+        pendentes = [
+            {
+                'id': row['id'],
+                'data_criacao': _fmt(row['data_criacao']),
+                'nome_usuario': row['nome_usuario'],
+                'tipo_usuario': row['tipo_usuario'],
+                'estado_produto': _estado_labels.get(row['estado_produto'], row['estado_produto'] or '-'),
+                'valor_proposto': float(row['valor_proposto']) if row['valor_proposto'] else 0.0,
+                'justificativa': row['justificativa_valor'] or '-',
+            }
+            for row in pendentes_raw
+        ]
+
+        return render_template(
+            'admin_overrides.html',
+            usuario=usuario,
+            pendentes=pendentes,
+            total=len(pendentes),
+        )
+
+    @app.route('/admin/overrides/<id_sol>/aprovar', methods=['POST'])
+    def aprovar_override(id_sol):
+        """Aprova o override de valor proposto para uma solicitação."""
+        if not usuario_logado():
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        dados.aprovar_override(id_sol)
+        flash('Override aprovado com sucesso.', 'success')
+        return redirect(url_for('admin_overrides'))
+
+    @app.route('/admin/overrides/<id_sol>/rejeitar', methods=['POST'])
+    def rejeitar_override(id_sol):
+        """Rejeita o override, revertendo ao valor calculado automaticamente."""
+        if not usuario_logado():
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        # recalcula o valor correto baseado no estado_produto e tabela_precos
+        avaliacao = dados.buscar_avaliacao_solicitacao(id_sol)
+        estado_produto_str = avaliacao['estado_produto'] if avaliacao else 'funcionando'
+
+        itens = dados.buscar_itens_solicitacao(id_sol)
+        valor_recalculado = 0.0
+        for item in itens:
+            subcategoria = item['subcategoria'] or 'smartphone_medio'
+            preco_row = dados.buscar_preco_subcategoria(subcategoria)
+            if preco_row:
+                vb = float(preco_row['valor_base_funcionando'])
+                vm = float(preco_row['valor_minimo_sucata'])
+            else:
+                vb, vm = 0.0, 0.0
+            try:
+                estado_enum = EstadoProduto(estado_produto_str)
+            except ValueError:
+                estado_enum = EstadoProduto.FUNCIONANDO
+            # cria dispositivo temporário para usar calcular_valor_avaliado
+            from ..domain.dispositivos import Celular
+            tmp = Celular(id='tmp', nome='tmp', peso_kg=0.0)
+            valor_item = tmp.calcular_valor_avaliado(estado_enum, vb, vm)
+            quantidade = item['quantidade'] if 'quantidade' in item.keys() else 1
+            valor_recalculado += valor_item * quantidade
+
+        dados.rejeitar_override(id_sol, valor_recalculado)
+        flash('Override rejeitado. Valor revertido ao cálculo automático.', 'success')
+        return redirect(url_for('admin_overrides'))
+
+    @app.route('/admin/precos')
+    def admin_precos():
+        """Tabela de preços editável pelo admin."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('dashboard'))
+
+        tabela = dados.buscar_tabela_precos()
+        _cat_labels = {
+            'celular': 'Celular',
+            'computador': 'Computador',
+            'eletrodomestico': 'Eletrodoméstico',
+        }
+        _sub_labels = {
+            'smartphone_basico': 'Smartphone Básico',
+            'smartphone_medio': 'Smartphone Médio',
+            'smartphone_premium': 'Smartphone Premium',
+            'iphone': 'iPhone',
+            'notebook_basico': 'Notebook Básico',
+            'notebook_gamer': 'Notebook Gamer',
+            'desktop': 'Desktop',
+            'geladeira': 'Geladeira',
+            'lavadora': 'Lavadora',
+            'ar_condicionado': 'Ar-condicionado',
+            'micro_ondas': 'Micro-ondas',
+            'tv': 'TV',
+        }
+        precos = [
+            {
+                'subcategoria': row['subcategoria'],
+                'subcategoria_label': _sub_labels.get(row['subcategoria'], row['subcategoria']),
+                'categoria': _cat_labels.get(row['categoria'], row['categoria']),
+                'valor_base': float(row['valor_base_funcionando']),
+                'valor_minimo': float(row['valor_minimo_sucata']),
+            }
+            for row in tabela
+        ]
+        return render_template('admin_precos.html', usuario=usuario, precos=precos)
+
+    @app.route('/admin/precos/<subcategoria>', methods=['POST'])
+    def atualizar_preco(subcategoria):
+        """Atualiza valores de uma subcategoria (admin only)."""
+        if not usuario_logado():
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'administrador':
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        try:
+            valor_base = float(request.form.get('valor_base', '0').replace(',', '.'))
+            valor_minimo = float(request.form.get('valor_minimo', '0').replace(',', '.'))
+        except ValueError:
+            flash('Valores inválidos.', 'error')
+            return redirect(url_for('admin_precos'))
+
+        if valor_base <= 0 or valor_minimo < 0:
+            flash('Valor base deve ser positivo e valor mínimo não pode ser negativo.', 'error')
+            return redirect(url_for('admin_precos'))
+
+        if valor_minimo >= valor_base:
+            flash('Valor mínimo de sucata deve ser menor que o valor base.', 'error')
+            return redirect(url_for('admin_precos'))
+
+        dados.atualizar_preco_subcategoria(subcategoria, valor_base, valor_minimo)
+        flash(f'Preços de "{subcategoria}" atualizados com sucesso.', 'success')
+        return redirect(url_for('admin_precos'))
 
     return app
 

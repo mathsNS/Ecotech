@@ -82,19 +82,22 @@ class ServicoDescarte:
                         dispositivo = DispositivoFactory.criar_computador(
                             item_row['id_dispositivo'],
                             item_row['nome'],
-                            item_row['peso_kg']
+                            item_row['peso_kg'],
+                            subcategoria=item_row['subcategoria'] or ''
                         )
                     elif tipo_dispositivo == 'eletrodomestico':
                         dispositivo = DispositivoFactory.criar_eletrodomestico(
                             item_row['id_dispositivo'],
                             item_row['nome'],
-                            item_row['peso_kg']
+                            item_row['peso_kg'],
+                            subcategoria=item_row['subcategoria'] or ''
                         )
                     else:
                         dispositivo = DispositivoFactory.criar_celular(
                             item_row['id_dispositivo'],
                             item_row['nome'],
-                            item_row['peso_kg']
+                            item_row['peso_kg'],
+                            subcategoria=item_row['subcategoria'] or ''
                         )
                     item = ItemDescarte(dispositivo, item_row['quantidade'], item_row['observacoes'] or '')
                     solicitacao._itens.append(item)
@@ -178,14 +181,7 @@ class ServicoDescarte:
         if self._dados:
             estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
             self._dados.atualizar_solicitacao(solicitacao.id, estado)
-
-            # crédita pontos apenas para cidadãos (empresas não tem adicionar_pontos)
-            if estado in ('RECICLADO', 'REUTILIZADO') and isinstance(solicitacao.usuario, Cidadao):
-                peso = solicitacao.calcular_peso_total()
-                pontos = int(peso * 10)  # 10 pts/kg
-                id_usuario = solicitacao.usuario.id
-                solicitacao.usuario.adicionar_pontos(pontos)
-                self._dados.atualizar_pontos_cidadao(id_usuario, pontos)
+            # crédito de pontos é feito pela camada web após calcular valor_final × 10%
 
     def cancelar_solicitacao(self, solicitacao: SolicitacaoDescarte, motivo: str = ""):
         """Cancela uma solicitação com motivo opcional."""
@@ -216,6 +212,50 @@ class ServicoDescarte:
             'pontos': int(peso_total * 10),
             'total_processadas': sum(1 for s in solicitacoes if s.estado.obter_nome() in _finais),
         }
+
+    MULTIPLICADORES_ESTADO = {
+        'funcionando':   1.00,
+        'defeito_leve':  0.40,
+        'defeito_grave': 0.15,
+    }
+    OVERRIDE_CAP_FACTOR = 1.50
+    # comissao EcoTech por plano (o restante fica para a empresa)
+    TAXAS_ECOTECH = {'free': 0.08, 'professional': 0.05, 'enterprise': 0.02}
+
+    @staticmethod
+    def calcular_valor_avaliado(
+        estado_produto: str,
+        valor_base: float,
+        valor_minimo_sucata: float,
+        valor_proposto: float = None
+    ) -> float:
+        if valor_proposto is not None:
+            return round(valor_proposto, 2)
+        if estado_produto == 'sucata':
+            return round(valor_minimo_sucata, 2)
+        mult = ServicoDescarte.MULTIPLICADORES_ESTADO.get(estado_produto, 1.00)
+        return round(valor_base * mult, 2)
+
+    @staticmethod
+    def validar_override(
+        valor_proposto: float,
+        valor_base: float,
+        valor_minimo_sucata: float
+    ) -> dict:
+        cap = round(valor_base * ServicoDescarte.OVERRIDE_CAP_FACTOR, 2)
+        if valor_proposto < valor_minimo_sucata:
+            return {
+                'status': 'invalido',
+                'motivo': f'abaixo do mínimo de sucata (R$ {valor_minimo_sucata:.2f})',
+                'valor_aplicado': valor_minimo_sucata,
+            }
+        if valor_proposto > cap:
+            return {
+                'status': 'pendente_doc',
+                'motivo': f'acima de 150% do valor base — exige comprovante (cap R$ {cap:.2f})',
+                'valor_aplicado': cap,
+            }
+        return {'status': 'aprovado', 'motivo': '', 'valor_aplicado': round(valor_proposto, 2)}
 
     @staticmethod
     def calcular_progresso(solicitacoes: List[SolicitacaoDescarte],

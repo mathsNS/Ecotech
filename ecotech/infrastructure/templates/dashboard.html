@@ -59,7 +59,13 @@
                 </div>
                 <h3 class="stat-value">{{ solicitacoes|length }}</h3>
             </div>
-            {% elif is_empresa %}
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Receita" class="stat-icon-img">
+                    <span class="stat-label">Receita EcoTech</span>
+                </div>
+                <h3 class="stat-value">R$ {{ "%.2f"|format(receita_ecotech_total|default(0))|replace('.', ',') }}</h3>
+            </div>
             <!-- Empresa ve metricas de processamento -->
             <div class="stat-card-new">
                 <div class="stat-top">
@@ -89,7 +95,13 @@
                 </div>
                 <h3 class="stat-value">{{ total_descartado|round(1) }}kg</h3>
             </div>
-            {% else %}
+            <div class="stat-card-new">
+                <div class="stat-top">
+                    <img src="{{ url_for('static', filename='images/notif-dinheiro.png') }}" alt="Receita" class="stat-icon-img">
+                    <span class="stat-label">Receita recebida</span>
+                </div>
+                <h3 class="stat-value">R$ {{ "%.2f"|format(saldo_empresa|default(0))|replace('.', ',') }}</h3>
+            </div>
             <!-- Cidadao ve saldo, pontos, tier e dispositivos -->
             <div class="stat-card-new">
                 <div class="stat-top">

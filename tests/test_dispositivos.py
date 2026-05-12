@@ -1,7 +1,7 @@
 """Testes para o módulo de dispositivos eletrônicos."""
 
 import pytest
-from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico, StatusDispositivo
+from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico, StatusDispositivo, EstadoProduto
 
 
 class TestDispositivos:
@@ -199,3 +199,71 @@ class TestStatusDispositivo:
         """Passar string no lugar de StatusDispositivo deve levantar ValueError."""
         with pytest.raises(ValueError, match="StatusDispositivo"):
             Celular("1", "iPhone", 0.2, status="danificado")
+
+
+class TestSubcategoria:
+
+    def test_subcategoria_padrao_celular(self):
+        celular = Celular("1", "Galaxy", 0.2)
+        assert celular.subcategoria == 'smartphone_medio'
+
+    def test_subcategoria_padrao_computador(self):
+        computador = Computador("2", "Dell", 2.5)
+        assert computador.subcategoria == 'notebook_basico'
+
+    def test_subcategoria_padrao_eletrodomestico(self):
+        eletro = Eletrodomestico("3", "Brastemp", 60.0)
+        assert eletro.subcategoria == 'geladeira'
+
+    def test_subcategoria_customizada(self):
+        celular = Celular("1", "iPhone 15 Pro", 0.2, subcategoria='iphone')
+        assert celular.subcategoria == 'iphone'
+
+    def test_subcategoria_customizada_computador(self):
+        computador = Computador("2", "Alienware", 3.5, subcategoria='notebook_gamer')
+        assert computador.subcategoria == 'notebook_gamer'
+
+
+class TestEstadoProduto:
+
+    def test_enum_valores(self):
+        assert EstadoProduto.FUNCIONANDO.value == 'funcionando'
+        assert EstadoProduto.DEFEITO_LEVE.value == 'defeito_leve'
+        assert EstadoProduto.DEFEITO_GRAVE.value == 'defeito_grave'
+        assert EstadoProduto.SUCATA.value == 'sucata'
+
+
+class TestCalcularValorAvaliado:
+
+    def test_funcionando_usa_valor_base_completo(self):
+        celular = Celular("1", "Galaxy", 0.2)
+        assert celular.calcular_valor_avaliado(EstadoProduto.FUNCIONANDO, 600.0, 10.0) == 600.0
+
+    def test_defeito_leve_aplica_40_pct(self):
+        celular = Celular("1", "Galaxy", 0.2)
+        assert celular.calcular_valor_avaliado(EstadoProduto.DEFEITO_LEVE, 600.0, 10.0) == 240.0
+
+    def test_defeito_grave_aplica_15_pct(self):
+        celular = Celular("1", "Galaxy", 0.2)
+        assert celular.calcular_valor_avaliado(EstadoProduto.DEFEITO_GRAVE, 600.0, 10.0) == 90.0
+
+    def test_sucata_usa_minimo_fixo(self):
+        celular = Celular("1", "Galaxy", 0.2)
+        assert celular.calcular_valor_avaliado(EstadoProduto.SUCATA, 600.0, 10.0) == 10.0
+
+    def test_sucata_ignora_valor_base(self):
+        eletro = Eletrodomestico("3", "Geladeira", 70.0)
+        assert eletro.calcular_valor_avaliado(EstadoProduto.SUCATA, 900.0, 130.0) == 130.0
+
+    def test_resultado_arredondado(self):
+        computador = Computador("2", "Dell", 2.5)
+        resultado = computador.calcular_valor_avaliado(EstadoProduto.DEFEITO_LEVE, 800.0, 30.0)
+        assert resultado == 320.0
+
+    def test_geladeira_funcionando(self):
+        eletro = Eletrodomestico("3", "Geladeira", 70.0)
+        assert eletro.calcular_valor_avaliado(EstadoProduto.FUNCIONANDO, 900.0, 130.0) == 900.0
+
+    def test_iphone_defeito_grave(self):
+        celular = Celular("1", "iPhone 15", 0.2, subcategoria='iphone')
+        assert celular.calcular_valor_avaliado(EstadoProduto.DEFEITO_GRAVE, 2500.0, 20.0) == 375.0

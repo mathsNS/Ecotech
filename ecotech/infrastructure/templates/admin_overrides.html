@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Aprovação de Overrides - EcoTech{% endblock %}
+
+{% block content %}
+<div class="usuarios-container">
+    <div class="container">
+
+        <!-- Header -->
+        <div class="page-header">
+            <div class="header-text">
+                <h1>Fila de Aprovação de Overrides</h1>
+                <p class="subtitle">Solicitações com valor proposto acima de 150% do preço base aguardando revisão</p>
+            </div>
+            <a href="{{ url_for('operacoes') }}" class="btn btn-secondary">← Voltar a Operações</a>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Contador -->
+        <div class="stats-grid-usuarios" style="margin-bottom: 1.5rem;">
+            <div class="stat-card-usuarios">
+                <div class="stat-icon-usuarios">
+                    <img src="{{ url_for('static', filename='images/icon-pendente.png') }}" alt="Pendentes">
+                </div>
+                <div class="stat-info-usuarios">
+                    <h3>{{ total }}</h3>
+                    <p>Aguardando aprovação</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de overrides pendentes -->
+        {% if pendentes %}
+        <div class="usuarios-section">
+            <div class="section-header">
+                <h2>Overrides Pendentes</h2>
+            </div>
+
+            <div class="usuarios-table-container">
+                <table class="usuarios-table">
+                    <thead>
+                        <tr>
+                            <th>ID Solicitação</th>
+                            <th>Data</th>
+                            <th>Usuário</th>
+                            <th>Estado Declarado</th>
+                            <th>Valor Proposto</th>
+                            <th>Justificativa</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ov in pendentes %}
+                        <tr class="usuario-row">
+                            <td>
+                                <span class="cpf-cnpj" title="{{ ov.id }}">{{ ov.id[:8].upper() }}…</span>
+                            </td>
+                            <td>{{ ov.data_criacao }}</td>
+                            <td>
+                                <div class="usuario-name-cell">
+                                    <span class="usuario-name">{{ ov.nome_usuario }}</span>
+                                    <span class="cpf-cnpj" style="font-size:0.75rem; color:#888;">{{ ov.tipo_usuario }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="pontos-badge">{{ ov.estado_produto }}</span>
+                            </td>
+                            <td>
+                                <strong>R$ {{ "%.2f"|format(ov.valor_proposto)|replace('.', ',') }}</strong>
+                            </td>
+                            <td style="max-width:240px; white-space:normal;">{{ ov.justificativa }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <form method="POST" action="{{ url_for('aprovar_override', id_sol=ov.id) }}" style="display:inline;">
+                                        <button type="submit" class="btn-action-small btn-edit" title="Aprovar override"
+                                                onclick="return confirm('Aprovar override para solicitação {{ ov.id[:8].upper() }}?')">
+                                            Aprovar
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('rejeitar_override', id_sol=ov.id) }}" style="display:inline;">
+                                        <button type="submit" class="btn-action-small btn-delete" title="Rejeitar e reverter ao valor calculado"
+                                                onclick="return confirm('Rejeitar override? O valor será revertido ao cálculo automático.')">
+                                            Rejeitar
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state" style="text-align:center; padding:3rem 0;">
+            <img src="{{ url_for('static', filename='images/icon-finalizado.png') }}" alt="Nenhum pendente" style="width:64px; opacity:0.5; margin-bottom:1rem;">
+            <h3 style="color:#888;">Nenhum override pendente</h3>
+            <p style="color:#aaa;">Todas as avaliações estão dentro do limite automático ou já foram revisadas.</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

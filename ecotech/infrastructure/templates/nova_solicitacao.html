@@ -84,6 +84,11 @@
                             </select>
                         </div>
 
+                        <div class="form-group-new">
+                            <label for="subcategoria">Categoria específica <span class="required">*</span></label>
+                            <select id="subcategoria" name="subcategoria" class="form-control-new" required></select>
+                        </div>
+
                         <div class="form-grid-2">
                             <div class="form-group-new">
                                 <label for="nome">Modelo/Nome <span class="required">*</span></label>
@@ -401,6 +406,41 @@ document.querySelector('form').addEventListener('keydown', function(e) {
     if (e.target.type === 'submit') return;
     e.preventDefault();
 });
+
+const _subcategorias = {
+    celular: [
+        ['smartphone_basico',  'Smartphone básico (Android)'],
+        ['smartphone_medio',   'Smartphone intermediário'],
+        ['smartphone_premium', 'Smartphone premium (Galaxy S, Pixel...)'],
+        ['iphone',             'iPhone'],
+    ],
+    computador: [
+        ['notebook_basico', 'Notebook básico'],
+        ['notebook_gamer',  'Notebook gamer / profissional'],
+        ['desktop',         'Desktop / Torre'],
+    ],
+    eletrodomestico: [
+        ['geladeira',       'Geladeira / Frigobar'],
+        ['lavadora',        'Máquina de lavar / Lava-louças'],
+        ['ar_condicionado', 'Ar-condicionado'],
+        ['micro_ondas',     'Micro-ondas'],
+        ['tv',              'TV / Monitor'],
+    ],
+};
+
+function atualizarSubcategorias() {
+    const tipo = document.getElementById('tipo_dispositivo').value;
+    const sel  = document.getElementById('subcategoria');
+    sel.innerHTML = '';
+    (_subcategorias[tipo] || []).forEach(([val, label]) => {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = label;
+        sel.appendChild(opt);
+    });
+}
+
+document.getElementById('tipo_dispositivo').addEventListener('change', atualizarSubcategorias);
+atualizarSubcategorias();
 
 updateStepper();
 </script>

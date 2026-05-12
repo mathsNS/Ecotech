@@ -122,6 +122,13 @@ class Dados(RepositorioBase):
         except Exception:
             pass  # coluna ja existe
 
+        # migracao: saldo financeiro da empresa
+        try:
+            c.execute("ALTER TABLE empresa ADD COLUMN saldo REAL DEFAULT 0.0")
+            self.conn.commit()
+        except Exception:
+            pass
+
         # Tabelas de Descarte
         c.execute("""
         CREATE TABLE IF NOT EXISTS solicitacao_descarte (
@@ -143,6 +150,10 @@ class Dados(RepositorioBase):
             "ALTER TABLE solicitacao_descarte ADD COLUMN nome_contato TEXT",
             "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_cidadao INTEGER DEFAULT 0",
             "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_empresa INTEGER DEFAULT 0",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN estado_produto TEXT",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN valor_proposto REAL",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN justificativa_valor TEXT",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN status_override TEXT DEFAULT 'nenhum'",
         ):
             try:
                 c.execute(col)
@@ -200,6 +211,41 @@ class Dados(RepositorioBase):
         )
         """)
 
+        # migracao: subcategoria no dispositivo
+        try:
+            c.execute("ALTER TABLE dispositivo ADD COLUMN subcategoria TEXT DEFAULT 'smartphone_medio'")
+            self.conn.commit()
+        except Exception:
+            pass
+
+        # tabela de precificacao por subcategoria
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS tabela_precos (
+            subcategoria TEXT PRIMARY KEY,
+            categoria TEXT,
+            valor_minimo_sucata REAL,
+            valor_base_funcionando REAL
+        )
+        """)
+        precos_padrao = [
+            ('smartphone_basico',    'celular',          8.00,   300.00),
+            ('smartphone_medio',     'celular',         10.00,   600.00),
+            ('smartphone_premium',   'celular',         15.00,  1500.00),
+            ('iphone',               'celular',         20.00,  2500.00),
+            ('notebook_basico',      'computador',      30.00,   800.00),
+            ('notebook_gamer',       'computador',      50.00,  3000.00),
+            ('desktop',              'computador',      40.00,   700.00),
+            ('geladeira',            'eletrodomestico', 130.00,  900.00),
+            ('lavadora',             'eletrodomestico',  80.00,  700.00),
+            ('ar_condicionado',      'eletrodomestico', 120.00, 1000.00),
+            ('micro_ondas',          'eletrodomestico',  15.00,  200.00),
+            ('tv',                   'eletrodomestico',  15.00,  500.00),
+        ]
+        c.executemany(
+            "INSERT OR IGNORE INTO tabela_precos (subcategoria, categoria, valor_minimo_sucata, valor_base_funcionando) VALUES (?, ?, ?, ?)",
+            precos_padrao
+        )
+
         # Índices para otimizar buscas frequentes
         c.execute("CREATE INDEX IF NOT EXISTS idx_solicitacao_usuario ON solicitacao_descarte(id_usuario)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_item_solicitacao ON item_descarte(id_solicitacao)")
@@ -207,6 +253,17 @@ class Dados(RepositorioBase):
         c.execute("CREATE INDEX IF NOT EXISTS idx_entrega_usuario ON entrega(id_usuario)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_rastreamento_solicitacao ON historico_rastreamento(id_solicitacao)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_saque_usuario ON saque(id_usuario)")
+
+        # tabela de receita da EcoTech (comissao por solicitacao)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS receita_ecotech (
+            id TEXT PRIMARY KEY,
+            id_solicitacao TEXT,
+            valor REAL,
+            data TEXT,
+            FOREIGN KEY(id_solicitacao) REFERENCES solicitacao_descarte(id)
+        )
+        """)
 
         self.conn.commit()
 
@@ -260,9 +317,9 @@ class Dados(RepositorioBase):
     def salvar_dispositivo(self, dispositivo):
         with self.conn:
             self.conn.execute("""
-            INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower()))
+            INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo, subcategoria)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower(), dispositivo.subcategoria))
 
     def salvar_ponto(self, ponto_coleta):
         with self.conn:
@@ -525,7 +582,7 @@ class Dados(RepositorioBase):
         """Retorna todos os itens de uma solicitação."""
         c = self.conn.cursor()
         c.execute("""
-            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo
+            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo, d.subcategoria
             FROM item_descarte i
             JOIN dispositivo d ON i.id_dispositivo = d.id
             WHERE i.id_solicitacao = ?
@@ -718,3 +775,119 @@ class Dados(RepositorioBase):
     def seed(self):
         # no-op seed real está em _inicializar_dados_exemplo (web.py)
         pass
+
+    # -------------------
+    # TABELA DE PREÇOS
+    # -------------------
+
+    def buscar_tabela_precos(self):
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM tabela_precos ORDER BY categoria, subcategoria")
+        return c.fetchall()
+
+    def buscar_preco_subcategoria(self, subcategoria: str):
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM tabela_precos WHERE subcategoria = ?", (subcategoria,))
+        return c.fetchone()
+
+    def atualizar_avaliacao_solicitacao(
+        self, id_sol: str, estado_produto: str,
+        valor_proposto: float, justificativa: str, status_override: str
+    ):
+        with self.conn:
+            self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET estado_produto = ?, valor_proposto = ?,
+                    justificativa_valor = ?, status_override = ?
+                WHERE id = ?
+            """, (estado_produto, valor_proposto, justificativa, status_override, id_sol))
+
+    def buscar_avaliacao_solicitacao(self, id_sol: str):
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT estado_produto, valor_proposto, justificativa_valor, status_override
+            FROM solicitacao_descarte WHERE id = ?
+        """, (id_sol,))
+        return c.fetchone()
+
+    def buscar_overrides_pendentes(self):
+        """Retorna solicitações aguardando aprovação de override de valor."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT sd.id, sd.data_criacao, sd.estado_produto, sd.valor_proposto,
+                   sd.justificativa_valor, u.nome as nome_usuario, u.tipo as tipo_usuario
+            FROM solicitacao_descarte sd
+            JOIN usuario u ON sd.id_usuario = u.id
+            WHERE sd.status_override = 'pendente_doc'
+            ORDER BY sd.data_criacao DESC
+        """)
+        return c.fetchall()
+
+    def aprovar_override(self, id_sol: str):
+        """Aprova o override de valor proposto pelo operador."""
+        c = self.conn.cursor()
+        c.execute(
+            "UPDATE solicitacao_descarte SET status_override = 'aprovado' WHERE id = ?",
+            (id_sol,)
+        )
+        self.conn.commit()
+
+    def rejeitar_override(self, id_sol: str, valor_recalculado: float):
+        """Rejeita o override, revertendo ao valor calculado automaticamente."""
+        c = self.conn.cursor()
+        c.execute(
+            "UPDATE solicitacao_descarte SET status_override = 'rejeitado', valor_proposto = ? WHERE id = ?",
+            (valor_recalculado, id_sol)
+        )
+        self.conn.commit()
+
+    # -------------------
+    # RECEITA / SALDO
+    # -------------------
+
+    def atualizar_saldo_empresa(self, id_empresa: str, delta: float):
+        """Credita delta no saldo financeiro da empresa."""
+        c = self.conn.cursor()
+        c.execute(
+            "UPDATE empresa SET saldo = COALESCE(saldo, 0.0) + ? WHERE id_usuario = ?",
+            (delta, id_empresa)
+        )
+        self.conn.commit()
+
+    def buscar_saldo_empresa(self, id_empresa: str) -> float:
+        """Retorna o saldo financeiro acumulado da empresa."""
+        c = self.conn.cursor()
+        c.execute("SELECT saldo FROM empresa WHERE id_usuario = ?", (id_empresa,))
+        row = c.fetchone()
+        return float(row['saldo']) if row and row['saldo'] is not None else 0.0
+
+    def registrar_receita_ecotech(self, id_sol: str, valor: float):
+        """Registra uma entrada de receita para a EcoTech."""
+        import uuid
+        c = self.conn.cursor()
+        c.execute(
+            "INSERT INTO receita_ecotech (id, id_solicitacao, valor, data) VALUES (?, ?, ?, ?)",
+            (str(uuid.uuid4()), id_sol, valor, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        )
+        self.conn.commit()
+
+    def buscar_receita_total_ecotech(self) -> float:
+        """Retorna a receita total acumulada da EcoTech."""
+        c = self.conn.cursor()
+        c.execute("SELECT COALESCE(SUM(valor), 0.0) AS total FROM receita_ecotech")
+        return float(c.fetchone()['total'])
+
+    def buscar_historico_receita_ecotech(self):
+        """Retorna todas as entradas de receita da EcoTech, mais recentes primeiro."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM receita_ecotech ORDER BY data DESC")
+        return c.fetchall()
+
+    def atualizar_preco_subcategoria(self, subcategoria: str, valor_base: float, valor_minimo: float):
+        """Atualiza os valores de uma subcategoria na tabela de preços."""
+        c = self.conn.cursor()
+        c.execute(
+            "UPDATE tabela_precos SET valor_base_funcionando = ?, valor_minimo_sucata = ? WHERE subcategoria = ?",
+            (valor_base, valor_minimo, subcategoria)
+        )
+        self.conn.commit()

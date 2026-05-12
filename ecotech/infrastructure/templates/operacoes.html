@@ -175,6 +175,24 @@
                         <option value="descarte">Descarte Seguro</option>
                     </select>
                 </div>
+                <div id="avaliacao-row" style="display:none; margin-bottom: 12px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Estado do produto</label>
+                    <select id="estado-produto-select" class="filter-select" style="width:100%; margin-bottom:10px;" onchange="toggleValorProposto()">
+                        <option value="funcionando">Funcionando</option>
+                        <option value="defeito_leve">Com defeito leve (tela, bateria...)</option>
+                        <option value="defeito_grave">Com defeito grave (não liga, placa...)</option>
+                        <option value="sucata">Sucata (apenas material bruto)</option>
+                    </select>
+                    <div id="valor-proposto-row" style="display:none;">
+                        <label style="font-size:12px; color: var(--text-secondary); display:block; margin-bottom:4px;">
+                            Propor valor diferente? (opcional — exige comprovante acima de 150% do base)
+                        </label>
+                        <input type="number" id="valor-proposto-input" class="filter-select" style="width:100%; margin-bottom:6px;"
+                               placeholder="Valor em R$ (ex: 350.00)" step="0.01" min="0">
+                        <textarea id="justificativa-input" class="filter-select" style="width:100%; resize:vertical; min-height:60px;"
+                                  placeholder="Justificativa (obrigatória se propor valor personalizado)"></textarea>
+                    </div>
+                </div>
                 <button id="btn-avancar" class="btn btn-primary" style="width:100%;" onclick="avancarEstado()">
                     Avançar Estado
                 </button>
@@ -224,7 +242,10 @@ function abrirDetalhes(btn) {
     if (avancoSection) {
         const podeAvancar = !ESTADOS_FINAIS.includes(d.estado);
         avancoSection.style.display = podeAvancar ? 'block' : 'none';
-        if (metodoRow) metodoRow.style.display = d.estado === 'Em Processamento' ? 'block' : 'none';
+        const isProcessamento = d.estado === 'Em Processamento';
+        if (metodoRow)    metodoRow.style.display    = isProcessamento ? 'block' : 'none';
+        const avaliacaoRow = document.getElementById('avaliacao-row');
+        if (avaliacaoRow) avaliacaoRow.style.display = isProcessamento ? 'block' : 'none';
     }
 
     document.getElementById('modal-detalhes').style.display = 'flex';
@@ -234,15 +255,31 @@ function fecharModal() {
     document.getElementById('modal-detalhes').style.display = 'none';
 }
 
+function toggleValorProposto() {
+    const row = document.getElementById('valor-proposto-row');
+    if (row) row.style.display = 'block';
+}
+
 function avancarEstado() {
     const btn  = document.getElementById('btn-avancar');
     const msg  = document.getElementById('avancar-msg');
     const metodoSelect = document.getElementById('metodo-select');
+    const estadoProdutoSelect = document.getElementById('estado-produto-select');
+    const valorPropostoInput  = document.getElementById('valor-proposto-input');
+    const justificativaInput  = document.getElementById('justificativa-input');
 
     const body = new URLSearchParams();
     const estadoAtual = document.getElementById('modal-estado').textContent;
     if (estadoAtual === 'Em Processamento' && metodoSelect) {
         body.append('metodo', metodoSelect.value);
+    }
+    if (estadoAtual === 'Em Processamento' && estadoProdutoSelect) {
+        body.append('estado_produto', estadoProdutoSelect.value);
+        const vp = valorPropostoInput ? valorPropostoInput.value.trim() : '';
+        if (vp) {
+            body.append('valor_proposto', vp);
+            body.append('justificativa', justificativaInput ? justificativaInput.value.trim() : '');
+        }
     }
 
     btn.disabled = true;
@@ -270,11 +307,12 @@ function avancarEstado() {
             if (data.notificacao) msg.textContent += ' ' + data.notificacao;
             btn.textContent   = 'Avançar Estado';
             btn.disabled      = !data.pode_avancar;
-            // reavalia visibilidade do select de método
+            // reavalia visibilidade do select de método e avaliação
             const metodoRow = document.getElementById('metodo-row');
-            if (metodoRow) {
-                metodoRow.style.display = data.novo_estado === 'Em Processamento' ? 'block' : 'none';
-            }
+            const avaliacaoRow = document.getElementById('avaliacao-row');
+            const isProcessamento = data.novo_estado === 'Em Processamento';
+            if (metodoRow)    metodoRow.style.display    = isProcessamento ? 'block' : 'none';
+            if (avaliacaoRow) avaliacaoRow.style.display = isProcessamento ? 'block' : 'none';
             if (!data.pode_avancar) {
                 document.getElementById('avanco-section').style.display = 'none';
             }

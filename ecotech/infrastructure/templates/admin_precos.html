@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Tabela de Preços - EcoTech{% endblock %}
+
+{% block content %}
+<div class="usuarios-container">
+    <div class="container">
+
+        <!-- Header -->
+        <div class="page-header">
+            <div class="header-text">
+                <h1>Tabela de Preços</h1>
+                <p class="subtitle">Valores de referência usados no cálculo automático de avaliações. Ajuste conforme o mercado.</p>
+            </div>
+            <a href="{{ url_for('admin_overrides') }}" class="btn btn-secondary">Ver Overrides Pendentes</a>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Legenda -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.875rem; color:#64748b;">
+            <strong>Como os preços funcionam:</strong>
+            Funcionando = <strong>valor base</strong> ×1.00 &nbsp;|&nbsp;
+            Defeito leve = valor base ×0.40 &nbsp;|&nbsp;
+            Defeito grave = valor base ×0.15 &nbsp;|&nbsp;
+            Sucata = <strong>valor mínimo</strong> (fixo).
+            Override &gt;150% do base exige aprovação.
+        </div>
+
+        <!-- Tabela por categoria -->
+        {% set categorias = precos | map(attribute='categoria') | unique | list %}
+        {% for cat in categorias %}
+        <div class="usuarios-section" style="margin-bottom:2rem;">
+            <div class="section-header">
+                <h2>{{ cat }}</h2>
+            </div>
+            <div class="usuarios-table-container">
+                <table class="usuarios-table">
+                    <thead>
+                        <tr>
+                            <th>Subcategoria</th>
+                            <th>Valor Base (Funcionando)</th>
+                            <th>Valor Mínimo (Sucata)</th>
+                            <th>Cap Override (×1.5)</th>
+                            <th>Editar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in precos if p.categoria == cat %}
+                        <tr class="usuario-row" id="row-{{ p.subcategoria }}">
+                            <td><strong>{{ p.subcategoria_label }}</strong></td>
+                            <td>
+                                <span class="preco-display" id="base-display-{{ p.subcategoria }}">
+                                    R$ {{ "%.2f"|format(p.valor_base)|replace('.', ',') }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="preco-display" id="min-display-{{ p.subcategoria }}">
+                                    R$ {{ "%.2f"|format(p.valor_minimo)|replace('.', ',') }}
+                                </span>
+                            </td>
+                            <td style="color:#888;">
+                                R$ {{ "%.2f"|format(p.valor_base * 1.5)|replace('.', ',') }}
+                            </td>
+                            <td>
+                                <button class="btn-action-small btn-edit"
+                                        onclick="abrirEdicao('{{ p.subcategoria }}', {{ p.valor_base }}, {{ p.valor_minimo }})">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+
+<!-- Modal de edição -->
+<div id="modal-preco" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:2rem; width:400px; max-width:92vw; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+        <h3 style="margin:0 0 1.25rem;" id="modal-titulo">Editar preços</h3>
+        <form id="form-preco" method="POST">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block; font-size:0.875rem; font-weight:600; margin-bottom:0.4rem;">Valor Base (Funcionando) — R$</label>
+                <input type="text" name="valor_base" id="input-base"
+                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem;"
+                       required>
+                <span style="font-size:0.75rem; color:#888;">Dispositivo em pleno funcionamento</span>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label style="display:block; font-size:0.875rem; font-weight:600; margin-bottom:0.4rem;">Valor Mínimo (Sucata) — R$</label>
+                <input type="text" name="valor_minimo" id="input-minimo"
+                       style="width:100%; padding:0.5rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem;"
+                       required>
+                <span style="font-size:0.75rem; color:#888;">Valor de material bruto (metais)</span>
+            </div>
+            <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+                <button type="button" onclick="fecharModal()"
+                        style="padding:0.5rem 1.25rem; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer;">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="padding:0.5rem 1.25rem; border:none; border-radius:6px; background:#10b981; color:#fff; font-weight:600; cursor:pointer;">
+                    Salvar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirEdicao(subcategoria, valorBase, valorMinimo) {
+    const modal = document.getElementById('modal-preco');
+    document.getElementById('modal-titulo').textContent = 'Editar: ' + subcategoria.replace(/_/g, ' ');
+    document.getElementById('input-base').value = valorBase.toFixed(2);
+    document.getElementById('input-minimo').value = valorMinimo.toFixed(2);
+    document.getElementById('form-preco').action = '/admin/precos/' + subcategoria;
+    modal.style.display = 'flex';
+}
+
+function fecharModal() {
+    document.getElementById('modal-preco').style.display = 'none';
+}
+
+// fechar ao clicar fora
+document.getElementById('modal-preco').addEventListener('click', function(e) {
+    if (e.target === this) fecharModal();
+});
+</script>
+{% endblock %}

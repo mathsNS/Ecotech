@@ -10,6 +10,13 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 
+class EstadoProduto(Enum):
+    FUNCIONANDO   = "funcionando"
+    DEFEITO_LEVE  = "defeito_leve"
+    DEFEITO_GRAVE = "defeito_grave"
+    SUCATA        = "sucata"
+
+
 class StatusDispositivo(Enum):
     """
     Representa o estado físico de um dispositivo eletrônico.
@@ -31,7 +38,13 @@ class DispositivoEletronico(ABC):
     Fornece validações básicas no construtor e propriedades de acesso aos atributos.
     """
 
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = "", status: StatusDispositivo = StatusDispositivo.FUNCIONANDO):
+    _MULTIPLICADORES_ESTADO = {
+        EstadoProduto.FUNCIONANDO:   1.00,
+        EstadoProduto.DEFEITO_LEVE:  0.40,
+        EstadoProduto.DEFEITO_GRAVE: 0.15,
+    }
+
+    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = "", status: StatusDispositivo = StatusDispositivo.FUNCIONANDO, subcategoria: str = ""):
         """
         Inicializa um dispositivo eletrônico.
 
@@ -67,6 +80,7 @@ class DispositivoEletronico(ABC):
         self._marca = marca
         self._modelo = modelo
         self._status = status
+        self._subcategoria = subcategoria or getattr(self.__class__, 'SUBCATEGORIA_PADRAO', '')
 
     # -------------------
     # PROPERTIES
@@ -97,6 +111,10 @@ class DispositivoEletronico(ABC):
         """Retorna o estado físico atual do dispositivo."""
         return self._status
 
+    @property
+    def subcategoria(self) -> str:
+        return self._subcategoria
+
     # ------------------
     # MÉTODOS ABSTRATOS
     # ------------------
@@ -116,6 +134,11 @@ class DispositivoEletronico(ABC):
         """Calcula o valor de revenda estimado."""
         pass
 
+    def calcular_valor_avaliado(self, estado: EstadoProduto, valor_base: float, valor_minimo_sucata: float) -> float:
+        if estado == EstadoProduto.SUCATA:
+            return round(valor_minimo_sucata, 2)
+        return round(valor_base * self._MULTIPLICADORES_ESTADO[estado], 2)
+
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
@@ -125,6 +148,8 @@ class DispositivoEletronico(ABC):
 
 class Celular(DispositivoEletronico):
     """Implementação para dispositivos do tipo Celular."""
+
+    SUBCATEGORIA_PADRAO = 'smartphone_medio'
 
     def obter_tipo(self) -> str:
         return "Celular"
@@ -138,6 +163,8 @@ class Celular(DispositivoEletronico):
 class Computador(DispositivoEletronico):
     """Implementação para dispositivos do tipo Computador."""
 
+    SUBCATEGORIA_PADRAO = 'notebook_basico'
+
     def obter_tipo(self) -> str:
         return "Computador"
 
@@ -149,6 +176,8 @@ class Computador(DispositivoEletronico):
 
 class Eletrodomestico(DispositivoEletronico):
     """Implementação para dispositivos do tipo Eletrodoméstico."""
+
+    SUBCATEGORIA_PADRAO = 'geladeira'
 
     def obter_tipo(self) -> str:
         return "Eletrodomestico"

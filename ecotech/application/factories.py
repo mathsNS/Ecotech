@@ -35,19 +35,19 @@ class DispositivoFactory:
     """
 
     @staticmethod
-    def criar_celular(id: str, nome: str, peso_kg: float) -> Celular:
+    def criar_celular(id: str, nome: str, peso_kg: float, subcategoria: str = "") -> Celular:
         """Cria uma instância de Celular."""
-        return Celular(id, nome, peso_kg)
+        return Celular(id, nome, peso_kg, subcategoria=subcategoria)
 
     @staticmethod
-    def criar_computador(id: str, nome: str, peso_kg: float) -> Computador:
+    def criar_computador(id: str, nome: str, peso_kg: float, subcategoria: str = "") -> Computador:
         """Cria uma instância de Computador."""
-        return Computador(id, nome, peso_kg)
+        return Computador(id, nome, peso_kg, subcategoria=subcategoria)
 
     @staticmethod
-    def criar_eletrodomestico(id: str, nome: str, peso_kg: float) -> Eletrodomestico:
+    def criar_eletrodomestico(id: str, nome: str, peso_kg: float, subcategoria: str = "") -> Eletrodomestico:
         """Cria uma instância de Eletrodoméstico."""
-        return Eletrodomestico(id, nome, peso_kg)
+        return Eletrodomestico(id, nome, peso_kg, subcategoria=subcategoria)
 
     @staticmethod
     def criar_dispositivo(tipo: str, dados: Dict[str, Any]) -> DispositivoEletronico:
