@@ -184,6 +184,11 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="fecharModal()">Fechar</button>
+            {% if is_admin or (usuario.tipo == 'empresa' and plano_empresa in ('professional', 'enterprise')) %}
+            <a id="btn-mtr" href="#" class="btn btn-primary" style="margin-left:8px;" target="_blank">
+                Baixar MTR (PDF)
+            </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -202,6 +207,10 @@ function abrirDetalhes(btn) {
     document.getElementById('modal-peso').textContent    = d.peso;
     document.getElementById('modal-data').textContent    = d.data;
     document.getElementById('modal-itens').textContent   = d.itens + ' item(ns)';
+
+    // atualiza link MTR se presente
+    const btnMtr = document.getElementById('btn-mtr');
+    if (btnMtr) { btnMtr.href = '/solicitacao/' + d.id + '/mtr'; }
 
     const estadoEl = document.getElementById('modal-estado');
     estadoEl.textContent = d.estado;
@@ -244,8 +253,13 @@ function avancarEstado() {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body.toString()
     })
-    .then(r => r.json().then(data => ({ ok: r.ok, data })))
-    .then(({ ok, data }) => {
+    .then(r => {
+        // tenta parsear JSON; se falhar (erro 500 sem JSON), trata como erro generico
+        return r.json()
+            .then(data => ({ ok: r.ok, status: r.status, data }))
+            .catch(() => ({ ok: false, status: r.status, data: { erro: 'Erro interno no servidor. A operação pode ter sido aplicada — recarregue a página.' } }));
+    })
+    .then(({ ok, status, data }) => {
         msg.style.display = 'block';
         if (ok) {
             const estadoEl = document.getElementById('modal-estado');
@@ -253,8 +267,14 @@ function avancarEstado() {
             estadoEl.className   = 'status-badge status-' + data.novo_estado.toLowerCase().replace(/ /g, '-');
             msg.style.color   = '#10b981';
             msg.textContent   = 'Estado atualizado para: ' + data.novo_estado;
+            if (data.notificacao) msg.textContent += ' ' + data.notificacao;
             btn.textContent   = 'Avançar Estado';
             btn.disabled      = !data.pode_avancar;
+            // reavalia visibilidade do select de método
+            const metodoRow = document.getElementById('metodo-row');
+            if (metodoRow) {
+                metodoRow.style.display = data.novo_estado === 'Em Processamento' ? 'block' : 'none';
+            }
             if (!data.pode_avancar) {
                 document.getElementById('avanco-section').style.display = 'none';
             }
@@ -276,8 +296,13 @@ function avancarEstado() {
             if (data.upgrade) {
                 msg.innerHTML = data.erro + ' <a href="/planos" style="color:#6366f1;font-weight:600;">Ver planos</a>';
             }
-            btn.textContent = 'Avançar Estado';
-            btn.disabled    = false;
+            // se foi erro 500, pode ser que o estado JÁ foi avancado - recarrega a pagina
+            if (status >= 500) {
+                setTimeout(() => location.reload(), 2500);
+            } else {
+                btn.textContent = 'Avançar Estado';
+                btn.disabled    = false;
+            }
         }
     })
     .catch(() => {

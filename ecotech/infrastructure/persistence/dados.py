@@ -141,6 +141,8 @@ class Dados(RepositorioBase):
             "ALTER TABLE solicitacao_descarte ADD COLUMN tipo_coleta TEXT DEFAULT 'domiciliar'",
             "ALTER TABLE solicitacao_descarte ADD COLUMN endereco_coleta TEXT",
             "ALTER TABLE solicitacao_descarte ADD COLUMN nome_contato TEXT",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_cidadao INTEGER DEFAULT 0",
+            "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_empresa INTEGER DEFAULT 0",
         ):
             try:
                 c.execute(col)
@@ -636,6 +638,78 @@ class Dados(RepositorioBase):
             WHERE u.tipo = 'empresa'
         """)
         return [dict(row) for row in c.fetchall()]
+
+    def buscar_pontos_empresa(self, id_empresa: str):
+        """Retorna todos os pontos de coleta ativos vinculados a esta empresa."""
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM ponto_coleta WHERE id_empresa = ? AND ativo = 1", (id_empresa,))
+        return [dict(row) for row in c.fetchall()]
+
+    def buscar_solicitacoes_ponto(self, id_ponto: str):
+        """Retorna todas as solicitações de um ponto, com nome do usuário."""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT s.*, u.nome AS nome_usuario
+            FROM solicitacao_descarte s
+            JOIN usuario u ON s.id_usuario = u.id
+            WHERE s.id_ponto_coleta = ?
+            ORDER BY s.data_criacao DESC
+        """, (id_ponto,))
+        return [dict(row) for row in c.fetchall()]
+
+    def confirmar_solicitacao(self, id_sol: str, quem: str) -> None:
+        """Marca confirmado_cidadao ou confirmado_empresa na solicitação."""
+        if quem not in ('cidadao', 'empresa'):
+            raise ValueError("quem deve ser 'cidadao' ou 'empresa'")
+        col = f'confirmado_{quem}'
+        with self.conn:
+            self.conn.execute(f"UPDATE solicitacao_descarte SET {col} = 1 WHERE id = ?", (id_sol,))
+
+    def buscar_confirmacoes_solicitacao(self, id_sol: str) -> dict:
+        """Retorna {confirmado_cidadao, confirmado_empresa} para a solicitação."""
+        c = self.conn.cursor()
+        c.execute(
+            "SELECT confirmado_cidadao, confirmado_empresa FROM solicitacao_descarte WHERE id = ?",
+            (id_sol,)
+        )
+        row = c.fetchone()
+        if not row:
+            return {'confirmado_cidadao': 0, 'confirmado_empresa': 0}
+        return {
+            'confirmado_cidadao': row['confirmado_cidadao'] or 0,
+            'confirmado_empresa': row['confirmado_empresa'] or 0,
+        }
+
+    def buscar_solicitacoes_ativas_cidadao(self, id_usuario: str):
+        """Retorna todas as solicitações não finalizadas de um cidadão."""
+        ESTADOS_FINAIS = ('RECICLADO', 'REUTILIZADO', 'DESCARTADO', 'CANCELADO')
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT s.*, pc.nome AS nome_ponto
+            FROM solicitacao_descarte s
+            LEFT JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id
+            WHERE s.id_usuario = ?
+            ORDER BY s.data_criacao DESC
+        """, (id_usuario,))
+        rows = [dict(r) for r in c.fetchall()]
+        return [r for r in rows if r['estado'] not in ESTADOS_FINAIS]
+
+    def salvar_entrega_para_solicitacao(
+        self, id_sol: str, id_usuario: str, valor: float, nome_empresa: str
+    ) -> str:
+        """Cria registro de entrega/incentivo quando a solicitação atinge estado final."""
+        import uuid as _uuid
+        id_entrega = str(_uuid.uuid4())
+        now = datetime.now()
+        with self.conn:
+            self.conn.execute("""
+                INSERT OR IGNORE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                id_entrega, id_usuario, round(valor, 2), nome_empresa,
+                now.strftime('%d/%m/%Y'), now.strftime('%H:%M'), 'finalizado'
+            ))
+        return id_entrega
 
     # -------------------
     # SEED

@@ -9,8 +9,41 @@
         <p class="subtitle">Histórico completo de suas coletas</p>
     </div>
 
-    <!-- lista de entregas completa -->
+    <!-- solicitações ativas aguardando confirmação (apenas cidadão) -->
+    {% if solicitacoes_ativas %}
+    <div class="entregas-container" style="margin-bottom: 2rem;">
+        <h2 style="font-size:1.1rem; color:#1D854D; font-weight:700; margin-bottom:.75rem;">Solicitações em Andamento</h2>
+        {% for sol in solicitacoes_ativas %}
+        <div class="entrega-card" style="border-left: 4px solid {% if sol.confirmado_empresa %}#1D854D{% else %}#f59e0b{% endif %};">
+            <div class="entrega-icon" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <img src="{{ url_for('static', filename='images/' + ('icon-finalizado.png' if sol.confirmado_empresa else 'icon-pendente.png')) }}" alt="" style="width:28px; height:28px; object-fit:contain;">
+            </div>
+            <div class="entrega-info">
+                <h3>{{ sol.nome_ponto }}</h3>
+                <p class="empresa">
+                    {% if sol.data_agendamento %}Agendada para: <strong>{{ sol.data_agendamento }}</strong>
+                    {% else %}Sem data agendada{% endif %}
+                </p>
+                <span class="entrega-id">ID: {{ sol.id[:8] }}…</span>
+            </div>
+            <div class="entrega-detalhes">
+                <span style="font-size:.8rem; padding:.25rem .65rem; border-radius:999px; font-weight:600; background:#fef3c7; color:#92400e;">
+                    {{ sol.estado }}
+                </span>
+                <span style="font-size:.75rem; color:#6b7280; margin-top:.25rem; display:flex; align-items:center; gap:.35rem;">
+                    <img src="{{ url_for('static', filename='images/' + ('icon-finalizado.png' if sol.confirmado_empresa else 'icon-pendente.png')) }}" alt="" style="width:13px; height:13px; object-fit:contain;">
+                    {% if sol.confirmado_empresa %}Recebimento confirmado{% else %}Aguardando confirmação do ponto{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- lista de entregas/incentivos completa -->
     <div class="entregas-container">
+        {% if entregas %}
+        <h2 style="font-size:1.1rem; color:#1D854D; font-weight:700; margin-bottom:.75rem;">Incentivos Recebidos</h2>
         {% for entrega in entregas %}
         <div class="entrega-card">
             <div class="entrega-icon {{ entrega.status }}">
@@ -38,6 +71,11 @@
             </div>
         </div>
         {% endfor %}
+        {% else %}
+        <div style="text-align:center; padding:2.5rem 1rem; background:#f8fffe; border-radius:12px; border:1px dashed #a0d5b5;">
+            <p style="color:#888; margin:0; font-size:.95rem;">Nenhum incentivo registrado ainda. Complete suas solicitações de descarte para receber créditos!</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 

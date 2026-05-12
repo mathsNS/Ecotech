@@ -392,6 +392,16 @@ document.querySelectorAll('.stepper-step').forEach((step, index) => {
     step.addEventListener('click', () => { currentStep = index + 1; updateStepper(); });
 });
 
+// previne que Enter avance/submeta o formulário antes da última etapa
+document.querySelector('form').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    const active = document.querySelector('[data-step-content].active');
+    if (!active) return;
+    // permite Enter apenas no botão de submit (passo 3)
+    if (e.target.type === 'submit') return;
+    e.preventDefault();
+});
+
 updateStepper();
 </script>
 {% endblock %}

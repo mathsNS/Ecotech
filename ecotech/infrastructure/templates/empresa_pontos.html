@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Meus Pontos de Coleta — EcoTech{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 2rem 1rem; max-width: 960px; margin: 0 auto;">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem;">
+        <div>
+            <h1 style="margin:0; font-size:1.6rem; color:#1D854D; font-weight:700;">Meus Pontos de Coleta</h1>
+            <p style="margin:.25rem 0 0; color:#666; font-size:.9rem;">Gerencie seus pontos e confirme as entregas agendadas.</p>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="btn" style="background:#f0faf4; color:#1D854D; border:1px solid #1D854D; padding:.5rem 1rem; border-radius:8px; font-size:.9rem; text-decoration:none;">← Voltar</a>
+    </div>
+
+    {% if not pontos_com_sol %}
+    <div style="text-align:center; padding:3rem 1rem; background:#f8fffe; border-radius:12px; border:1px dashed #a0d5b5;">
+        <p style="font-size:1.1rem; color:#555; margin:0 0 .5rem;">Nenhum ponto de coleta cadastrado para sua empresa.</p>
+        <p style="color:#888; font-size:.9rem; margin:0;">Entre em contato com o administrador para vincular um ponto ao seu CNPJ.</p>
+    </div>
+    {% endif %}
+
+    {% for item in pontos_com_sol %}
+    {% set ponto = item.ponto %}
+    {% set solicitacoes = item.solicitacoes %}
+
+    <div class="card" style="margin-bottom:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08); overflow:hidden;">
+        <!-- cabeçalho do ponto -->
+        <div style="background:#1D854D; color:#F5F7F6; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+            <div>
+                <h2 style="margin:0; font-size:1.1rem; font-weight:700;">{{ ponto.nome }}</h2>
+                <p style="margin:.2rem 0 0; font-size:.85rem; opacity:.9;">{{ ponto.endereco }}</p>
+            </div>
+            <div style="text-align:right;">
+                <span style="font-size:.8rem; opacity:.85;">Capacidade</span><br>
+                <strong style="font-size:1rem;">{{ ponto.ocupacao_atual_kg|round(1) }} / {{ ponto.capacidade_kg }} kg</strong>
+            </div>
+        </div>
+
+        <!-- barra de capacidade -->
+        {% set pct = ((ponto.ocupacao_atual_kg / ponto.capacidade_kg) * 100)|round(1) if ponto.capacidade_kg > 0 else 0 %}
+        <div style="height:6px; background:#e5e7eb;">
+            <div style="height:100%; width:{{ [pct, 100]|min }}%; background:{% if pct >= 85 %}#ef4444{% elif pct >= 60 %}#f59e0b{% else %}#22c55e{% endif %}; transition:width .4s;"></div>
+        </div>
+
+        <div style="padding:1.25rem;">
+            <h3 style="margin:0 0 1rem; font-size:1rem; color:#374151;">
+                Entregas agendadas
+                <span style="background:#e5e7eb; color:#555; border-radius:999px; padding:.15rem .55rem; font-size:.8rem; font-weight:600; margin-left:.5rem;">{{ solicitacoes|length }}</span>
+            </h3>
+
+            {% if not solicitacoes %}
+            <p style="color:#888; font-size:.9rem; margin:0;">Nenhuma entrega agendada para este ponto.</p>
+            {% else %}
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:.88rem;">
+                    <thead>
+                        <tr style="background:#f3f4f6; color:#374151;">
+                            <th style="padding:.6rem .75rem; text-align:left; font-weight:600;">Cidadão</th>
+                            <th style="padding:.6rem .75rem; text-align:left; font-weight:600;">Agendamento</th>
+                            <th style="padding:.6rem .75rem; text-align:right; font-weight:600;">Peso (kg)</th>
+                            <th style="padding:.6rem .75rem; text-align:center; font-weight:600;">Estado</th>
+                            <th style="padding:.6rem .75rem; text-align:center; font-weight:600;">Recebimento</th>
+                            <th style="padding:.6rem .75rem; text-align:center; font-weight:600;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sol in solicitacoes %}
+                        <tr style="border-bottom:1px solid #f0f0f0;" id="row-{{ sol.id }}">
+                            <td style="padding:.7rem .75rem;">{{ sol.nome_usuario }}</td>
+                            <td style="padding:.7rem .75rem;">{{ sol.data_agendamento or '—' }}</td>
+                            <td style="padding:.7rem .75rem; text-align:right;">{{ '%.1f'|format(sol.peso_total) }}</td>
+                            <td style="padding:.7rem .75rem; text-align:center;">
+                                <span style="background:#e0f2fe; color:#0369a1; border-radius:999px; padding:.2rem .7rem; font-size:.8rem; font-weight:600;">
+                                    {{ sol.estado }}
+                                </span>
+                            </td>
+                            <td style="padding:.7rem .75rem; text-align:center;">
+                                <span style="font-size:.75rem; display:inline-flex; align-items:center; gap:.3rem;" id="status-icon-{{ sol.id }}">
+                                    <img src="{{ url_for('static', filename='images/' + ('icon-finalizado.png' if sol.confirmado_empresa else 'icon-pendente.png')) }}" alt="" style="width:14px; height:14px; object-fit:contain;">
+                                    {% if sol.confirmado_empresa %}Confirmado{% else %}Pendente{% endif %}
+                                </span>
+                            </td>
+                            <td style="padding:.7rem .75rem; text-align:center;">
+                                {% if sol.pode_confirmar %}
+                                <button
+                                    class="btn-confirmar"
+                                    data-id="{{ sol.id }}"
+                                    style="background:#1D854D; color:#fff; border:none; border-radius:8px; padding:.4rem .9rem; font-size:.82rem; cursor:pointer;"
+                                    onclick="confirmarEntrega(this, '{{ sol.id }}')"
+                                >Confirmar Recebimento</button>
+                                {% else %}
+                                <span style="color:#9ca3af; font-size:.82rem;">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="toast-ep" style="display:none; position:fixed; bottom:1.5rem; right:1.5rem; background:#1D854D; color:#fff; padding:.85rem 1.25rem; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,.18); z-index:9999; max-width:340px; font-size:.9rem;"></div>
+
+<script>
+function confirmarEntrega(btn, id) {
+    btn.disabled = true;
+    btn.textContent = 'Aguarde…';
+    const fd = new FormData();
+    fd.append('quem', 'empresa');
+    fetch(`/solicitacao/${id}/confirmar`, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.erro) {
+                mostrarToast(data.erro, '#dc2626');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Recebimento';
+                return;
+            }
+            mostrarToast(data.msg, '#1D854D');
+            // atualiza a linha sem recarregar
+            const row = document.getElementById('row-' + id);
+            if (row) {
+                const tdEstado = row.querySelector('td:nth-child(4)');
+                if (tdEstado) tdEstado.innerHTML = '<span style="background:#dcfce7; color:#166534; border-radius:999px; padding:.2rem .7rem; font-size:.8rem; font-weight:600;">Coletado</span>';
+                const statusIcon = document.getElementById('status-icon-' + id);
+                if (statusIcon) statusIcon.innerHTML = '<img src="/static/images/icon-finalizado.png" style="width:14px;height:14px;object-fit:contain;"> Confirmado';
+                const tdAcao = row.querySelector('td:nth-child(6)');
+                if (tdAcao) tdAcao.innerHTML = '<span style="color:#9ca3af; font-size:.82rem;">—</span>';
+            }
+            if (data.ambos) { setTimeout(() => location.reload(), 1800); }
+        })
+        .catch(() => {
+            mostrarToast('Erro de comunicação. Tente novamente.', '#dc2626');
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Recebimento';
+        });
+}
+
+function mostrarToast(msg, cor) {
+    const t = document.getElementById('toast-ep');
+    t.textContent = msg;
+    t.style.background = cor || '#1D854D';
+    t.style.display = 'block';
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 4000);
+}
+</script>
+{% endblock %}

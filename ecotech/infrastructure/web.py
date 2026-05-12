@@ -8,6 +8,7 @@ baseada no design mobile fornecido.
 import csv
 import io
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
+from .pdf import gerar_mtr
 from datetime import datetime
 from typing import Optional
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -275,11 +276,20 @@ def criar_app() -> Flask:
             })
 
         entregas.sort(key=lambda x: x['_dt'], reverse=True)
-        
+
+        # pontos reais persistidos no banco (não recalculados)
+        cidadao_row = dados.buscar_cidadao(usuario['id'])
+        pontos_reais = int(cidadao_row['pontos']) if cidadao_row and cidadao_row['pontos'] else 0
+
         # calcula porcentagens para barras de progresso
         progresso = servico_descarte.calcular_progresso(solicitacoes_usuario)
-        tier_info = servico_descarte.calcular_info_tier(metricas_usuario['pontos'])
-        saldo_acumulado = servico_saque.calcular_saldo_disponivel(todas_solicitacoes, usuario['id'])
+        tier_info = servico_descarte.calcular_info_tier(pontos_reais)
+        # saldo baseado nos pontos reais do banco, descontando saques já realizados
+        saques_realizados = sum(
+            s['valor'] for s in servico_saque.listar_saques(usuario['id'])
+            if s.get('status') != 'cancelado'
+        )
+        saldo_acumulado = max(round(pontos_reais * servico_saque.TAXA_REAIS_POR_PONTO - saques_realizados, 2), 0.0)
         meta_missao = 15
 
         return render_template(
@@ -289,7 +299,7 @@ def criar_app() -> Flask:
             entregas=entregas[:10],
             total_descartado=metricas_usuario['peso_total'],
             impacto_evitado=metricas_usuario['impacto_total'],
-            pontos_acumulados=metricas_usuario['pontos'],
+            pontos_acumulados=pontos_reais,
             saldo_acumulado=saldo_acumulado,
             tier_nome=tier_info['nome'],
             proximo_tier_nome=tier_info['proximo_nome'],
@@ -308,6 +318,11 @@ def criar_app() -> Flask:
             return redirect(url_for('login'))
         
         usuario = dados_usuario()
+
+        # empresas gerenciam seus pontos, não criam solicitações
+        if usuario['tipo'] == 'empresa':
+            flash('Empresas gerenciam seus pontos de coleta na página dedicada.', 'info')
+            return redirect(url_for('empresa_pontos'))
         
         if request.method == 'POST':
             try:
@@ -403,6 +418,105 @@ def criar_app() -> Flask:
             usuario=usuario,
             pontos=pontos
         )
+
+    @app.route('/empresa/pontos')
+    def empresa_pontos():
+        """Painel de administração dos pontos de coleta da empresa."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        usuario = dados_usuario()
+        if usuario['tipo'] not in ('empresa', 'administrador'):
+            flash('Acesso não autorizado.', 'error')
+            return redirect(url_for('dashboard'))
+
+        pontos_raw = dados.buscar_pontos_empresa(usuario['id'])
+        todas = servico_descarte.listar_solicitacoes()
+        sol_map = {s.id: s for s in todas}
+
+        pontos_com_sol = []
+        for ponto in pontos_raw:
+            rows_sol = dados.buscar_solicitacoes_ponto(ponto['id'])
+            solicitacoes_ponto = []
+            for row in rows_sol:
+                sol = sol_map.get(row['id'])
+                if sol is None:
+                    continue
+                confs = dados.buscar_confirmacoes_solicitacao(row['id'])
+                # formata data_agendamento 
+                raw_agenda = row.get('data_agendamento') or ''
+                data_agendamento_fmt = ''
+                if raw_agenda:
+                    for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d', '%d/%m/%Y %H:%M', '%d/%m/%Y'):
+                        try:
+                            dt_agenda = datetime.strptime(raw_agenda.strip(), fmt)
+                            data_agendamento_fmt = dt_agenda.strftime('%d/%m %H:%M') if '%H' in fmt else dt_agenda.strftime('%d/%m')
+                            break
+                        except ValueError:
+                            continue
+                    if not data_agendamento_fmt:
+                        data_agendamento_fmt = raw_agenda
+                solicitacoes_ponto.append({
+                    'id':               row['id'],
+                    'nome_usuario':     row.get('nome_usuario', ''),
+                    'estado':           row['estado'].replace('_', ' ').title(),
+                    'data_agendamento': data_agendamento_fmt,
+                    'peso_total':       sol.calcular_peso_total(),
+                    'confirmado_empresa':  confs['confirmado_empresa'],
+                    'pode_confirmar':   (
+                        row['estado'] == 'SOLICITADO' and not confs['confirmado_empresa']
+                    ),
+                })
+            pontos_com_sol.append({'ponto': ponto, 'solicitacoes': solicitacoes_ponto})
+
+        plano_empresa = dados.buscar_plano_empresa(usuario['id'])
+        return render_template(
+            'empresa_pontos.html',
+            usuario=usuario,
+            pontos_com_sol=pontos_com_sol,
+            plano_empresa=plano_empresa,
+        )
+
+    @app.route('/solicitacao/<id_sol>/confirmar', methods=['POST'])
+    def confirmar_solicitacao(id_sol):
+        """AJAX: empresa confirma o recebimento da entrega."""
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+
+        usuario = dados_usuario()
+        if usuario['tipo'] not in ('empresa', 'administrador'):
+            return jsonify({'erro': 'Apenas a empresa pode confirmar recebimento'}), 403
+
+        todas = servico_descarte.listar_solicitacoes()
+        sol = next((s for s in todas if s.id == id_sol), None)
+        if sol is None:
+            return jsonify({'erro': 'Solicitação não encontrada'}), 404
+
+        if sol.estado.obter_nome() != 'Solicitado':
+            return jsonify({'erro': 'Esta solicitação não está mais aguardando confirmação'}), 400
+
+        # avança para Coletado
+        servico_descarte.avancar_estado_solicitacao(sol)
+
+        # atualiza capacidade real do ponto de coleta
+        if sol.ponto_coleta:
+            peso = sol.calcular_peso_total()
+            nova_ocp = sol.ponto_coleta.ocupacao_atual_kg + peso
+            dados.atualizar_ocupacao_ponto(sol.ponto_coleta.id, nova_ocp)
+            sol.ponto_coleta.ocupacao_atual_kg = nova_ocp
+
+        # notifica o cidadão
+        dados.salvar_notificacao(
+            sol.usuario.id,
+            f'O ponto de coleta "{usuario["nome"]}" confirmou o recebimento do seu descarte. '
+            f'Aguarde enquanto a empresa define o destino do material - '
+            f'seus créditos serão liberados assim que o processo for concluído.'
+        )
+
+        return jsonify({
+            'ok': True,
+            'novo_estado': sol.estado.obter_nome(),
+            'msg': f'Recebimento confirmado! {sol.usuario.nome} foi notificado.',
+        })
     
     @app.route('/notificacoes')
     def notificacoes():
@@ -475,10 +589,25 @@ def criar_app() -> Flask:
 
         entregas.sort(key=lambda x: x['_dt'], reverse=True)
 
+        # solicitações ativas do cidadão (acompanhamento de status)
+        solicitacoes_ativas = []
+        if usuario['tipo'] == 'cidadao':
+            rows_ativas = dados.buscar_solicitacoes_ativas_cidadao(usuario['id'])
+            for row in rows_ativas:
+                confs = dados.buscar_confirmacoes_solicitacao(row['id'])
+                solicitacoes_ativas.append({
+                    'id':               row['id'],
+                    'estado':           row['estado'].replace('_', ' ').title(),
+                    'data_agendamento': row.get('data_agendamento') or '',
+                    'nome_ponto':       row.get('nome_ponto') or 'Coleta domiciliar',
+                    'confirmado_empresa': confs['confirmado_empresa'],
+                })
+
         return render_template(
             'ultimas_entregas.html',
             usuario=usuario,
-            entregas=entregas
+            entregas=entregas,
+            solicitacoes_ativas=solicitacoes_ativas,
         )
     
     @app.route('/planos', methods=['GET', 'POST'])
@@ -509,8 +638,14 @@ def criar_app() -> Flask:
         usuario = dados_usuario()
 
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
-        saldo = servico_saque.calcular_saldo_disponivel(todas_solicitacoes, usuario['id'])
-        pontos = servico_saque.calcular_pontos(todas_solicitacoes, usuario['id'])
+        # pontos reais do banco, não recalculados
+        cidadao_row = dados.buscar_cidadao(usuario['id'])
+        pontos = int(cidadao_row['pontos']) if cidadao_row and cidadao_row['pontos'] else 0
+        saldo = round(pontos * servico_saque.TAXA_REAIS_POR_PONTO, 2) - sum(
+            s['valor'] for s in servico_saque.listar_saques(usuario['id'])
+            if s.get('status') != 'cancelado'
+        )
+        saldo = max(round(saldo, 2), 0.0)
         historico_saques = servico_saque.listar_saques(usuario['id'])
 
         if request.method == 'POST':
@@ -647,26 +782,42 @@ def criar_app() -> Flask:
         # administrador vê tudo, outros usuários veem apenas as suas
         if usuario['tipo'] == 'administrador':
             solicitacoes_usuario = todas_solicitacoes
+        elif usuario['tipo'] == 'empresa':
+            # empresa vê solicitações nos seus pontos de coleta
+            pontos_empresa = {p['id'] for p in dados.buscar_pontos_empresa(usuario['id'])}
+            solicitacoes_usuario = [
+                s for s in todas_solicitacoes
+                if (s.ponto_coleta and s.ponto_coleta.id in pontos_empresa)
+                or s.usuario.id == usuario['id']
+            ]
         else:
             solicitacoes_usuario = [
-                s for s in todas_solicitacoes 
+                s for s in todas_solicitacoes
                 if s.usuario.id == usuario['id']
             ]
         
+        # ordena do mais recente para o mais antigo
+        solicitacoes_usuario = sorted(solicitacoes_usuario, key=lambda s: s._data_criacao, reverse=True)
+
         # filtra por estado se tiver parametro
         filtro_estado = request.args.get('estado', '')
         solicitacoes_filtradas = servico_descarte.filtrar_por_estado(solicitacoes_usuario, filtro_estado)
 
         # calcula estatisticas baseadas nas solicitações que o usuário pode ver
         stats = servico_descarte.calcular_stats_estados(solicitacoes_usuario)
-        
+
+        plano_empresa = ''
+        if usuario['tipo'] == 'empresa':
+            plano_empresa = dados.buscar_plano_empresa(usuario['id'])
+
         return render_template(
             'operacoes.html', 
             usuario=usuario,
             solicitacoes=solicitacoes_filtradas,
             stats=stats,
             filtro_atual=filtro_estado,
-            is_admin=usuario['tipo'] == 'administrador'
+            is_admin=usuario['tipo'] == 'administrador',
+            plano_empresa=plano_empresa,
         )
 
     @app.route('/operacoes/<id_sol>/avancar', methods=['POST'])
@@ -731,22 +882,46 @@ def criar_app() -> Flask:
         # feature flag Enterprise: cidadão recebe 50% de bônus nos pontos
         # quando uma empresa Enterprise finaliza a solicitação
         _estados_finais_set = {'Reciclado', 'Reutilizado', 'Descartado'}
+        notificacao_msg = ''
         bonus_msg = ''
-        if novo_estado in _estados_finais_set and usuario['tipo'] == 'empresa':
-            plano_atual = dados.buscar_plano_empresa(usuario['id'])
-            if plano_atual == 'enterprise':
-                peso = sol.calcular_peso_total()
-                bonus = int(peso * 10 * 0.5)  # 50% extra
-                if bonus > 0:
-                    dados.atualizar_pontos_cidadao(sol.usuario.id, bonus)
-                    bonus_msg = f' Bônus Enterprise: +{bonus} pontos extras!'
+        if novo_estado in _estados_finais_set:
+            # pontos base para cidadão (serviço já credita; aqui calcula mensagem)
+            if sol.usuario.obter_tipo() == 'Cidadão':
+                pontos_base = int(sol.calcular_peso_total() * 10)
+                notificacao_msg = f'+{pontos_base} pontos creditados!'
+
+                # calcula crédito financeiro = 10% do valor de reciclagem dos itens
+                valor_revenda_total = sum(
+                    item.dispositivo.calcular_valor_revenda() * item.quantidade
+                    for item in sol.itens
+                )
+                credito = round(valor_revenda_total * 0.1, 2)
+                nome_empresa = usuario['nome'] if usuario['tipo'] == 'empresa' else 'EcoTech'
+                dados.salvar_entrega_para_solicitacao(sol.id, sol.usuario.id, credito, nome_empresa)
+                if credito > 0:
+                    notificacao_msg += f' Crédito de R$ {credito:.2f} liberado na carteira!'
+
+            # bônus Enterprise para o cidadão que submeteu
+            if usuario['tipo'] == 'empresa':
+                plano_atual = dados.buscar_plano_empresa(usuario['id'])
+                if plano_atual == 'enterprise' and sol.usuario.obter_tipo() == 'Cidadão':
+                    peso = sol.calcular_peso_total()
+                    bonus = int(peso * 10 * 0.5)  # 50% extra
+                    if bonus > 0:
+                        dados.atualizar_pontos_cidadao(sol.usuario.id, bonus)
+                        bonus_msg = f' Bônus Enterprise: +{bonus} pontos extras!'
+                        notificacao_msg += bonus_msg
 
         dados.salvar_notificacao(
             sol.usuario.id,
             f'Sua solicitação foi atualizada para: {novo_estado}.{bonus_msg}'
         )
 
-        return jsonify({'novo_estado': novo_estado, 'pode_avancar': sol.estado.pode_avancar()})
+        return jsonify({
+            'novo_estado': novo_estado,
+            'pode_avancar': sol.estado.pode_avancar(),
+            'notificacao': notificacao_msg,
+        })
 
     @app.route('/relatorios')
     def relatorios():
@@ -857,6 +1032,39 @@ def criar_app() -> Flask:
             output.getvalue(),
             mimetype='text/csv',
             headers={'Content-Disposition': 'attachment; filename=relatorio_ecotech.csv'}
+        )
+
+    @app.route('/solicitacao/<id_sol>/mtr')
+    def gerar_mtr_pdf(id_sol):
+        """Gera e retorna o PDF do MTR para a solicitação. Professional+ e admin apenas."""
+        if not usuario_logado():
+            return redirect(url_for('login'))
+
+        usuario = dados_usuario()
+
+        # Gate: apenas empresa Professional/Enterprise ou admin
+        if usuario['tipo'] == 'empresa':
+            plano = dados.buscar_plano_empresa(usuario['id'])
+            if plano == 'free':
+                flash('Geração de MTR disponível apenas nos planos Professional e Enterprise.', 'error')
+                return redirect(url_for('operacoes'))
+        elif usuario['tipo'] == 'cidadao':
+            flash('Acesso não autorizado.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Busca a solicitação
+        todas = servico_descarte.listar_solicitacoes()
+        sol = next((s for s in todas if s.id == id_sol), None)
+        if sol is None:
+            flash('Solicitação não encontrada.', 'error')
+            return redirect(url_for('operacoes'))
+
+        pdf_bytes = gerar_mtr(sol)
+        numero_mtr = f"MTR-{sol.id[:8].upper()}"
+        return Response(
+            pdf_bytes,
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename={numero_mtr}.pdf'}
         )
 
     @app.route('/usuarios')

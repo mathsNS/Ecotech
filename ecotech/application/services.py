@@ -179,8 +179,8 @@ class ServicoDescarte:
             estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
             self._dados.atualizar_solicitacao(solicitacao.id, estado)
 
-            # se atingiu estado final positivo, credita pontos ao cidadão
-            if estado in ('RECICLADO', 'REUTILIZADO'):
+            # crédita pontos apenas para cidadãos (empresas não tem adicionar_pontos)
+            if estado in ('RECICLADO', 'REUTILIZADO') and isinstance(solicitacao.usuario, Cidadao):
                 peso = solicitacao.calcular_peso_total()
                 pontos = int(peso * 10)  # 10 pts/kg
                 id_usuario = solicitacao.usuario.id

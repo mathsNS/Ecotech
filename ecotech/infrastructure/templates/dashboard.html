@@ -273,6 +273,18 @@
                     <h2>Ações rápidas</h2>
                 </div>
                 <div class="actions-grid-new">
+                    {% if is_empresa %}
+                    <div class="action-card-new">
+                        <div class="action-icon-circle">
+                            <img src="{{ url_for('static', filename='images/localizacao.png') }}" alt="Pontos">
+                        </div>
+                        <div class="action-text-content">
+                            <h3 class="action-title-new">Meus Pontos de Coleta</h3>
+                            <p class="action-subtitle-new">Gerencie seus pontos e confirme entregas</p>
+                        </div>
+                        <a href="{{ url_for('empresa_pontos') }}" class="btn btn-action">Gerenciar</a>
+                    </div>
+                    {% else %}
                     <div class="action-card-new">
                         <div class="action-icon-circle">
                             <img src="{{ url_for('static', filename='images/calendario.png') }}" alt="Agendar">
@@ -293,6 +305,7 @@
                         </div>
                         <a href="{{ url_for('pontos_coleta') }}" class="btn btn-action">Buscar</a>
                     </div>
+                    {% endif %}
                     {% if not is_admin and not is_empresa %}
                     <div class="action-card-new">
                         <div class="action-icon-circle">
