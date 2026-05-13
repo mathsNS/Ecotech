@@ -116,16 +116,18 @@
                 </form>
             </div>
 
+<span id="_perfil-flags" data-atualizado="{{ ('Perfil atualizado' in get_flashed_messages()|join)|tojson }}" hidden></span>
 <script>
 function toggleEditarPerfil() {
     const f = document.getElementById('editar-perfil-form');
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-{% if 'Perfil atualizado' in get_flashed_messages()|join %}
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('editar-perfil-form').style.display = 'none';
-});
-{% endif %}
+var _perfilAtualizado = JSON.parse(document.getElementById('_perfil-flags').dataset.atualizado);
+if (_perfilAtualizado) {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('editar-perfil-form').style.display = 'none';
+    });
+}
 </script>
         </div>
     </div>

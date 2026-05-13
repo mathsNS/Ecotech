@@ -181,3 +181,117 @@ def test_calcular_metricas_total_processadas(servico_com_solicitacao):
     servico, sol = servico_com_solicitacao
     metricas = servico.calcular_metricas([sol])
     assert metricas['total_processadas'] == 1
+
+
+# ---------------------------------------------------------------------------
+# confirmar_solicitacao / buscar_confirmacoes_solicitacao
+# ---------------------------------------------------------------------------
+
+def _setup_solicitacao(dados):
+    """Cria cidadão, ponto e solicitação no banco; retorna (cid, pnt, sol)."""
+    from ecotech.domain.descarte import SolicitacaoDescarte
+    cid = _cidadao()
+    pnt = _ponto()
+    cel = _celular()
+    dados.salvar_cidadao(cid, password_hash='hash')
+    dados.salvar_ponto(pnt)
+    dados.salvar_dispositivo(cel)
+
+    from ecotech.domain.descarte import ItemDescarte
+    sol = SolicitacaoDescarte('sol-test-1', cid, pnt)
+    item = ItemDescarte(cel, 1)
+    sol.adicionar_item(item)
+    dados.salvar_solicitacao(sol)
+    dados.salvar_itens_descarte(sol.id, item)
+    return cid, pnt, sol
+
+
+def test_confirmacoes_iniciais_sao_zero(dados):
+    """Solicitação recém-criada tem confirmado_cidadao=0 e confirmado_empresa=0."""
+    _, _, sol = _setup_solicitacao(dados)
+    conf = dados.buscar_confirmacoes_solicitacao(sol.id)
+    assert conf['confirmado_cidadao'] == 0
+    assert conf['confirmado_empresa'] == 0
+
+
+def test_confirmar_solicitacao_cidadao(dados):
+    _, _, sol = _setup_solicitacao(dados)
+    dados.confirmar_solicitacao(sol.id, 'cidadao')
+    conf = dados.buscar_confirmacoes_solicitacao(sol.id)
+    assert conf['confirmado_cidadao'] == 1
+    assert conf['confirmado_empresa'] == 0
+
+
+def test_confirmar_solicitacao_empresa(dados):
+    _, _, sol = _setup_solicitacao(dados)
+    dados.confirmar_solicitacao(sol.id, 'empresa')
+    conf = dados.buscar_confirmacoes_solicitacao(sol.id)
+    assert conf['confirmado_empresa'] == 1
+    assert conf['confirmado_cidadao'] == 0
+
+
+def test_confirmar_ambos_independentes(dados):
+    """Confirmar cidadão e empresa de forma independente."""
+    _, _, sol = _setup_solicitacao(dados)
+    dados.confirmar_solicitacao(sol.id, 'cidadao')
+    dados.confirmar_solicitacao(sol.id, 'empresa')
+    conf = dados.buscar_confirmacoes_solicitacao(sol.id)
+    assert conf['confirmado_cidadao'] == 1
+    assert conf['confirmado_empresa'] == 1
+
+
+def test_confirmar_valor_invalido_levanta_valueerror(dados):
+    _, _, sol = _setup_solicitacao(dados)
+    with pytest.raises(ValueError):
+        dados.confirmar_solicitacao(sol.id, 'admin')
+
+
+def test_buscar_confirmacoes_id_inexistente_retorna_zeros(dados):
+    conf = dados.buscar_confirmacoes_solicitacao('id-que-nao-existe')
+    assert conf == {'confirmado_cidadao': 0, 'confirmado_empresa': 0}
+
+
+# ---------------------------------------------------------------------------
+# buscar_solicitacoes_ponto
+# ---------------------------------------------------------------------------
+
+def test_buscar_solicitacoes_ponto_retorna_solicitacao(dados):
+    _, pnt, sol = _setup_solicitacao(dados)
+    rows = dados.buscar_solicitacoes_ponto(pnt.id)
+    assert len(rows) == 1
+    assert rows[0]['id'] == sol.id
+
+
+def test_buscar_solicitacoes_ponto_vazio(dados):
+    """Ponto sem solicitações retorna lista vazia."""
+    pnt = _ponto()
+    dados.salvar_ponto(pnt)
+    assert dados.buscar_solicitacoes_ponto(pnt.id) == []
+
+
+def test_buscar_solicitacoes_ponto_inclui_nome_usuario(dados):
+    _, pnt, _ = _setup_solicitacao(dados)
+    rows = dados.buscar_solicitacoes_ponto(pnt.id)
+    assert 'nome_usuario' in rows[0]
+    assert rows[0]['nome_usuario'] == 'João Silva'
+
+
+def test_buscar_solicitacoes_ponto_multiplas(dados):
+    """Duas solicitações no mesmo ponto são retornadas."""
+    from ecotech.domain.descarte import SolicitacaoDescarte, ItemDescarte
+    cid = _cidadao()
+    pnt = _ponto()
+    cel = _celular()
+    dados.salvar_cidadao(cid, password_hash='hash')
+    dados.salvar_ponto(pnt)
+    dados.salvar_dispositivo(cel)
+
+    for i in range(2):
+        sol = SolicitacaoDescarte(f'sol-multi-{i}', cid, pnt)
+        item = ItemDescarte(cel, 1)
+        sol.adicionar_item(item)
+        dados.salvar_solicitacao(sol)
+        dados.salvar_itens_descarte(sol.id, item)
+
+    rows = dados.buscar_solicitacoes_ponto(pnt.id)
+    assert len(rows) == 2

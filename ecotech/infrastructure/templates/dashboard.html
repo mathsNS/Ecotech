@@ -66,6 +66,7 @@
                 </div>
                 <h3 class="stat-value">R$ {{ "%.2f"|format(receita_ecotech_total|default(0))|replace('.', ',') }}</h3>
             </div>
+            {% elif is_empresa %}
             <!-- Empresa ve metricas de processamento -->
             <div class="stat-card-new">
                 <div class="stat-top">
@@ -102,6 +103,7 @@
                 </div>
                 <h3 class="stat-value">R$ {{ "%.2f"|format(saldo_empresa|default(0))|replace('.', ',') }}</h3>
             </div>
+            {% else %}
             <!-- Cidadao ve saldo, pontos, tier e dispositivos -->
             <div class="stat-card-new">
                 <div class="stat-top">
