@@ -817,14 +817,24 @@ def criar_app() -> Flask:
         if usuario['tipo'] == 'empresa':
             plano_empresa = dados.buscar_plano_empresa(usuario['id'])
 
+        per_page = 20
+        page = request.args.get('page', 1, type=int)
+        total_solicitacoes = len(solicitacoes_filtradas)
+        total_pages = max(1, (total_solicitacoes + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        solicitacoes_page = solicitacoes_filtradas[(page - 1) * per_page : page * per_page]
+
         return render_template(
             'operacoes.html', 
             usuario=usuario,
-            solicitacoes=solicitacoes_filtradas,
+            solicitacoes=solicitacoes_page,
             stats=stats,
             filtro_atual=filtro_estado,
             is_admin=usuario['tipo'] == 'administrador',
             plano_empresa=plano_empresa,
+            page=page,
+            total_pages=total_pages,
+            total_solicitacoes=total_solicitacoes,
         )
 
     @app.route('/operacoes/<id_sol>/avancar', methods=['POST'])
@@ -1154,13 +1164,31 @@ def criar_app() -> Flask:
             {**e, 'data_cadastro': formatar_data(e['data_cadastro'])}
             for e in empresas_raw
         ]
-        
+
+        per_page = 20
+        total_cidadaos = len(cidadaos)
+        total_empresas = len(empresas)
+
+        page_c = request.args.get('page_c', 1, type=int)
+        total_pages_c = max(1, (total_cidadaos + per_page - 1) // per_page)
+        page_c = max(1, min(page_c, total_pages_c))
+        cidadaos_page = cidadaos[(page_c - 1) * per_page : page_c * per_page]
+
+        page_e = request.args.get('page_e', 1, type=int)
+        total_pages_e = max(1, (total_empresas + per_page - 1) // per_page)
+        page_e = max(1, min(page_e, total_pages_e))
+        empresas_page = empresas[(page_e - 1) * per_page : page_e * per_page]
+
         return render_template('usuarios.html',
                              usuario=usuario,
-                             cidadaos=cidadaos,
-                             empresas=empresas,
-                             total_cidadaos=len(cidadaos),
-                             total_empresas=len(empresas))
+                             cidadaos=cidadaos_page,
+                             empresas=empresas_page,
+                             total_cidadaos=total_cidadaos,
+                             total_empresas=total_empresas,
+                             page_c=page_c,
+                             total_pages_c=total_pages_c,
+                             page_e=page_e,
+                             total_pages_e=total_pages_e)
     
     @app.route('/api/solicitacoes')
     def api_solicitacoes():

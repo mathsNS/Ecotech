@@ -4,6 +4,115 @@
 
 - Python 3.10 ou superior
 - pip (gerenciador de pacotes do Python)
+
+## Instalação
+
+### 1. Clonar o repositório
+
+```powershell
+git clone https://github.com/mathsNS/Ecotech.git
+cd Ecotech
+```
+
+### 2. Criar e ativar o ambiente virtual
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Instalar dependências
+
+```powershell
+pip install flask werkzeug fpdf2 pytest pytest-cov pytest-mock
+```
+
+### 4. Executar a aplicação
+
+```powershell
+python run.py
+```
+
+A aplicação estará disponível em **http://localhost:5000**.
+
+---
+
+## Executar Testes
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/ -q
+.\.venv\Scripts\python.exe -m pytest tests/ --cov=ecotech   # com cobertura
+```
+
+---
+
+## Contas de Acesso (pré-cadastradas no seed)
+
+### Cidadãos
+| Nome | CPF (login) | Senha |
+|---|---|---|
+| João Silva | `12345678909` | `cidadao123` |
+| Ana Beatriz Ferreira | `98765432100` | `ana123` |
+| Carlos Eduardo Mendes | `34945611840` | `carlos123` |
+| Fernanda Lima | `47585901330` | `fernanda123` |
+| Rafael Gonçalves | `70548478490` | `rafael123` |
+
+### Empresas
+| Nome | CNPJ (login) | Senha |
+|---|---|---|
+| Recicla Kariri | `11222333000181` | `empresa123` |
+| TechLixo Soluções | `14380200000121` | `techlixo123` |
+| GreenCycle Nordeste | `33000167000101` | `greencycle123` |
+
+### Administrador
+| Email | Senha |
+|---|---|
+| `admin@ecotech.com` | `admin123` |
+
+> **Como fazer login:** acesse `/login`, selecione o tipo de conta e informe CPF/CNPJ (apenas dígitos, sem pontos ou traços) ou e-mail conforme o tipo.
+
+---
+
+## Estrutura de Pastas
+
+```
+Ecotech/
+├── ecotech/
+│   ├── domain/              # Entidades e regras de domínio
+│   ├── application/         # Serviços e fábricas
+│   └── infrastructure/      # Flask, SQLite, templates, static
+├── tests/                   # Testes automatizados (271 testes)
+├── run.py                   # Ponto de entrada
+├── pyproject.toml           # Metadados do projeto
+└── CREDENCIAIS.txt          # Referência completa de contas
+```
+
+---
+
+## Solução de Problemas
+
+### Erro: `ModuleNotFoundError`
+Confirme que o ambiente virtual está ativado (`.venv`) e que as dependências foram instaladas.
+
+### Porta 5000 em uso
+Edite `run.py` e altere `port=5000` para outra porta disponível.
+
+### Banco de dados corrompido
+Delete o arquivo `ecotech.db` na raiz do projeto. Ele será recriado com os dados de seed na próxima execução.
+
+---
+
+## Suporte
+
+- Abner Levi (@abnerlevi)
+- Maria Antônia (@mariastrajano)
+- Matheus Nogueira (@mathNS)
+
+
+## Pré-requisitos
+
+- Python 3.10 ou superior
+- pip (gerenciador de pacotes do Python)
 - Poetry (opcional, mas recomendado)
 
 ## Método 1: Instalação com Poetry (Recomendado)

@@ -143,6 +143,24 @@
                     <p>Nenhuma solicitação encontrada com os filtros aplicados.</p>
                 </div>
                 {% endif %}
+
+                {% if total_pages > 1 %}
+                <div class="pagination">
+                    {% if page > 1 %}
+                    <a href="{{ url_for('operacoes', page=page-1, estado=filtro_atual) }}" class="page-btn">&laquo; Anterior</a>
+                    {% else %}
+                    <span class="page-btn page-btn-disabled">&laquo; Anterior</span>
+                    {% endif %}
+
+                    <span class="page-info">Página {{ page }} de {{ total_pages }} ({{ total_solicitacoes }} no total)</span>
+
+                    {% if page < total_pages %}
+                    <a href="{{ url_for('operacoes', page=page+1, estado=filtro_atual) }}" class="page-btn">Próxima &raquo;</a>
+                    {% else %}
+                    <span class="page-btn page-btn-disabled">Próxima &raquo;</span>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

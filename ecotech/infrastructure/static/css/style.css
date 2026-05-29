@@ -3476,3 +3476,41 @@ input[type="time"].form-control-new::-webkit-calendar-picker-indicator {
 @media (max-width: 900px) {
     .esg-grid { grid-template-columns: 1fr; }
 }
+
+/* Paginação */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 12px 0;
+}
+
+.page-btn {
+    display: inline-block;
+    padding: 7px 16px;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.page-btn:hover {
+    background: var(--primary-dark, #059669);
+}
+
+.page-btn-disabled {
+    background: var(--border-color, #e5e7eb);
+    color: var(--text-secondary, #9ca3af);
+    cursor: default;
+    pointer-events: none;
+}
+
+.page-info {
+    font-size: 14px;
+    color: var(--text-secondary);
+}

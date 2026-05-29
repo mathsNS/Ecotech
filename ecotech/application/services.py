@@ -4,6 +4,36 @@ import uuid
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
+
+def _validar_cpf(cpf: str) -> bool:
+    """Valida CPF pelo algoritmo dos dígitos verificadores. Recebe apenas dígitos."""
+    cpf = cpf.strip()
+    if len(cpf) != 11 or not cpf.isdigit() or cpf == cpf[0] * 11:
+        return False
+    for i in range(2):
+        peso = range(10 + i, 1, -1)
+        soma = sum(int(d) * p for d, p in zip(cpf, peso))
+        digito = (soma * 10 % 11) % 10
+        if digito != int(cpf[9 + i]):
+            return False
+    return True
+
+
+def _validar_cnpj(cnpj: str) -> bool:
+    """Valida CNPJ pelo algoritmo dos dígitos verificadores. Recebe apenas dígitos."""
+    cnpj = cnpj.strip()
+    if len(cnpj) != 14 or not cnpj.isdigit() or cnpj == cnpj[0] * 14:
+        return False
+    pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    pesos2 = [6] + pesos1
+    for pesos, pos in ((pesos1, 12), (pesos2, 13)):
+        soma = sum(int(cnpj[i]) * pesos[i] for i in range(len(pesos)))
+        resto = soma % 11
+        digito = 0 if resto < 2 else 11 - resto
+        if digito != int(cnpj[pos]):
+            return False
+    return True
+
 from ..domain.usuarios import Usuario, Cidadao, Empresa, Administrador
 from ..domain.dispositivos import DispositivoEletronico
 from ..domain.descarte import (
@@ -548,9 +578,20 @@ class ServicoUsuario:
     def criar_usuario(self, tipo: str, dados: Dict, senha: str = "") -> Usuario:
         """Cria e persiste um usuário. Gera hash da senha se fornecida."""
         from .factories import UsuarioFactory
-        
+
         if 'id' not in dados:
             dados['id'] = str(uuid.uuid4())
+
+        if tipo == 'cidadao':
+            cpf = dados.get('cpf', '').replace('.', '').replace('-', '').strip()
+            dados['cpf'] = cpf
+            if not _validar_cpf(cpf):
+                raise ValueError('CPF inválido.')
+        elif tipo == 'empresa':
+            cnpj = dados.get('cnpj', '').replace('.', '').replace('-', '').replace('/', '').strip()
+            dados['cnpj'] = cnpj
+            if not _validar_cnpj(cnpj):
+                raise ValueError('CNPJ inválido.')
         
         usuario = UsuarioFactory.criar_usuario(tipo, dados)
         self._usuarios[usuario.id] = usuario
@@ -577,8 +618,12 @@ class ServicoUsuario:
             return None
 
         if tipo == 'cidadao':
+            if not _validar_cpf(credencial):
+                return None
             row = self._dados.buscar_usuario_por_cpf(credencial)
         elif tipo == 'empresa':
+            if not _validar_cnpj(credencial):
+                return None
             row = self._dados.buscar_usuario_por_cnpj(credencial)
         elif tipo == 'administrador':
             row = self._dados.buscar_usuario_por_email(credencial)
