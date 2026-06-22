@@ -1,0 +1,9 @@
+services:
+  website:
+    build: ./
+    restart: always
+    container_name: ecotech-01
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./website:/usr/local/ecotech
