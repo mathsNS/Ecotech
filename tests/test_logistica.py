@@ -1,6 +1,7 @@
 """Testes de bases operacionais, localização e distância."""
 
 import sqlite3
+from datetime import datetime, time
 
 import pytest
 
@@ -9,7 +10,7 @@ from ecotech.application.geolocalizacao import (
     GeolocalizadorCoordenadasInformadas,
 )
 from ecotech.application.services import ServicoBaseOperacional
-from ecotech.domain.logistica import BaseOperacional, Coordenadas
+from ecotech.domain.logistica import BaseOperacional, Coordenadas, JanelaAtendimento
 from ecotech.domain.usuarios import Empresa
 from ecotech.infrastructure.persistence.dados import Dados
 
@@ -109,3 +110,19 @@ def test_persistir_localizacao_apenas_em_coleta_domiciliar(servico):
     row = dados.buscar_solicitacao('sol-1')
     assert row['latitude_coleta'] == pytest.approx(-7.2)
     assert row['longitude_coleta'] == pytest.approx(-39.3)
+
+
+def test_configuracao_operacional_e_carregada_em_lote(servico):
+    bases, _ = servico
+    base = bases.criar('emp-1', _dados_base())
+    janela = JanelaAtendimento(0, time(8), time(18))
+    bases.configurar_categorias('emp-1', base.id, ['Celular', 'notebook'])
+    bases.configurar_disponibilidade('emp-1', base.id, [janela])
+    bases.definir_indisponibilidade(
+        'emp-1', base.id, datetime(2026, 9, 10, 12)
+    )
+
+    candidata = bases.listar_candidatas()[0]
+    assert candidata.categorias_atendidas == frozenset({'celular', 'notebook'})
+    assert candidata.disponibilidade == (janela,)
+    assert candidata.indisponivel_ate == datetime(2026, 9, 10, 12)

@@ -119,6 +119,24 @@ class RepositorioBase(ABC):
         self, id_base: str, id_empresa: str, ativa: bool
     ) -> None: ...
 
+    @abstractmethod
+    def buscar_bases_candidatas(self) -> List[Any]: ...
+
+    @abstractmethod
+    def configurar_categorias_base(
+        self, id_base: str, id_empresa: str, categorias: List[str]
+    ) -> None: ...
+
+    @abstractmethod
+    def configurar_disponibilidade_base(
+        self, id_base: str, id_empresa: str, janelas: List[Any]
+    ) -> None: ...
+
+    @abstractmethod
+    def definir_indisponibilidade_base(
+        self, id_base: str, id_empresa: str, indisponivel_ate: Any
+    ) -> None: ...
+
     # --- Solicitações: salvar ---
 
     @abstractmethod

@@ -1,6 +1,8 @@
 """Entidades de logística para o despacho de coletas domiciliares."""
 
 from dataclasses import dataclass
+from datetime import datetime, time
+from typing import FrozenSet, Tuple
 
 
 def validar_coordenadas(latitude: float, longitude: float) -> None:
@@ -17,6 +19,27 @@ class Coordenadas:
 
     def __post_init__(self):
         validar_coordenadas(self.latitude, self.longitude)
+
+
+@dataclass(frozen=True)
+class JanelaAtendimento:
+    """Intervalo semanal em que uma base pode iniciar uma coleta."""
+
+    dia_semana: int
+    inicio: time
+    fim: time
+
+    def __post_init__(self):
+        if self.dia_semana not in range(7):
+            raise ValueError("dia da semana deve estar entre 0 e 6")
+        if self.inicio >= self.fim:
+            raise ValueError("início da janela deve anteceder o fim")
+
+    def contem(self, instante: datetime) -> bool:
+        return (
+            instante.weekday() == self.dia_semana
+            and self.inicio <= instante.time() < self.fim
+        )
 
 
 class BaseOperacional:
@@ -36,6 +59,12 @@ class BaseOperacional:
         realiza_coleta_domiciliar: bool = True,
         ativa: bool = True,
         ponto_coleta_id: str | None = None,
+        categorias_atendidas=('*',),
+        disponibilidade: Tuple[JanelaAtendimento, ...] = (),
+        indisponivel_ate: datetime | None = None,
+        empresa_ativa: bool = True,
+        carga_operacional: int = 0,
+        capacidade_comprometida_kg: float = 0.0,
     ):
         if not id or not empresa_id:
             raise ValueError("base e empresa devem possuir identificadores")
@@ -63,6 +92,17 @@ class BaseOperacional:
         self._realiza_coleta_domiciliar = bool(realiza_coleta_domiciliar)
         self._ativa = bool(ativa)
         self._ponto_coleta_id = ponto_coleta_id
+        self._categorias_atendidas: FrozenSet[str] = frozenset(
+            str(categoria).strip().lower() for categoria in categorias_atendidas
+            if str(categoria).strip()
+        )
+        self._disponibilidade = tuple(disponibilidade)
+        self._indisponivel_ate = indisponivel_ate
+        self._empresa_ativa = bool(empresa_ativa)
+        self._carga_operacional = max(0, int(carga_operacional))
+        self._capacidade_comprometida_kg = max(
+            0.0, float(capacidade_comprometida_kg)
+        )
 
     @property
     def id(self): return self._id
@@ -99,6 +139,33 @@ class BaseOperacional:
 
     @property
     def ponto_coleta_id(self): return self._ponto_coleta_id
+
+    @property
+    def categorias_atendidas(self): return self._categorias_atendidas
+
+    @property
+    def disponibilidade(self): return self._disponibilidade
+
+    @property
+    def indisponivel_ate(self): return self._indisponivel_ate
+
+    @property
+    def empresa_ativa(self): return self._empresa_ativa
+
+    @property
+    def carga_operacional(self): return self._carga_operacional
+
+    @property
+    def capacidade_comprometida_kg(self): return self._capacidade_comprometida_kg
+
+    @property
+    def capacidade_disponivel_kg(self) -> float:
+        return max(
+            0.0,
+            self._capacidade_kg
+            - self._ocupacao_atual_kg
+            - self._capacidade_comprometida_kg,
+        )
 
     @property
     def coordenadas(self) -> Coordenadas:

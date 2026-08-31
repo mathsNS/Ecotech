@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 from .v001_integridade_basica import aplicar as aplicar_v001
 from .v002_idempotencia_financeira import aplicar as aplicar_v002
 from .v003_bases_localizacao import aplicar as aplicar_v003
+from .v004_elegibilidade_ranking import aplicar as aplicar_v004
 
 
 MIGRATIONS = (
     (1, "integridade_basica", aplicar_v001),
     (2, "idempotencia_financeira", aplicar_v002),
     (3, "bases_operacionais_localizacao", aplicar_v003),
+    (4, "elegibilidade_ranking", aplicar_v004),
 )
 
 

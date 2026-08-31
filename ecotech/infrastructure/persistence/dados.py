@@ -453,6 +453,10 @@ class Dados(RepositorioBase):
                 int(base.realiza_coleta_domiciliar), int(base.ativa),
                 agora, agora,
             ))
+            self.conn.execute(
+                "INSERT OR IGNORE INTO base_categoria(base_id, categoria) VALUES (?, '*')",
+                (base.id,),
+            )
 
     def buscar_base_operacional(self, id_base: str):
         return self.conn.execute(
@@ -497,6 +501,89 @@ class Dados(RepositorioBase):
             ))
         if cursor.rowcount != 1:
             raise ValueError("base operacional não encontrada para esta empresa")
+
+    def configurar_categorias_base(
+        self, id_base: str, id_empresa: str, categorias
+    ) -> None:
+        categorias = sorted({c.strip().lower() for c in categorias if c.strip()})
+        if not categorias:
+            raise ValueError("informe ao menos uma categoria")
+        with self.conn:
+            existe = self.conn.execute(
+                "SELECT 1 FROM base_operacional WHERE id = ? AND empresa_id = ?",
+                (id_base, id_empresa),
+            ).fetchone()
+            if not existe:
+                raise ValueError("base operacional não encontrada para esta empresa")
+            self.conn.execute("DELETE FROM base_categoria WHERE base_id = ?", (id_base,))
+            self.conn.executemany(
+                "INSERT INTO base_categoria(base_id, categoria) VALUES (?, ?)",
+                [(id_base, categoria) for categoria in categorias],
+            )
+
+    def configurar_disponibilidade_base(
+        self, id_base: str, id_empresa: str, janelas
+    ) -> None:
+        with self.conn:
+            existe = self.conn.execute(
+                "SELECT 1 FROM base_operacional WHERE id = ? AND empresa_id = ?",
+                (id_base, id_empresa),
+            ).fetchone()
+            if not existe:
+                raise ValueError("base operacional não encontrada para esta empresa")
+            self.conn.execute(
+                "DELETE FROM base_disponibilidade WHERE base_id = ?", (id_base,)
+            )
+            self.conn.executemany("""
+                INSERT INTO base_disponibilidade(
+                    base_id, dia_semana, hora_inicio, hora_fim
+                ) VALUES (?, ?, ?, ?)
+            """, [
+                (id_base, janela.dia_semana, janela.inicio.strftime('%H:%M'),
+                 janela.fim.strftime('%H:%M')) for janela in janelas
+            ])
+
+    def definir_indisponibilidade_base(
+        self, id_base: str, id_empresa: str, indisponivel_ate
+    ) -> None:
+        valor = indisponivel_ate.isoformat(timespec='seconds') if indisponivel_ate else None
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE base_operacional SET indisponivel_ate = ?, atualizada_em = ?
+                WHERE id = ? AND empresa_id = ?
+            """, (valor, datetime.now().isoformat(timespec='seconds'), id_base, id_empresa))
+        if cursor.rowcount != 1:
+            raise ValueError("base operacional não encontrada para esta empresa")
+
+    def buscar_bases_candidatas(self):
+        """Carrega todos os fatores em uma consulta, evitando N+1 no ranking."""
+        return self.conn.execute("""
+            WITH carga AS (
+                SELECT sd.base_operacional_id AS base_id,
+                       COUNT(DISTINCT sd.id) AS total_coletas,
+                       COALESCE(SUM(d.peso_kg * i.quantidade), 0) AS peso_comprometido
+                FROM solicitacao_descarte sd
+                LEFT JOIN item_descarte i ON i.id_solicitacao = sd.id
+                LEFT JOIN dispositivo d ON d.id = i.id_dispositivo
+                WHERE sd.base_operacional_id IS NOT NULL
+                  AND sd.estado NOT IN ('RECICLADO', 'REUTILIZADO', 'CANCELADO')
+                GROUP BY sd.base_operacional_id
+            )
+            SELECT b.*, u.ativo AS empresa_ativa,
+                   COALESCE(c.total_coletas, 0) AS carga_operacional,
+                   COALESCE(c.peso_comprometido, 0) AS capacidade_comprometida_kg,
+                   GROUP_CONCAT(DISTINCT bc.categoria) AS categorias,
+                   GROUP_CONCAT(DISTINCT
+                       bd.dia_semana || '@' || bd.hora_inicio || '@' || bd.hora_fim
+                   ) AS janelas
+            FROM base_operacional b
+            JOIN usuario u ON u.id = b.empresa_id
+            LEFT JOIN carga c ON c.base_id = b.id
+            LEFT JOIN base_categoria bc ON bc.base_id = b.id
+            LEFT JOIN base_disponibilidade bd ON bd.base_id = b.id
+            GROUP BY b.id
+            ORDER BY b.id
+        """).fetchall()
 
     # -------------------
     # DESATIVAR (soft-delete)
@@ -713,6 +800,10 @@ class Dados(RepositorioBase):
                        ocupacao_atual_kg, 1, ativo, datetime('now'), datetime('now')
                 FROM ponto_coleta WHERE id = ?
             """, (id_empresa, id_ponto))
+            self.conn.execute("""
+                INSERT OR IGNORE INTO base_categoria(base_id, categoria)
+                SELECT id, '*' FROM base_operacional WHERE ponto_coleta_id = ?
+            """, (id_ponto,))
 
     def buscar_pontos_para_selecao(self):
         """Retorna apenas pontos vinculados a empresas para o select do formulario."""

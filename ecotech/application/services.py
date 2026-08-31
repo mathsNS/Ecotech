@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, time
 import uuid
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -44,7 +44,7 @@ from ..domain.descarte import (
 from ..domain.tratamento import MetodoTratamento
 from ..domain.relatorio import RelatorioAmbiental
 from ..domain.repositorio import RepositorioBase
-from ..domain.logistica import BaseOperacional
+from ..domain.logistica import BaseOperacional, JanelaAtendimento
 
 
 class ServicoDescarte:
@@ -564,6 +564,18 @@ class ServicoBaseOperacional:
 
     @staticmethod
     def _de_row(row) -> BaseOperacional:
+        chaves = set(row.keys())
+        categorias = (row['categorias'] or '*').split(',') if 'categorias' in chaves else ('*',)
+        janelas = []
+        if 'janelas' in chaves and row['janelas']:
+            for janela in row['janelas'].split(','):
+                dia, inicio, fim = janela.split('@')
+                janelas.append(JanelaAtendimento(
+                    int(dia), time.fromisoformat(inicio), time.fromisoformat(fim)
+                ))
+        indisponivel_ate = None
+        if 'indisponivel_ate' in chaves and row['indisponivel_ate']:
+            indisponivel_ate = datetime.fromisoformat(row['indisponivel_ate'])
         return BaseOperacional(
             id=row['id'], empresa_id=row['empresa_id'], nome=row['nome'],
             endereco=row['endereco'], latitude=row['latitude'],
@@ -573,6 +585,15 @@ class ServicoBaseOperacional:
             ocupacao_atual_kg=row['ocupacao_atual_kg'],
             realiza_coleta_domiciliar=bool(row['realiza_coleta_domiciliar']),
             ativa=bool(row['ativa']), ponto_coleta_id=row['ponto_coleta_id'],
+            categorias_atendidas=categorias,
+            disponibilidade=tuple(janelas),
+            indisponivel_ate=indisponivel_ate,
+            empresa_ativa=bool(row['empresa_ativa']) if 'empresa_ativa' in chaves else True,
+            carga_operacional=row['carga_operacional'] if 'carga_operacional' in chaves else 0,
+            capacidade_comprometida_kg=(
+                row['capacidade_comprometida_kg']
+                if 'capacidade_comprometida_kg' in chaves else 0
+            ),
         )
 
     def criar(self, empresa_id: str, dados_base: Dict) -> BaseOperacional:
@@ -630,6 +651,26 @@ class ServicoBaseOperacional:
         if not atual or not atual.pertence_a(empresa_id):
             raise PermissionError("base operacional não pertence à empresa")
         self._dados.definir_atividade_base(id_base, empresa_id, ativa)
+
+    def listar_candidatas(self) -> List[BaseOperacional]:
+        return [self._de_row(row) for row in self._dados.buscar_bases_candidatas()]
+
+    def configurar_categorias(
+        self, empresa_id: str, id_base: str, categorias: List[str]
+    ) -> None:
+        self._dados.configurar_categorias_base(id_base, empresa_id, categorias)
+
+    def configurar_disponibilidade(
+        self, empresa_id: str, id_base: str, janelas: List[JanelaAtendimento]
+    ) -> None:
+        self._dados.configurar_disponibilidade_base(id_base, empresa_id, janelas)
+
+    def definir_indisponibilidade(
+        self, empresa_id: str, id_base: str, indisponivel_ate
+    ) -> None:
+        self._dados.definir_indisponibilidade_base(
+            id_base, empresa_id, indisponivel_ate
+        )
 
 
 class ServicoUsuario:
