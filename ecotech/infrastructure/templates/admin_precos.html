@@ -93,6 +93,7 @@
     <div style="background:#fff; border-radius:12px; padding:2rem; width:400px; max-width:92vw; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
         <h3 style="margin:0 0 1.25rem;" id="modal-titulo">Editar preços</h3>
         <form id="form-preco" method="POST">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <div style="margin-bottom:1rem;">
                 <label style="display:block; font-size:0.875rem; font-weight:600; margin-bottom:0.4rem;">Valor Base (Funcionando) — R$</label>
                 <input type="text" name="valor_base" id="input-base"

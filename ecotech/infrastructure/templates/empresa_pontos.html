@@ -9,7 +9,10 @@
             <h1 style="margin:0; font-size:1.6rem; color:#1D854D; font-weight:700;">Meus Pontos de Coleta</h1>
             <p style="margin:.25rem 0 0; color:#666; font-size:.9rem;">Gerencie seus pontos e confirme as entregas agendadas.</p>
         </div>
-        <a href="{{ url_for('dashboard') }}" class="btn" style="background:#f0faf4; color:#1D854D; border:1px solid #1D854D; padding:.5rem 1rem; border-radius:8px; font-size:.9rem; text-decoration:none;">← Voltar</a>
+        <div style="display:flex;gap:.5rem;">
+            <a href="{{ url_for('empresa_bases') }}" class="btn" style="background:#1D854D;color:#fff;padding:.5rem 1rem;border-radius:8px;text-decoration:none;">Bases operacionais</a>
+            <a href="{{ url_for('dashboard') }}" class="btn" style="background:#f0faf4; color:#1D854D; border:1px solid #1D854D; padding:.5rem 1rem; border-radius:8px; font-size:.9rem; text-decoration:none;">← Voltar</a>
+        </div>
     </div>
 
     {% if not pontos_com_sol %}
@@ -111,6 +114,7 @@ function confirmarEntrega(btn, id) {
     btn.textContent = 'Aguarde…';
     const fd = new FormData();
     fd.append('quem', 'empresa');
+    fd.append('_csrf_token', '{{ csrf_token() }}');
     fetch(`/solicitacao/${id}/confirmar`, { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {

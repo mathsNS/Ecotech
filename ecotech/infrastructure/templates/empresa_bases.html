@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Bases Operacionais — EcoTech{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:980px;margin:0 auto;padding:2rem 1rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1 style="color:#1D854D;margin:0;">Bases operacionais</h1>
+            <p>Cadastre os locais de onde partem suas coletas domiciliares.</p>
+        </div>
+        <a href="{{ url_for('empresa_pontos') }}" class="btn">← Pontos de coleta</a>
+    </div>
+
+    <section class="card" style="padding:1.25rem;margin:1.5rem 0;">
+        <h2 style="font-size:1.1rem;">Nova base</h2>
+        <form method="POST" action="{{ url_for('empresa_bases') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div class="form-grid-2">
+                <label>Nome<input class="form-control-new" name="nome" required></label>
+                <label>Endereço<input class="form-control-new" name="endereco" required></label>
+                <label>Latitude<input class="form-control-new" type="number" step="any" name="latitude" min="-90" max="90" required></label>
+                <label>Longitude<input class="form-control-new" type="number" step="any" name="longitude" min="-180" max="180" required></label>
+                <label>Raio de atendimento (km)<input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="25" required></label>
+                <label>Capacidade (kg)<input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="1000" required></label>
+            </div>
+            <label style="display:block;margin:.75rem 0;"><input type="checkbox" name="realiza_coleta_domiciliar" checked> Realiza coleta domiciliar</label>
+            <button class="btn" type="submit">Cadastrar base</button>
+        </form>
+    </section>
+
+    {% for base in bases %}
+    <section class="card" style="padding:1.25rem;margin-bottom:1rem;opacity:{{ 1 if base.ativa else 0.65 }};">
+        <form method="POST" action="{{ url_for('editar_base', id_base=base.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div class="form-grid-2">
+                <label>Nome<input class="form-control-new" name="nome" value="{{ base.nome }}" required></label>
+                <label>Endereço<input class="form-control-new" name="endereco" value="{{ base.endereco }}" required></label>
+                <label>Latitude<input class="form-control-new" type="number" step="any" name="latitude" value="{{ base.latitude }}" required></label>
+                <label>Longitude<input class="form-control-new" type="number" step="any" name="longitude" value="{{ base.longitude }}" required></label>
+                <label>Raio (km)<input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="{{ base.raio_atendimento_km }}" required></label>
+                <label>Capacidade (kg)<input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="{{ base.capacidade_kg }}" required></label>
+            </div>
+            <label style="display:block;margin:.75rem 0;"><input type="checkbox" name="realiza_coleta_domiciliar" {% if base.realiza_coleta_domiciliar %}checked{% endif %}> Realiza coleta domiciliar</label>
+            <button class="btn" type="submit">Salvar alterações</button>
+        </form>
+        <form method="POST" action="{{ url_for('atividade_base', id_base=base.id) }}" style="margin-top:.75rem;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ativa" value="{{ 0 if base.ativa else 1 }}">
+            <button class="btn" type="submit">{{ 'Desativar' if base.ativa else 'Ativar' }} base</button>
+        </form>
+    </section>
+    {% else %}
+    <p>Nenhuma base operacional cadastrada.</p>
+    {% endfor %}
+</div>
+{% endblock %}

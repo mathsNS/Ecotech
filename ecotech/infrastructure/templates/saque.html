@@ -98,6 +98,7 @@
 
             <div class="form-section">
                 <form method="POST" action="{{ url_for('saque') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="metodo" id="metodo_selecionado" value="Cartao">
                 <div class="form-group">
                     <label>Nome*</label>

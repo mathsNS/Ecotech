@@ -19,6 +19,7 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('criar_conta') }}" id="criar-conta-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <!-- tipo de conta -->
             <div class="form-group">
                 <label>Tipo de conta</label>

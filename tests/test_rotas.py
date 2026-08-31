@@ -70,6 +70,7 @@ def _set_session(client, user_id, nome, tipo):
 # IDs fixos definidos no seed de _inicializar_dados_exemplo
 _ID_ADMIN = "USR-ADM-001"
 _ID_EMPRESA_FREE = "user-2"   # Recicla Kariri (plano free por padrão)
+_ID_OUTRA_EMPRESA = "user-7"   # TechLixo Soluções
 _ID_CIDADAO = "user-1"        # João Silva
 
 
@@ -220,3 +221,163 @@ def test_confirmar_rota_empresa_avanca_para_coletado(client, app):
     data = resp.get_json()
     assert data.get("ok") is True
     assert data.get("novo_estado") == "Coletado"
+
+
+def _buscar_solicitacao_de_outra_empresa(id_empresa):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    db = _dados_mod.Dados()
+    return db.conn.execute(
+        "SELECT s.id FROM solicitacao_descarte s "
+        "JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id "
+        "WHERE pc.id_empresa <> ? LIMIT 1",
+        (id_empresa,)
+    ).fetchone()
+
+
+def test_confirmar_rota_outra_empresa_retorna_403(client):
+    row = _buscar_solicitacao_de_outra_empresa(_ID_EMPRESA_FREE)
+    if row is None:
+        pytest.skip("Sem solicitação de outra empresa no seed")
+
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.post(f"/solicitacao/{row['id']}/confirmar")
+
+    assert resp.status_code == 403
+    assert resp.is_json
+
+
+def test_avancar_rota_outra_empresa_retorna_403(client):
+    row = _buscar_solicitacao_de_outra_empresa(_ID_EMPRESA_FREE)
+    if row is None:
+        pytest.skip("Sem solicitação de outra empresa no seed")
+
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.post(f"/operacoes/{row['id']}/avancar")
+
+    assert resp.status_code == 403
+    assert resp.is_json
+
+
+def test_mtr_outra_empresa_nao_e_gerado(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    db = _dados_mod.Dados()
+    db.atualizar_plano_empresa(_ID_EMPRESA_FREE, 'professional')
+    row = db.conn.execute(
+        "SELECT s.id FROM solicitacao_descarte s "
+        "JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id "
+        "WHERE pc.id_empresa <> ? LIMIT 1",
+        (_ID_EMPRESA_FREE,)
+    ).fetchone()
+    if row is None:
+        pytest.skip("Sem solicitação de outra empresa no seed")
+
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.get(f"/solicitacao/{row['id']}/mtr", follow_redirects=False)
+
+    assert resp.status_code in (301, 302)
+    assert '/operacoes' in resp.headers['Location']
+
+
+def test_saque_negado_para_empresa(client):
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.get('/saque', follow_redirects=False)
+
+    assert resp.status_code in (301, 302)
+    assert '/dashboard' in resp.headers['Location']
+
+
+def test_csrf_rejeita_post_sem_token_quando_habilitado(client, app):
+    _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
+    app.config['TESTING'] = False
+    app.config['CSRF_ENABLED'] = True
+    try:
+        resp = client.post('/usuarios/user-1/desativar')
+    finally:
+        app.config['TESTING'] = True
+
+    assert resp.status_code == 400
+    assert resp.is_json
+
+
+def test_empresa_lista_suas_bases_operacionais(client):
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.get('/empresa/bases')
+
+    assert resp.status_code == 200
+    assert b'Bases operacionais' in resp.data
+    assert b'Recicla Kariri' in resp.data
+
+
+def test_empresa_nao_edita_base_de_outra_empresa(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    db = _dados_mod.Dados()
+    row = db.conn.execute(
+        "SELECT id FROM base_operacional WHERE empresa_id <> ? LIMIT 1",
+        (_ID_EMPRESA_FREE,)
+    ).fetchone()
+    if row is None:
+        pytest.skip('Sem base de outra empresa no seed')
+
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    resp = client.post(
+        f"/empresa/bases/{row['id']}/editar",
+        data={
+            'nome': 'Invasão', 'endereco': 'Rua X',
+            'latitude': '-7.2', 'longitude': '-39.3',
+            'raio_atendimento_km': '10', 'capacidade_kg': '100',
+        },
+    )
+    assert resp.status_code == 403
+
+
+def _dados_nova_coleta(**sobrescrever):
+    dados = {
+        'tipo_dispositivo': 'celular',
+        'subcategoria': 'smartphone_medio',
+        'nome': 'Aparelho Localizado',
+        'peso_kg': '1.0',
+        'quantidade': '1',
+        'tipo_coleta': 'domiciliar',
+        'endereco_coleta': 'Rua da Localização, 10',
+        'latitude_coleta': '-7.2134',
+        'longitude_coleta': '-39.3153',
+        'nome_contato': 'João',
+        'data_coleta': '2026-09-10',
+        'horario_coleta': '14:30',
+    }
+    dados.update(sobrescrever)
+    return dados
+
+
+def test_coleta_domiciliar_persiste_coordenadas(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    resp = client.post('/nova-solicitacao', data=_dados_nova_coleta())
+    assert resp.status_code in (301, 302)
+
+    db = _dados_mod.Dados()
+    row = db.conn.execute("""
+        SELECT latitude_coleta, longitude_coleta, origem_localizacao
+        FROM solicitacao_descarte
+        WHERE endereco_coleta = 'Rua da Localização, 10'
+        ORDER BY rowid DESC LIMIT 1
+    """).fetchone()
+    assert row['latitude_coleta'] == pytest.approx(-7.2134)
+    assert row['longitude_coleta'] == pytest.approx(-39.3153)
+    assert row['origem_localizacao'] == 'navegador_ou_formulario'
+
+
+def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    db = _dados_mod.Dados()
+    antes = db.contar_solicitacoes()
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    resp = client.post(
+        '/nova-solicitacao',
+        data=_dados_nova_coleta(
+            endereco_coleta='Rua Sem Coordenadas',
+            latitude_coleta='', longitude_coleta='',
+        ),
+    )
+    assert resp.status_code == 200
+    assert _dados_mod.Dados().contar_solicitacoes() == antes

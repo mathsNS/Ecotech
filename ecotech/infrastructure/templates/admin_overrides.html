@@ -82,12 +82,14 @@
                             <td>
                                 <div class="action-buttons">
                                     <form method="POST" action="{{ url_for('aprovar_override', id_sol=ov.id) }}" style="display:inline;">
+                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn-action-small btn-edit" title="Aprovar override"
                                                 onclick="return confirm('Aprovar override para solicitação {{ ov.id[:8].upper() }}?')">
                                             Aprovar
                                         </button>
                                     </form>
                                     <form method="POST" action="{{ url_for('rejeitar_override', id_sol=ov.id) }}" style="display:inline;">
+                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn-action-small btn-delete" title="Rejeitar e reverter ao valor calculado"
                                                 onclick="return confirm('Rejeitar override? O valor será revertido ao cálculo automático.')">
                                             Rejeitar

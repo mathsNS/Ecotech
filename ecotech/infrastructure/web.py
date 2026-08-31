@@ -7,6 +7,9 @@ baseada no design mobile fornecido.
 
 import csv
 import io
+import hmac
+import os
+import secrets
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from .pdf import gerar_mtr
 from datetime import datetime
@@ -20,10 +23,16 @@ from ..application.services import (
     ServicoUsuario,
     ServicoSaque,
     ServicoAutenticacao,
+    ServicoBaseOperacional,
 )
+from ..application.geolocalizacao import GeolocalizadorCoordenadasInformadas
 from ..application.factories import (
     DispositivoFactory,
     MetodoTratamentoFactory
+)
+from ..application.authorization import (
+    listar_solicitacoes_visiveis_empresa,
+    usuario_pode_operar_solicitacao,
 )
 from ..domain.usuarios import Usuario
 from ..domain.dispositivos import EstadoProduto
@@ -39,8 +48,9 @@ def criar_app() -> Flask:
     """
     from datetime import timedelta
     app = Flask(__name__)
-    app.secret_key = "ecotech-secret-key-2026"
+    app.secret_key = os.environ.get('ECOTECH_SECRET_KEY') or secrets.token_hex(32)
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+    app.config.setdefault('CSRF_ENABLED', True)
     
     # instancia unica de dados compartilhada por todos os servicos
     dados = Dados()
@@ -52,6 +62,8 @@ def criar_app() -> Flask:
     servico_relatorio = ServicoRelatorio()
     servico_saque = ServicoSaque(dados)
     servico_autenticacao = ServicoAutenticacao(servico_usuario)
+    servico_base = ServicoBaseOperacional(dados)
+    geolocalizador = GeolocalizadorCoordenadasInformadas()
     
     # configura dependencias entre servicos
     servico_descarte.set_servicos(servico_usuario, servico_ponto)
@@ -60,7 +72,6 @@ def criar_app() -> Flask:
     servico_descarte._carregar_solicitacoes_do_banco()
     
     # dados exemplo, só roda no processo pai (não no filho do reloader)
-    import os
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
     
@@ -77,6 +88,32 @@ def criar_app() -> Flask:
                 'nome': session.get('user_nome'),
                 'tipo': session.get('user_tipo')
             }
+        return None
+
+    def csrf_token():
+        """Cria ou devolve o token CSRF associado à sessão atual."""
+        token = session.get('_csrf_token')
+        if not token:
+            token = secrets.token_urlsafe(32)
+            session['_csrf_token'] = token
+        return token
+
+    app.jinja_env.globals['csrf_token'] = csrf_token
+
+    @app.before_request
+    def proteger_csrf():
+        """Valida requisições mutáveis que utilizam a sessão Flask."""
+        if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            return None
+        if not app.config.get('CSRF_ENABLED', True) or app.testing:
+            return None
+
+        esperado = session.get('_csrf_token')
+        recebido = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
+        if not esperado or not recebido or not hmac.compare_digest(esperado, recebido):
+            if request.path.startswith(('/operacoes/', '/solicitacao/', '/usuarios/', '/admin/')):
+                return jsonify({'erro': 'Token CSRF inválido ou ausente'}), 400
+            return 'Token CSRF inválido ou ausente', 400
         return None
     
     # rotas
@@ -206,11 +243,16 @@ def criar_app() -> Flask:
                 is_admin=True
             )
         
-        # solicitacoes do usuario
-        solicitacoes_usuario = [
-            s for s in todas_solicitacoes 
-            if s.usuario.id == usuario['id']
-        ]
+        # escopo único por papel
+        if usuario['tipo'] == 'empresa':
+            solicitacoes_usuario = listar_solicitacoes_visiveis_empresa(
+                usuario['id'], todas_solicitacoes, dados
+            )
+        else:
+            solicitacoes_usuario = [
+                s for s in todas_solicitacoes
+                if s.usuario.id == usuario['id']
+            ]
         
         # calcula metricas do usuario
         metricas_usuario = servico_descarte.calcular_metricas(solicitacoes_usuario)
@@ -341,6 +383,8 @@ def criar_app() -> Flask:
                 ponto_id          = request.form.get('ponto_id', '').strip()
                 tipo_coleta       = request.form.get('tipo_coleta', 'domiciliar').strip()
                 endereco_coleta   = request.form.get('endereco_coleta', '').strip()
+                latitude_coleta   = request.form.get('latitude_coleta', '').strip()
+                longitude_coleta  = request.form.get('longitude_coleta', '').strip()
                 nome_contato      = request.form.get('nome_contato', '').strip()
                 data_coleta       = request.form.get('data_coleta', '').strip()
                 horario_coleta    = request.form.get('horario_coleta', '').strip()
@@ -358,6 +402,12 @@ def criar_app() -> Flask:
                     ponto = pontos_disponiveis[0] if pontos_disponiveis else None
                 # para domiciliar, ponto fica None (empresa é atribuída depois)
 
+                coordenadas = None
+                if tipo_coleta == 'domiciliar':
+                    coordenadas = geolocalizador.localizar(
+                        endereco_coleta, latitude_coleta, longitude_coleta
+                    )
+
                 solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
 
                 dispositivo = DispositivoFactory.criar_dispositivo(
@@ -369,6 +419,12 @@ def criar_app() -> Flask:
                 dados.atualizar_detalhes_coleta(
                     solicitacao.id, tipo_coleta, endereco_coleta, nome_contato, data_agendamento
                 )
+
+                if tipo_coleta == 'domiciliar':
+                    dados.atualizar_localizacao_coleta(
+                        solicitacao.id, coordenadas.latitude,
+                        coordenadas.longitude, 'navegador_ou_formulario'
+                    )
 
                 dados.salvar_notificacao(
                     usuario['id'],
@@ -483,6 +539,75 @@ def criar_app() -> Flask:
             plano_empresa=plano_empresa,
         )
 
+    def _dados_form_base():
+        return {
+            'nome': request.form.get('nome', '').strip(),
+            'endereco': request.form.get('endereco', '').strip(),
+            'latitude': request.form.get('latitude', '').strip(),
+            'longitude': request.form.get('longitude', '').strip(),
+            'raio_atendimento_km': request.form.get(
+                'raio_atendimento_km', ''
+            ).strip(),
+            'capacidade_kg': request.form.get('capacidade_kg', '').strip(),
+            'realiza_coleta_domiciliar': (
+                request.form.get('realiza_coleta_domiciliar') == 'on'
+            ),
+        }
+
+    @app.route('/empresa/bases', methods=['GET', 'POST'])
+    def empresa_bases():
+        if not usuario_logado():
+            return redirect(url_for('login'))
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            flash('Apenas empresas podem gerenciar bases operacionais.', 'error')
+            return redirect(url_for('dashboard'))
+
+        if request.method == 'POST':
+            try:
+                servico_base.criar(usuario['id'], _dados_form_base())
+                flash('Base operacional criada com sucesso.', 'success')
+                return redirect(url_for('empresa_bases'))
+            except (ValueError, TypeError) as exc:
+                flash(str(exc), 'error')
+
+        return render_template(
+            'empresa_bases.html', usuario=usuario,
+            bases=servico_base.listar_empresa(usuario['id'])
+        )
+
+    @app.route('/empresa/bases/<id_base>/editar', methods=['POST'])
+    def editar_base(id_base):
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            return jsonify({'erro': 'Acesso não autorizado'}), 403
+        try:
+            servico_base.atualizar(usuario['id'], id_base, _dados_form_base())
+            flash('Base operacional atualizada.', 'success')
+            return redirect(url_for('empresa_bases'))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except (ValueError, TypeError) as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('empresa_bases'))
+
+    @app.route('/empresa/bases/<id_base>/atividade', methods=['POST'])
+    def atividade_base(id_base):
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            return jsonify({'erro': 'Acesso não autorizado'}), 403
+        try:
+            servico_base.definir_atividade(
+                usuario['id'], id_base, request.form.get('ativa') == '1'
+            )
+            return redirect(url_for('empresa_bases'))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+
     @app.route('/solicitacao/<id_sol>/confirmar', methods=['POST'])
     def confirmar_solicitacao(id_sol):
         """AJAX: empresa confirma o recebimento da entrega."""
@@ -497,6 +622,9 @@ def criar_app() -> Flask:
         sol = next((s for s in todas if s.id == id_sol), None)
         if sol is None:
             return jsonify({'erro': 'Solicitação não encontrada'}), 404
+
+        if not usuario_pode_operar_solicitacao(usuario, sol, dados):
+            return jsonify({'erro': 'Acesso não autorizado a esta solicitação'}), 403
 
         if sol.estado.obter_nome() != 'Solicitado':
             return jsonify({'erro': 'Esta solicitação não está mais aguardando confirmação'}), 400
@@ -644,6 +772,10 @@ def criar_app() -> Flask:
 
         usuario = dados_usuario()
 
+        if usuario['tipo'] != 'cidadao':
+            flash('A carteira e os saques estão disponíveis apenas para cidadãos.', 'error')
+            return redirect(url_for('dashboard'))
+
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
         # pontos reais do banco, não recalculados
         cidadao_row = dados.buscar_cidadao(usuario['id'])
@@ -790,13 +922,9 @@ def criar_app() -> Flask:
         if usuario['tipo'] == 'administrador':
             solicitacoes_usuario = todas_solicitacoes
         elif usuario['tipo'] == 'empresa':
-            # empresa vê solicitações nos seus pontos de coleta
-            pontos_empresa = {p['id'] for p in dados.buscar_pontos_empresa(usuario['id'])}
-            solicitacoes_usuario = [
-                s for s in todas_solicitacoes
-                if (s.ponto_coleta and s.ponto_coleta.id in pontos_empresa)
-                or s.usuario.id == usuario['id']
-            ]
+            solicitacoes_usuario = listar_solicitacoes_visiveis_empresa(
+                usuario['id'], todas_solicitacoes, dados
+            )
         else:
             solicitacoes_usuario = [
                 s for s in todas_solicitacoes
@@ -847,16 +975,26 @@ def criar_app() -> Flask:
         if usuario['tipo'] not in ('empresa', 'administrador'):
             return jsonify({'erro': 'Acesso não autorizado'}), 403
 
-        # verifica limite de 30 sol/mês para empresas Free
+        # busca a solicitação
+        todas = servico_descarte.listar_solicitacoes()
+        sol = next((s for s in todas if s.id == id_sol), None)
+        if sol is None:
+            return jsonify({'erro': 'Solicitação não encontrada'}), 404
+
+        if not usuario_pode_operar_solicitacao(usuario, sol, dados):
+            return jsonify({'erro': 'Acesso não autorizado a esta solicitação'}), 403
+
+        # verifica o limite mensal somente dentro do escopo da empresa atual
         if usuario['tipo'] == 'empresa':
             plano = dados.buscar_plano_empresa(usuario['id'])
             if plano == 'free':
                 mes_atual = datetime.now().month
                 ano_atual = datetime.now().year
-                todas = servico_descarte.listar_solicitacoes()
-                # conta solicitações que a empresa avançou este mês (estado != Solicitado)
+                solicitacoes_empresa = listar_solicitacoes_visiveis_empresa(
+                    usuario['id'], todas, dados
+                )
                 processadas_mes = sum(
-                    1 for s in todas
+                    1 for s in solicitacoes_empresa
                     if s.estado.obter_nome() not in ('Solicitado', 'Cancelado')
                     and s._data_criacao.month == mes_atual
                     and s._data_criacao.year == ano_atual
@@ -866,12 +1004,6 @@ def criar_app() -> Flask:
                         'erro': 'Limite de 30 solicitações/mês atingido. Faça upgrade para o plano Professional.',
                         'upgrade': True
                     }), 403
-
-        # busca a solicitação
-        todas = servico_descarte.listar_solicitacoes()
-        sol = next((s for s in todas if s.id == id_sol), None)
-        if sol is None:
-            return jsonify({'erro': 'Solicitação não encontrada'}), 404
 
         if not sol.estado.pode_avancar():
             return jsonify({'erro': 'Esta solicitação já está em estado final'}), 400
@@ -996,10 +1128,15 @@ def criar_app() -> Flask:
         # busca todas as solicitacoes
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
         
-        """ administrador vê relatório geral, outros veem apenas suas solicitações """
+        """Administrador vê tudo; empresa usa o escopo operacional."""
         if usuario['tipo'] == 'administrador':
             solicitacoes_para_relatorio = todas_solicitacoes
             titulo_relatorio = "Relatório Geral do Sistema"
+        elif usuario['tipo'] == 'empresa':
+            solicitacoes_para_relatorio = listar_solicitacoes_visiveis_empresa(
+                usuario['id'], todas_solicitacoes, dados
+            )
+            titulo_relatorio = f"Relatório de {usuario['nome']}"
         else:
             solicitacoes_para_relatorio = [
                 s for s in todas_solicitacoes 
@@ -1070,7 +1207,9 @@ def criar_app() -> Flask:
         if usuario['tipo'] == 'administrador':
             solicitacoes = todas_solicitacoes
         else:
-            solicitacoes = [s for s in todas_solicitacoes if s.usuario.id == usuario['id']]
+            solicitacoes = listar_solicitacoes_visiveis_empresa(
+                usuario['id'], todas_solicitacoes, dados
+            )
 
         estados_finais = {'Reciclado', 'Reutilizado', 'Descartado'}
         finalizadas = [s for s in solicitacoes if s.estado.obter_nome() in estados_finais]
@@ -1119,6 +1258,10 @@ def criar_app() -> Flask:
         sol = next((s for s in todas if s.id == id_sol), None)
         if sol is None:
             flash('Solicitação não encontrada.', 'error')
+            return redirect(url_for('operacoes'))
+
+        if not usuario_pode_operar_solicitacao(usuario, sol, dados):
+            flash('Acesso não autorizado a esta solicitação.', 'error')
             return redirect(url_for('operacoes'))
 
         pdf_bytes = gerar_mtr(sol)
@@ -1201,6 +1344,10 @@ def criar_app() -> Flask:
 
         if usuario['tipo'] == 'administrador':
             lista = todas
+        elif usuario['tipo'] == 'empresa':
+            lista = listar_solicitacoes_visiveis_empresa(
+                usuario['id'], todas, dados
+            )
         else:
             lista = [s for s in todas if s.usuario.id == usuario['id']]
 

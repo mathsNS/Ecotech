@@ -65,6 +65,7 @@
                 </div>
 
                 <form method="POST" class="solicitation-form-new" novalidate>
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                     <!-- etapa 1: informações do dispositivo -->
                     <div class="step-content active" data-step-content="1">
                         <div class="form-section-new">
@@ -185,6 +186,20 @@
                             <input type="text" id="endereco_coleta" name="endereco_coleta" class="form-control-new"
                                    placeholder="Rua, número, bairro, cidade" required>
                         </div>
+
+                        <input type="hidden" id="latitude_coleta" name="latitude_coleta">
+                        <input type="hidden" id="longitude_coleta" name="longitude_coleta">
+                        <div class="form-grid-2" id="coordenadas-fallback">
+                            <div class="form-group-new">
+                                <label for="latitude_manual">Latitude <span class="required">*</span></label>
+                                <input type="number" step="any" id="latitude_manual" class="form-control-new" placeholder="Ex.: -7.2134">
+                            </div>
+                            <div class="form-group-new">
+                                <label for="longitude_manual">Longitude <span class="required">*</span></label>
+                                <input type="number" step="any" id="longitude_manual" class="form-control-new" placeholder="Ex.: -39.3153">
+                            </div>
+                        </div>
+                        <p id="status-localizacao" style="font-size:.85rem;color:#666;">Tentando obter sua localização pelo navegador…</p>
 
                         <div class="form-group-new">
                             <label for="ponto_referencia">Ponto de referência</label>
@@ -334,6 +349,34 @@ const requiredByStep = {
     2: tipoColeta === 'entrega_ponto' ? ['nome_contato'] : ['endereco_coleta'],
     3: ['data_coleta', 'horario_coleta']
 };
+
+if (tipoColeta === 'domiciliar') {
+    const lat = document.getElementById('latitude_coleta');
+    const lon = document.getElementById('longitude_coleta');
+    const latManual = document.getElementById('latitude_manual');
+    const lonManual = document.getElementById('longitude_manual');
+    const status = document.getElementById('status-localizacao');
+    const copiarManual = () => {
+        lat.value = latManual.value;
+        lon.value = lonManual.value;
+    };
+    latManual.addEventListener('input', copiarManual);
+    lonManual.addEventListener('input', copiarManual);
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                lat.value = pos.coords.latitude;
+                lon.value = pos.coords.longitude;
+                latManual.value = pos.coords.latitude.toFixed(6);
+                lonManual.value = pos.coords.longitude.toFixed(6);
+                status.textContent = 'Localização obtida. Você pode ajustar as coordenadas se necessário.';
+            },
+            () => { status.textContent = 'Não foi possível obter automaticamente. Informe as coordenadas.'; }
+        );
+    } else {
+        status.textContent = 'Geolocalização indisponível. Informe as coordenadas.';
+    }
+}
 
 function validarPasso(step) {
     const ids = requiredByStep[step] || [];

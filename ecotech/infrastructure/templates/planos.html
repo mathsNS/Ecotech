@@ -43,6 +43,7 @@
             <div class="plano-atual-label">Plano atual</div>
             {% else %}
             <form method="POST">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="plano" value="free">
                 <button type="submit" class="btn-plano btn-plano-secundario">Fazer downgrade</button>
             </form>
@@ -74,6 +75,7 @@
             <div class="plano-atual-label">Plano atual</div>
             {% else %}
             <form method="POST">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="plano" value="professional">
                 <button type="submit" class="btn-plano btn-plano-principal">
                     {% if plano_atual == 'free' %}Fazer upgrade{% else %}Fazer downgrade{% endif %}
@@ -106,6 +108,7 @@
             <div class="plano-atual-label">Plano atual</div>
             {% else %}
             <form method="POST">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="plano" value="enterprise">
                 <button type="submit" class="btn-plano btn-plano-principal">Fazer upgrade</button>
             </form>

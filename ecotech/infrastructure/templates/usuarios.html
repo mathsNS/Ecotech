@@ -177,7 +177,10 @@ document.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', function() {
         const id = this.dataset.id;
         if (!confirm('Tem certeza que deseja desativar este usuário?')) return;
-        fetch('/usuarios/' + id + '/desativar', {method: 'POST'})
+        fetch('/usuarios/' + id + '/desativar', {
+            method: 'POST',
+            headers: {'X-CSRF-Token': '{{ csrf_token() }}'}
+        })
             .then(r => r.json())
             .then(data => {
                 if (data.ok) {

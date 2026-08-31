@@ -85,6 +85,7 @@
             <div id="editar-perfil-form" style="display:none; margin-top:24px; border-top:1px solid var(--border-color); padding-top:20px;">
                 <h3 style="margin-bottom:16px;">Editar perfil</h3>
                 <form method="POST" action="{{ url_for('perfil_editar') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group" style="margin-bottom:12px;">
                         <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Nome</label>
                         <input type="text" name="nome" value="{{ usuario.nome }}" required

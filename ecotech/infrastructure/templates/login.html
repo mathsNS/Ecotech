@@ -19,6 +19,7 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('login') }}" id="login-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label>Tipo de conta</label>
                 <div class="radio-group">
