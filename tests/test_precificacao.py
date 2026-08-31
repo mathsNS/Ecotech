@@ -318,15 +318,18 @@ def test_registrar_receita_ecotech(dados, sol_no_banco):
     assert dados.buscar_receita_total_ecotech() == pytest.approx(72.0)
 
 
-def test_receita_ecotech_acumulativa(dados, sol_no_banco):
-    dados.registrar_receita_ecotech("sol-1", 72.0)
-    dados.registrar_receita_ecotech("sol-1", 45.0)
-    assert dados.buscar_receita_total_ecotech() == pytest.approx(117.0)
+def test_receita_ecotech_idempotente_por_solicitacao(dados, sol_no_banco):
+    assert dados.registrar_receita_ecotech("sol-1", 72.0) is True
+    assert dados.registrar_receita_ecotech("sol-1", 45.0) is False
+    assert dados.buscar_receita_total_ecotech() == pytest.approx(72.0)
 
 
 def test_historico_receita_ecotech_ordenado(dados, sol_no_banco):
     dados.registrar_receita_ecotech("sol-1", 72.0)
-    dados.registrar_receita_ecotech("sol-1", 18.0)
+    from ecotech.domain.descarte import SolicitacaoDescarte
+    segunda = SolicitacaoDescarte("sol-2", sol_no_banco.usuario, sol_no_banco.ponto_coleta)
+    dados.salvar_solicitacao(segunda)
+    dados.registrar_receita_ecotech("sol-2", 18.0)
     hist = dados.buscar_historico_receita_ecotech()
     assert len(hist) == 2
 

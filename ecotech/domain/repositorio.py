@@ -102,6 +102,23 @@ class RepositorioBase(ABC):
         """Atualiza a ocupação atual de um ponto de coleta."""
         ...
 
+    @abstractmethod
+    def salvar_base_operacional(self, base: Any) -> None: ...
+
+    @abstractmethod
+    def buscar_base_operacional(self, id_base: str) -> Optional[Any]: ...
+
+    @abstractmethod
+    def buscar_bases_empresa(self, id_empresa: str) -> List[Any]: ...
+
+    @abstractmethod
+    def atualizar_base_operacional(self, base: Any) -> None: ...
+
+    @abstractmethod
+    def definir_atividade_base(
+        self, id_base: str, id_empresa: str, ativa: bool
+    ) -> None: ...
+
     # --- Solicitações: salvar ---
 
     @abstractmethod
@@ -148,6 +165,12 @@ class RepositorioBase(ABC):
                                metodo_tratamento: Optional[str] = None) -> None:
         """Atualiza o estado (e opcionalmente o método de tratamento) de uma solicitação."""
         ...
+
+    @abstractmethod
+    def atualizar_localizacao_coleta(
+        self, id_solicitacao: str, latitude: float, longitude: float,
+        origem: str
+    ) -> None: ...
 
     # --- Notificações e Entregas ---
 

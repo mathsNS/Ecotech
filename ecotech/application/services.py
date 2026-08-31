@@ -44,6 +44,7 @@ from ..domain.descarte import (
 from ..domain.tratamento import MetodoTratamento
 from ..domain.relatorio import RelatorioAmbiental
 from ..domain.repositorio import RepositorioBase
+from ..domain.logistica import BaseOperacional
 
 
 class ServicoDescarte:
@@ -72,7 +73,11 @@ class ServicoDescarte:
         if not self._servico_usuario or not self._servico_ponto or not self._dados:
             return  # precisa dos servicos pra reconstruir
         
-        from .factories import DispositivoFactory, EstadoFactory
+        from .factories import (
+            DispositivoFactory,
+            EstadoFactory,
+            MetodoTratamentoFactory,
+        )
 
         solicitacoes_db = self._dados.buscar_todas_solicitacoes()
         
@@ -99,9 +104,30 @@ class ServicoDescarte:
                     except (ValueError, TypeError):
                         pass  # mantém data padrão se o formato for inválido
                 
-                # carrega metodo de tratamento e impacto evitado do banco
+                # reconstrói o método concreto de tratamento salvo no banco
                 if row['metodo_tratamento']:
+                    nome_metodo = row['metodo_tratamento'].strip().lower()
+                    mapa_metodos = {
+                        'reciclagem': 'reciclagem',
+                        'reuso': 'reuso',
+                        'descarte controlado': 'descarte',
+                    }
+                    tipo_metodo = mapa_metodos.get(nome_metodo)
+                    if tipo_metodo:
+                        solicitacao.metodo_tratamento = (
+                            MetodoTratamentoFactory.criar_metodo(tipo_metodo)
+                        )
                     solicitacao.metodo_tratamento_str = row['metodo_tratamento']
+
+                if row['data_agendamento']:
+                    for formato in ('%Y-%m-%d %H:%M', '%Y-%m-%d', '%d/%m/%Y %H:%M'):
+                        try:
+                            solicitacao._data_agendamento = datetime.strptime(
+                                row['data_agendamento'], formato
+                            )
+                            break
+                        except (ValueError, TypeError):
+                            continue
                 
                 # busca e adiciona os itens
                 itens_db = self._dados.buscar_itens_solicitacao(row['id'])
@@ -528,6 +554,82 @@ class ServicoPontoColeta:
     def buscar_ponto(self, id: str) -> Optional[PontoColeta]:
         """Busca um ponto de coleta pelo ID."""
         return self._pontos.get(id)
+
+
+class ServicoBaseOperacional:
+    """Gerencia bases operacionais pertencentes às empresas."""
+
+    def __init__(self, dados: RepositorioBase):
+        self._dados = dados
+
+    @staticmethod
+    def _de_row(row) -> BaseOperacional:
+        return BaseOperacional(
+            id=row['id'], empresa_id=row['empresa_id'], nome=row['nome'],
+            endereco=row['endereco'], latitude=row['latitude'],
+            longitude=row['longitude'],
+            raio_atendimento_km=row['raio_atendimento_km'],
+            capacidade_kg=row['capacidade_kg'],
+            ocupacao_atual_kg=row['ocupacao_atual_kg'],
+            realiza_coleta_domiciliar=bool(row['realiza_coleta_domiciliar']),
+            ativa=bool(row['ativa']), ponto_coleta_id=row['ponto_coleta_id'],
+        )
+
+    def criar(self, empresa_id: str, dados_base: Dict) -> BaseOperacional:
+        base = BaseOperacional(
+            id=dados_base.get('id') or str(uuid.uuid4()),
+            empresa_id=empresa_id, nome=dados_base['nome'],
+            endereco=dados_base['endereco'],
+            latitude=float(dados_base['latitude']),
+            longitude=float(dados_base['longitude']),
+            raio_atendimento_km=float(dados_base['raio_atendimento_km']),
+            capacidade_kg=float(dados_base['capacidade_kg']),
+            realiza_coleta_domiciliar=bool(
+                dados_base.get('realiza_coleta_domiciliar', True)
+            ),
+        )
+        self._dados.salvar_base_operacional(base)
+        return base
+
+    def listar_empresa(self, empresa_id: str) -> List[BaseOperacional]:
+        return [
+            self._de_row(row)
+            for row in self._dados.buscar_bases_empresa(empresa_id)
+        ]
+
+    def buscar(self, id_base: str) -> Optional[BaseOperacional]:
+        row = self._dados.buscar_base_operacional(id_base)
+        return self._de_row(row) if row else None
+
+    def atualizar(
+        self, empresa_id: str, id_base: str, dados_base: Dict
+    ) -> BaseOperacional:
+        atual = self.buscar(id_base)
+        if not atual or not atual.pertence_a(empresa_id):
+            raise PermissionError("base operacional não pertence à empresa")
+        base = BaseOperacional(
+            id=id_base, empresa_id=empresa_id,
+            nome=dados_base['nome'], endereco=dados_base['endereco'],
+            latitude=float(dados_base['latitude']),
+            longitude=float(dados_base['longitude']),
+            raio_atendimento_km=float(dados_base['raio_atendimento_km']),
+            capacidade_kg=float(dados_base['capacidade_kg']),
+            ocupacao_atual_kg=atual.ocupacao_atual_kg,
+            realiza_coleta_domiciliar=bool(
+                dados_base.get('realiza_coleta_domiciliar', False)
+            ),
+            ativa=atual.ativa, ponto_coleta_id=atual.ponto_coleta_id,
+        )
+        self._dados.atualizar_base_operacional(base)
+        return base
+
+    def definir_atividade(
+        self, empresa_id: str, id_base: str, ativa: bool
+    ) -> None:
+        atual = self.buscar(id_base)
+        if not atual or not atual.pertence_a(empresa_id):
+            raise PermissionError("base operacional não pertence à empresa")
+        self._dados.definir_atividade_base(id_base, empresa_id, ativa)
 
 
 class ServicoUsuario:

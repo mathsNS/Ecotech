@@ -5,6 +5,8 @@ from ...domain.usuarios import Cidadao, Empresa, Administrador
 from ...domain.dispositivos import Celular
 from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, RastreamentoEntrega
 from ...domain.repositorio import RepositorioBase
+from ...domain.logistica import BaseOperacional
+from .migrations import executar_migrations, versao_atual
 
 class Dados(RepositorioBase):
     """Implementação SQLite do RepositorioBase."""
@@ -14,6 +16,21 @@ class Dados(RepositorioBase):
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.criar_tabelas()
+
+    def _coluna_existe(self, tabela: str, coluna: str) -> bool:
+        return any(
+            row['name'] == coluna
+            for row in self.conn.execute(f"PRAGMA table_info({tabela})")
+        )
+
+    def _adicionar_coluna_se_ausente(
+        self, tabela: str, coluna: str, definicao: str
+    ) -> None:
+        """Aplica uma evolução legada de coluna sem ocultar erros do SQLite."""
+        if not self._coluna_existe(tabela, coluna):
+            self.conn.execute(
+                f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}"
+            )
 
     def criar_tabelas(self):
         c = self.conn.cursor()
@@ -31,11 +48,7 @@ class Dados(RepositorioBase):
         )
         """)
 
-        # Migração incremental: adiciona password_hash se a tabela já existia sem ela
-        try:
-            c.execute("ALTER TABLE usuario ADD COLUMN password_hash TEXT")
-        except Exception:
-            pass  # coluna já existe
+        self._adicionar_coluna_se_ausente('usuario', 'password_hash', 'TEXT')
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS cidadao (
@@ -88,12 +101,9 @@ class Dados(RepositorioBase):
             tipo TEXT DEFAULT 'celular'
         )
         """)
-        # migracao: adiciona coluna tipo se nao existir
-        try:
-            c.execute("ALTER TABLE dispositivo ADD COLUMN tipo TEXT DEFAULT 'celular'")
-            self.conn.commit()
-        except Exception:
-            pass  # coluna ja existe
+        self._adicionar_coluna_se_ausente(
+            'dispositivo', 'tipo', "TEXT DEFAULT 'celular'"
+        )
 
         # Tabela de Ponto de Coleta
         c.execute("""
@@ -108,26 +118,13 @@ class Dados(RepositorioBase):
             ocupacao_atual_kg REAL 
         )
         """)
-        # migracao incremental: adiciona id_empresa se nao existir
-        try:
-            c.execute("ALTER TABLE ponto_coleta ADD COLUMN id_empresa TEXT")
-            self.conn.commit()
-        except Exception:
-            pass  # coluna ja existe
-
-        # migracao incremental: adiciona plano na tabela empresa
-        try:
-            c.execute("ALTER TABLE empresa ADD COLUMN plano TEXT DEFAULT 'free'")
-            self.conn.commit()
-        except Exception:
-            pass  # coluna ja existe
-
-        # migracao: saldo financeiro da empresa
-        try:
-            c.execute("ALTER TABLE empresa ADD COLUMN saldo REAL DEFAULT 0.0")
-            self.conn.commit()
-        except Exception:
-            pass
+        self._adicionar_coluna_se_ausente('ponto_coleta', 'id_empresa', 'TEXT')
+        self._adicionar_coluna_se_ausente(
+            'empresa', 'plano', "TEXT DEFAULT 'free'"
+        )
+        self._adicionar_coluna_se_ausente(
+            'empresa', 'saldo', 'REAL DEFAULT 0.0'
+        )
 
         # Tabelas de Descarte
         c.execute("""
@@ -143,23 +140,20 @@ class Dados(RepositorioBase):
             FOREIGN KEY(id_ponto_coleta) REFERENCES ponto_coleta(id)
         )
         """)
-        # migracoes incrementais em solicitacao_descarte
-        for col in (
-            "ALTER TABLE solicitacao_descarte ADD COLUMN tipo_coleta TEXT DEFAULT 'domiciliar'",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN endereco_coleta TEXT",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN nome_contato TEXT",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_cidadao INTEGER DEFAULT 0",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN confirmado_empresa INTEGER DEFAULT 0",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN estado_produto TEXT",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN valor_proposto REAL",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN justificativa_valor TEXT",
-            "ALTER TABLE solicitacao_descarte ADD COLUMN status_override TEXT DEFAULT 'nenhum'",
+        for coluna, definicao in (
+            ('tipo_coleta', "TEXT DEFAULT 'domiciliar'"),
+            ('endereco_coleta', 'TEXT'),
+            ('nome_contato', 'TEXT'),
+            ('confirmado_cidadao', 'INTEGER DEFAULT 0'),
+            ('confirmado_empresa', 'INTEGER DEFAULT 0'),
+            ('estado_produto', 'TEXT'),
+            ('valor_proposto', 'REAL'),
+            ('justificativa_valor', 'TEXT'),
+            ('status_override', "TEXT DEFAULT 'nenhum'"),
         ):
-            try:
-                c.execute(col)
-                self.conn.commit()
-            except Exception:
-                pass
+            self._adicionar_coluna_se_ausente(
+                'solicitacao_descarte', coluna, definicao
+            )
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS item_descarte (
@@ -187,13 +181,15 @@ class Dados(RepositorioBase):
         c.execute("""
         CREATE TABLE IF NOT EXISTS entrega (
             id TEXT PRIMARY KEY,
+            id_solicitacao TEXT,
             id_usuario TEXT,
             valor REAL,
             empresa TEXT,
             data TEXT,
             hora TEXT,
             status TEXT,
-            FOREIGN KEY(id_usuario) REFERENCES usuario(id)
+            FOREIGN KEY(id_usuario) REFERENCES usuario(id),
+            FOREIGN KEY(id_solicitacao) REFERENCES solicitacao_descarte(id)
         )
         """)
 
@@ -211,12 +207,9 @@ class Dados(RepositorioBase):
         )
         """)
 
-        # migracao: subcategoria no dispositivo
-        try:
-            c.execute("ALTER TABLE dispositivo ADD COLUMN subcategoria TEXT DEFAULT 'smartphone_medio'")
-            self.conn.commit()
-        except Exception:
-            pass
+        self._adicionar_coluna_se_ausente(
+            'dispositivo', 'subcategoria', "TEXT DEFAULT 'smartphone_medio'"
+        )
 
         # tabela de precificacao por subcategoria
         c.execute("""
@@ -266,6 +259,7 @@ class Dados(RepositorioBase):
         """)
 
         self.conn.commit()
+        executar_migrations(self.conn)
 
     # -------------------
     # SALVAR
@@ -416,6 +410,23 @@ class Dados(RepositorioBase):
              WHERE id = ?
             """, (estado, metodo_tratamento, id_solicitacao))
 
+    def atualizar_localizacao_coleta(
+        self, id_solicitacao: str, latitude: float, longitude: float,
+        origem: str
+    ) -> None:
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET latitude_coleta = ?, longitude_coleta = ?,
+                    localizacao_obtida_em = ?, origem_localizacao = ?
+                WHERE id = ? AND tipo_coleta = 'domiciliar'
+            """, (
+                latitude, longitude, datetime.now().isoformat(timespec='seconds'),
+                origem, id_solicitacao,
+            ))
+        if cursor.rowcount != 1:
+            raise ValueError("solicitação domiciliar não encontrada")
+
     def atualizar_ocupacao_ponto(self, id_ponto: str, ocupacao_atual_kg: float) -> None:
         """Atualiza a ocupação atual de um ponto de coleta."""
         with self.conn:
@@ -423,6 +434,69 @@ class Dados(RepositorioBase):
                 "UPDATE ponto_coleta SET ocupacao_atual_kg = ? WHERE id = ?",
                 (ocupacao_atual_kg, id_ponto)
             )
+
+    def salvar_base_operacional(self, base: BaseOperacional) -> None:
+        agora = datetime.now().isoformat(timespec='seconds')
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO base_operacional (
+                    id, empresa_id, ponto_coleta_id, nome, endereco,
+                    latitude, longitude, raio_atendimento_km,
+                    capacidade_kg, ocupacao_atual_kg,
+                    realiza_coleta_domiciliar, ativa, criada_em, atualizada_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                base.id, base.empresa_id, base.ponto_coleta_id,
+                base.nome, base.endereco, base.latitude, base.longitude,
+                base.raio_atendimento_km, base.capacidade_kg,
+                base.ocupacao_atual_kg,
+                int(base.realiza_coleta_domiciliar), int(base.ativa),
+                agora, agora,
+            ))
+
+    def buscar_base_operacional(self, id_base: str):
+        return self.conn.execute(
+            "SELECT * FROM base_operacional WHERE id = ?", (id_base,)
+        ).fetchone()
+
+    def buscar_bases_empresa(self, id_empresa: str):
+        return self.conn.execute("""
+            SELECT * FROM base_operacional
+            WHERE empresa_id = ? ORDER BY ativa DESC, nome
+        """, (id_empresa,)).fetchall()
+
+    def atualizar_base_operacional(self, base: BaseOperacional) -> None:
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE base_operacional
+                SET nome = ?, endereco = ?, latitude = ?, longitude = ?,
+                    raio_atendimento_km = ?, capacidade_kg = ?,
+                    ocupacao_atual_kg = ?, realiza_coleta_domiciliar = ?,
+                    atualizada_em = ?
+                WHERE id = ? AND empresa_id = ?
+            """, (
+                base.nome, base.endereco, base.latitude, base.longitude,
+                base.raio_atendimento_km, base.capacidade_kg,
+                base.ocupacao_atual_kg, int(base.realiza_coleta_domiciliar),
+                datetime.now().isoformat(timespec='seconds'),
+                base.id, base.empresa_id,
+            ))
+        if cursor.rowcount != 1:
+            raise ValueError("base operacional não encontrada para esta empresa")
+
+    def definir_atividade_base(
+        self, id_base: str, id_empresa: str, ativa: bool
+    ) -> None:
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE base_operacional SET ativa = ?, atualizada_em = ?
+                WHERE id = ? AND empresa_id = ?
+            """, (
+                int(ativa), datetime.now().isoformat(timespec='seconds'),
+                id_base, id_empresa,
+            ))
+        if cursor.rowcount != 1:
+            raise ValueError("base operacional não encontrada para esta empresa")
 
     # -------------------
     # DESATIVAR (soft-delete)
@@ -627,27 +701,18 @@ class Dados(RepositorioBase):
                 "UPDATE ponto_coleta SET id_empresa = ? WHERE id = ?",
                 (id_empresa, id_ponto)
             )
-
-    def buscar_pontos_para_selecao(self):
-        """Retorna pontos de coleta enriquecidos com nome da empresa."""
-        c = self.conn.cursor()
-        c.execute("""
-            SELECT pc.id, pc.nome, pc.endereco, pc.id_empresa,
-                   COALESCE(u.nome, '') as nome_empresa
-            FROM ponto_coleta pc
-            LEFT JOIN usuario u ON pc.id_empresa = u.id
-            WHERE pc.ativo = 1
-            ORDER BY pc.id_empresa IS NULL, pc.nome
-        """)
-        return [dict(row) for row in c.fetchall()]
-
-    def vincular_empresa_a_ponto(self, id_ponto: str, id_empresa: str) -> None:
-        """Associa uma empresa a um ponto de coleta."""
-        with self.conn:
-            self.conn.execute(
-                "UPDATE ponto_coleta SET id_empresa = ? WHERE id = ?",
-                (id_empresa, id_ponto)
-            )
+            self.conn.execute("""
+                INSERT OR IGNORE INTO base_operacional (
+                    id, empresa_id, ponto_coleta_id, nome, endereco,
+                    latitude, longitude, raio_atendimento_km,
+                    capacidade_kg, ocupacao_atual_kg,
+                    realiza_coleta_domiciliar, ativa, criada_em, atualizada_em
+                )
+                SELECT 'base-' || id, ?, id, nome, endereco,
+                       latitude, longitude, 25.0, capacidade_kg,
+                       ocupacao_atual_kg, 1, ativo, datetime('now'), datetime('now')
+                FROM ponto_coleta WHERE id = ?
+            """, (id_empresa, id_ponto))
 
     def buscar_pontos_para_selecao(self):
         """Retorna apenas pontos vinculados a empresas para o select do formulario."""
@@ -760,10 +825,11 @@ class Dados(RepositorioBase):
         now = datetime.now()
         with self.conn:
             self.conn.execute("""
-                INSERT OR IGNORE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO entrega
+                    (id, id_solicitacao, id_usuario, valor, empresa, data, hora, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                id_entrega, id_usuario, round(valor, 2), nome_empresa,
+                id_entrega, id_sol, id_usuario, round(valor, 2), nome_empresa,
                 now.strftime('%d/%m/%Y'), now.strftime('%H:%M'), 'finalizado'
             ))
         return id_entrega
@@ -861,15 +927,17 @@ class Dados(RepositorioBase):
         row = c.fetchone()
         return float(row['saldo']) if row and row['saldo'] is not None else 0.0
 
-    def registrar_receita_ecotech(self, id_sol: str, valor: float):
-        """Registra uma entrada de receita para a EcoTech."""
+    def registrar_receita_ecotech(self, id_sol: str, valor: float) -> bool:
+        """Registra uma única receita por solicitação e informa se foi criada."""
         import uuid
         c = self.conn.cursor()
         c.execute(
-            "INSERT INTO receita_ecotech (id, id_solicitacao, valor, data) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO receita_ecotech "
+            "(id, id_solicitacao, valor, data) VALUES (?, ?, ?, ?)",
             (str(uuid.uuid4()), id_sol, valor, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         )
         self.conn.commit()
+        return c.rowcount == 1
 
     def buscar_receita_total_ecotech(self) -> float:
         """Retorna a receita total acumulada da EcoTech."""
@@ -891,3 +959,7 @@ class Dados(RepositorioBase):
             (valor_base, valor_minimo, subcategoria)
         )
         self.conn.commit()
+
+    def buscar_versao_schema(self) -> int:
+        """Retorna a versão mais recente aplicada ao schema."""
+        return versao_atual(self.conn)
