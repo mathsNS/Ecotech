@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, time
+from enum import Enum
 from typing import FrozenSet, Tuple
 
 
@@ -40,6 +41,36 @@ class JanelaAtendimento:
             instante.weekday() == self.dia_semana
             and self.inicio <= instante.time() < self.fim
         )
+
+
+class StatusOferta(str, Enum):
+    AGUARDANDO = 'AGUARDANDO'
+    ATIVA = 'ATIVA'
+    ACEITA = 'ACEITA'
+    RECUSADA = 'RECUSADA'
+    EXPIRADA = 'EXPIRADA'
+    CANCELADA = 'CANCELADA'
+
+
+@dataclass(frozen=True)
+class OfertaColeta:
+    id: str
+    solicitacao_id: str
+    empresa_id: str
+    base_operacional_id: str
+    distancia_km: float
+    score_prioridade: float
+    prioridade: int
+    rodada: int
+    status: StatusOferta = StatusOferta.AGUARDANDO
+    snapshot_fatores: dict | None = None
+
+    def __post_init__(self):
+        if not all((self.id, self.solicitacao_id, self.empresa_id,
+                    self.base_operacional_id)):
+            raise ValueError("oferta deve possuir identificadores")
+        if self.distancia_km < 0 or self.prioridade < 1 or self.rodada < 1:
+            raise ValueError("distância, prioridade ou rodada inválida")
 
 
 class BaseOperacional:

@@ -193,9 +193,33 @@ class RepositorioBase(ABC):
     # --- Notificações e Entregas ---
 
     @abstractmethod
-    def salvar_notificacao(self, id_usuario: str, mensagem: str) -> None:
+    def salvar_notificacao(
+        self, id_usuario: str, mensagem: str,
+        chave_idempotencia: Optional[str] = None
+    ) -> None:
         """Persiste uma notificação para um usuário."""
         ...
+
+    @abstractmethod
+    def salvar_ofertas_coleta(self, ofertas: List[Any], criada_em: str) -> None: ...
+
+    @abstractmethod
+    def ativar_proxima_rodada_ofertas(
+        self, solicitacao_id: str, ativada_em: str, expira_em: str
+    ) -> List[Any]: ...
+
+    @abstractmethod
+    def expirar_ofertas_vencidas(
+        self, agora: str, proxima_expiracao: str
+    ) -> List[Any]: ...
+
+    @abstractmethod
+    def buscar_ofertas_solicitacao(self, solicitacao_id: str) -> List[Any]: ...
+
+    @abstractmethod
+    def marcar_despacho_esgotado(
+        self, solicitacao_id: str, agora: str
+    ) -> None: ...
 
     @abstractmethod
     def buscar_notificacoes_usuario(self, id_usuario: str) -> List[Any]:

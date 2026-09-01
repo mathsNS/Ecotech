@@ -14,6 +14,7 @@ class DemandaColeta:
     categorias: frozenset[str]
     peso_kg: float
     agendada_para: datetime
+    regiao: str = ''
 
     def __post_init__(self):
         object.__setattr__(

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime
 from werkzeug.security import generate_password_hash
@@ -300,13 +301,22 @@ class Dados(RepositorioBase):
                 "INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)",
                 (administrador.id, administrador.nivel)
             )
-    def salvar_notificacao(self, id_usuario, mensagem):
+    def salvar_notificacao(self, id_usuario, mensagem, chave_idempotencia=None):
         timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        with self.conn:
-            self.conn.execute("""
-            INSERT INTO notificacao (id_usuario, timestamp, mensagem)
-            VALUES (?, ?, ?)
-            """, (id_usuario, timestamp, mensagem))
+        try:
+            with self.conn:
+                self.conn.execute("""
+                INSERT INTO notificacao (
+                    id_usuario, timestamp, mensagem, chave_idempotencia
+                ) VALUES (?, ?, ?, ?)
+                """, (id_usuario, timestamp, mensagem, chave_idempotencia))
+        except sqlite3.IntegrityError:
+            if chave_idempotencia and self.conn.execute(
+                "SELECT 1 FROM notificacao WHERE chave_idempotencia = ?",
+                (chave_idempotencia,),
+            ).fetchone():
+                return
+            raise
 
     def salvar_dispositivo(self, dispositivo):
         with self.conn:
@@ -584,6 +594,110 @@ class Dados(RepositorioBase):
             GROUP BY b.id
             ORDER BY b.id
         """).fetchall()
+
+    def salvar_ofertas_coleta(self, ofertas, criada_em: str) -> None:
+        if not ofertas:
+            return
+        solicitacao_id = ofertas[0].solicitacao_id
+        with self.conn:
+            self.conn.executemany("""
+                INSERT OR IGNORE INTO oferta_coleta (
+                    id, solicitacao_id, empresa_id, base_operacional_id,
+                    distancia_km, score_prioridade, prioridade, rodada,
+                    status, snapshot_fatores, criada_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [(
+                oferta.id, oferta.solicitacao_id, oferta.empresa_id,
+                oferta.base_operacional_id, oferta.distancia_km,
+                oferta.score_prioridade, oferta.prioridade, oferta.rodada,
+                oferta.status.value, json.dumps(
+                    oferta.snapshot_fatores or {}, sort_keys=True
+                ), criada_em,
+            ) for oferta in ofertas])
+            self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET estado = 'BUSCANDO_EMPRESA', despacho_esgotado_em = NULL
+                WHERE id = ? AND tipo_coleta = 'domiciliar'
+            """, (solicitacao_id,))
+
+    def _ativar_proxima_rodada(
+        self, solicitacao_id: str, ativada_em: str, expira_em: str
+    ):
+        cursor = self.conn.execute("""
+            UPDATE oferta_coleta
+            SET status = 'ATIVA', enviada_em = ?, ativada_em = ?, expira_em = ?
+            WHERE solicitacao_id = ? AND status = 'AGUARDANDO'
+              AND rodada = (
+                  SELECT MIN(rodada) FROM oferta_coleta
+                  WHERE solicitacao_id = ? AND status = 'AGUARDANDO'
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM oferta_coleta
+                  WHERE solicitacao_id = ? AND status IN ('ATIVA', 'ACEITA')
+              )
+        """, (
+            ativada_em, ativada_em, expira_em, solicitacao_id,
+            solicitacao_id, solicitacao_id,
+        ))
+        if cursor.rowcount:
+            return self.conn.execute("""
+                SELECT * FROM oferta_coleta
+                WHERE solicitacao_id = ? AND status = 'ATIVA'
+                  AND ativada_em = ? ORDER BY prioridade
+            """, (solicitacao_id, ativada_em)).fetchall()
+        pendente = self.conn.execute("""
+            SELECT 1 FROM oferta_coleta
+            WHERE solicitacao_id = ?
+              AND status IN ('AGUARDANDO', 'ATIVA', 'ACEITA') LIMIT 1
+        """, (solicitacao_id,)).fetchone()
+        if not pendente:
+            self.conn.execute("""
+                UPDATE solicitacao_descarte SET despacho_esgotado_em = ?
+                WHERE id = ? AND estado = 'BUSCANDO_EMPRESA'
+            """, (ativada_em, solicitacao_id))
+        return []
+
+    def ativar_proxima_rodada_ofertas(
+        self, solicitacao_id: str, ativada_em: str, expira_em: str
+    ):
+        with self.conn:
+            return self._ativar_proxima_rodada(
+                solicitacao_id, ativada_em, expira_em
+            )
+
+    def expirar_ofertas_vencidas(self, agora: str, proxima_expiracao: str):
+        with self.conn:
+            solicitacoes = [row['solicitacao_id'] for row in self.conn.execute("""
+                SELECT DISTINCT solicitacao_id FROM oferta_coleta
+                WHERE status = 'ATIVA' AND expira_em <= ?
+            """, (agora,)).fetchall()]
+            if not solicitacoes:
+                return []
+            self.conn.execute("""
+                UPDATE oferta_coleta
+                SET status = 'EXPIRADA', respondida_em = ?
+                WHERE status = 'ATIVA' AND expira_em <= ?
+            """, (agora, agora))
+            ativadas = []
+            for solicitacao_id in solicitacoes:
+                ativadas.extend(self._ativar_proxima_rodada(
+                    solicitacao_id, agora, proxima_expiracao
+                ))
+            return ativadas
+
+    def buscar_ofertas_solicitacao(self, solicitacao_id: str):
+        return self.conn.execute("""
+            SELECT * FROM oferta_coleta WHERE solicitacao_id = ?
+            ORDER BY prioridade
+        """, (solicitacao_id,)).fetchall()
+
+    def marcar_despacho_esgotado(self, solicitacao_id: str, agora: str) -> None:
+        with self.conn:
+            self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET estado = 'BUSCANDO_EMPRESA', despacho_esgotado_em = ?
+                WHERE id = ? AND tipo_coleta = 'domiciliar'
+            """, (agora, solicitacao_id))
 
     # -------------------
     # DESATIVAR (soft-delete)
