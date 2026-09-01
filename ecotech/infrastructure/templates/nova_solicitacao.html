@@ -259,6 +259,10 @@
                                 <label for="horario_coleta">Horário aproximado <span class="required">*</span></label>
                                 <input type="time" id="horario_coleta" name="horario_coleta" class="form-control-new" required>
                             </div>
+                            <div class="form-group-new">
+                                <label for="horario_fim">Disponível até <span class="required">*</span></label>
+                                <input type="time" id="horario_fim" name="horario_fim" class="form-control-new" required>
+                            </div>
                         </div>
 
                         <div class="schedule-info">
@@ -347,7 +351,7 @@ const totalSteps = 3;
 const requiredByStep = {
     1: ['nome', 'peso_kg', 'quantidade'],
     2: tipoColeta === 'entrega_ponto' ? ['nome_contato'] : ['endereco_coleta'],
-    3: ['data_coleta', 'horario_coleta']
+    3: ['data_coleta', 'horario_coleta', 'horario_fim']
 };
 
 if (tipoColeta === 'domiciliar') {

@@ -29,6 +29,7 @@ from ..application.services import (
 from ..application.geolocalizacao import GeolocalizadorCoordenadasInformadas
 from ..application.despacho import ConfiguracaoDespacho, ServicoDespacho
 from ..application.elegibilidade import DemandaColeta
+from ..application.agendamento import ServicoAgendamento
 from ..application.factories import (
     DispositivoFactory,
     MetodoTratamentoFactory
@@ -82,6 +83,7 @@ def criar_app() -> Flask:
             ),
         ),
     )
+    servico_agendamento = ServicoAgendamento(dados)
     geolocalizador = GeolocalizadorCoordenadasInformadas()
     
     # configura dependencias entre servicos
@@ -447,6 +449,14 @@ def criar_app() -> Flask:
                     agendada_para = datetime.strptime(
                         data_agendamento, '%Y-%m-%d %H:%M'
                     ) if data_agendamento else datetime.now()
+                    fim_informado = request.form.get('horario_fim', '').strip()
+                    janela_fim = (
+                        datetime.strptime(f'{data_coleta} {fim_informado}', '%Y-%m-%d %H:%M')
+                        if data_coleta and fim_informado else agendada_para + timedelta(hours=2)
+                    )
+                    servico_agendamento.solicitar(
+                        solicitacao.id, usuario['id'], agendada_para, janela_fim
+                    )
                     servico_despacho.criar_ofertas(
                         solicitacao.id,
                         DemandaColeta(
@@ -725,6 +735,36 @@ def criar_app() -> Flask:
         if usuario['tipo'] != 'empresa':
             return jsonify({'erro': 'Acesso não autorizado'}), 403
         return jsonify({'ofertas': servico_despacho.listar_ofertas_ativas(usuario['id'])})
+
+    def _instante_form(nome):
+        return datetime.fromisoformat(request.form.get(nome, ''))
+
+    @app.route('/agendamentos/<id_sol>/propor', methods=['POST'])
+    def propor_agendamento(id_sol):
+        if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
+        try:
+            row=servico_agendamento.propor(id_sol,session['user_id'],_instante_form('inicio'),_instante_form('fim'))
+            return jsonify({'ok':True,'status':row['status']})
+        except PermissionError as exc: return jsonify({'erro':str(exc)}),403
+        except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
+
+    @app.route('/agendamentos/<id_sol>/aceitar', methods=['POST'])
+    def aceitar_agendamento(id_sol):
+        if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
+        try:
+            row=servico_agendamento.aceitar(id_sol,session['user_id'])
+            return jsonify({'ok':True,'status':row['status'],'inicio':row['inicio_confirmado'],'fim':row['fim_confirmado']})
+        except PermissionError as exc: return jsonify({'erro':str(exc)}),403
+        except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
+
+    @app.route('/agendamentos/<id_sol>/rejeitar', methods=['POST'])
+    def rejeitar_agendamento(id_sol):
+        if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
+        try:
+            row=servico_agendamento.rejeitar(id_sol,session['user_id'])
+            return jsonify({'ok':True,'status':row['status']})
+        except PermissionError as exc: return jsonify({'erro':str(exc)}),403
+        except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
 
     @app.route('/ofertas/<oferta_id>/aceitar', methods=['POST'])
     def aceitar_oferta(oferta_id):
