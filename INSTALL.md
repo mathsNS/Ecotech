@@ -44,6 +44,42 @@ A aplicação estará disponível em **http://localhost:5000**.
 .\.venv\Scripts\python.exe -m pytest tests/ --cov=ecotech   # com cobertura
 ```
 
+## Configuração de segurança
+
+Defina uma chave secreta própria antes de executar a aplicação em um ambiente
+persistente ou compartilhado:
+
+```powershell
+$env:ECOTECH_SECRET_KEY = "uma-chave-longa-aleatoria-e-privada"
+python run.py
+```
+
+Quando a variável não é informada, a aplicação gera uma chave efêmera aleatória.
+Isso é adequado apenas para desenvolvimento local, pois invalida as sessões após
+cada reinício do processo.
+
+## Migrations do banco
+
+O schema SQLite é atualizado automaticamente na inicialização por migrations
+versionadas em `ecotech/infrastructure/persistence/migrations/`. As versões
+aplicadas ficam registradas na tabela `schema_migration`.
+
+Antes de atualizar um ambiente persistente, faça uma cópia de segurança de
+`ecotech.db`. A migration interrompe a inicialização com uma mensagem explícita
+se encontrar emails, CPFs, CNPJs ou lançamentos financeiros duplicados que
+impeçam a aplicação das novas constraints; o banco não deve ser apagado para
+contornar esse erro.
+
+### Localização de coletas domiciliares
+
+Coletas domiciliares exigem latitude e longitude válidas. A interface tenta
+obtê-las pela API de geolocalização do navegador e permite correção manual. O
+navegador normalmente exige HTTPS ou `localhost` para liberar essa API.
+
+Empresas podem administrar suas bases em `/empresa/bases`. Os pontos
+empresariais existentes são convertidos em bases iniciais pela migration v3,
+com raio padrão de 25 km, sem remover ou alterar o ponto original.
+
 ---
 
 ## Contas de Acesso (pré-cadastradas no seed)
