@@ -716,7 +716,42 @@ class Dados(RepositorioBase):
         resumo=self.conn.execute("""SELECT status,COUNT(*) total FROM oferta_coleta GROUP BY status ORDER BY status""").fetchall()
         pendentes=self.conn.execute("""SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY data_criacao DESC LIMIT 100""").fetchall()
         atribuicoes=self.conn.execute("""SELECT sd.id,sd.empresa_responsavel_id,sd.atribuida_em,COUNT(o.id) total_ofertas,MAX(o.rodada) rodadas FROM solicitacao_descarte sd LEFT JOIN oferta_coleta o ON o.solicitacao_id=sd.id WHERE sd.empresa_responsavel_id IS NOT NULL GROUP BY sd.id ORDER BY sd.atribuida_em DESC LIMIT 100""").fetchall()
-        return {'resumo':resumo,'pendentes':pendentes,'atribuicoes':atribuicoes}
+        metricas=self.conn.execute("""SELECT
+          COUNT(DISTINCT CASE WHEN o.status='ACEITA' THEN o.solicitacao_id END) aceitas,
+          COUNT(DISTINCT o.solicitacao_id) solicitacoes_ofertadas,
+          AVG(CASE WHEN o.status='ACEITA' THEN (julianday(o.respondida_em)-julianday(o.criada_em))*1440 END) minutos_ate_aceite,
+          AVG(o.rodada) media_rodadas,
+          AVG((julianday(primeira.criada_em)-julianday(sd.data_criacao))*1440) minutos_ate_primeira_oferta,
+          100.0*SUM(CASE WHEN o.status='ACEITA' THEN 1 ELSE 0 END)/NULLIF(SUM(CASE WHEN o.status IN ('ACEITA','RECUSADA') THEN 1 ELSE 0 END),0) taxa_aceite,
+          100.0*SUM(CASE WHEN o.status='RECUSADA' THEN 1 ELSE 0 END)/NULLIF(SUM(CASE WHEN o.status IN ('ACEITA','RECUSADA') THEN 1 ELSE 0 END),0) taxa_recusa
+          FROM oferta_coleta o
+          JOIN solicitacao_descarte sd ON sd.id=o.solicitacao_id
+          JOIN (SELECT solicitacao_id,MIN(criada_em) criada_em FROM oferta_coleta GROUP BY solicitacao_id) primeira
+            ON primeira.solicitacao_id=o.solicitacao_id""").fetchone()
+        eventos=self.conn.execute("""SELECT
+          SUM(CASE WHEN tipo='CONFLITO_ACEITE' THEN 1 ELSE 0 END) conflitos,
+          SUM(CASE WHEN tipo='SEM_EMPRESA_ELEGIVEL' THEN 1 ELSE 0 END) sem_empresa,
+          SUM(CASE WHEN tipo='FALHA_GEOCODIFICACAO' THEN 1 ELSE 0 END) falhas_geocodificacao
+          FROM evento_operacional""").fetchone()
+        tempo_agendamento=self.conn.execute("""SELECT AVG(
+          (julianday(e.criado_em)-julianday(sd.atribuida_em))*1440
+          ) minutos_atribuicao_ate_agendamento
+          FROM evento_operacional e JOIN solicitacao_descarte sd
+            ON sd.id=e.solicitacao_id
+          WHERE e.tipo='AGENDAMENTO_CONFIRMADO'""").fetchone()
+        return {'resumo':resumo,'pendentes':pendentes,'atribuicoes':atribuicoes,
+                'metricas':metricas,'eventos':eventos,
+                'tempo_agendamento':tempo_agendamento}
+
+    def registrar_evento_operacional(self, tipo, solicitacao_id=None,
+                                     oferta_id=None, detalhes=None, agora=None):
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO evento_operacional(tipo,solicitacao_id,oferta_id,detalhes,criado_em) VALUES(?,?,?,?,?)",
+                (tipo, solicitacao_id, oferta_id,
+                 json.dumps(detalhes or {}, sort_keys=True),
+                 agora or datetime.now().isoformat(timespec='seconds')),
+            )
 
     def aceitar_oferta_coleta(
         self, oferta_id: str, empresa_id: str, agora: str
@@ -797,6 +832,8 @@ class Dados(RepositorioBase):
             self.conn.execute("""INSERT OR IGNORE INTO conversa_solicitacao
                 (id,solicitacao_id,cidadao_id,empresa_id,criada_em)
                 VALUES(?,?,?,?,?)""",(str(uuid.uuid4()),oferta['solicitacao_id'],oferta['id_usuario'],empresa_id,agora))
+            self.conn.execute("INSERT INTO evento_operacional(tipo,solicitacao_id,oferta_id,detalhes,criado_em) VALUES('OFERTA_ACEITA',?,?,?,?)",
+                (oferta['solicitacao_id'],oferta_id,json.dumps({'empresa_id':empresa_id,'base_id':oferta['base_operacional_id']},sort_keys=True),agora))
             self.conn.commit()
             return self.conn.execute("""
                 SELECT o.*, sd.endereco_coleta, sd.nome_contato,
@@ -866,6 +903,8 @@ class Dados(RepositorioBase):
             self.conn.execute("UPDATE solicitacao_descarte SET data_agendamento=? WHERE id=?",(inicio,solicitacao_id))
             self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'ACEITA',?,?,?)",(solicitacao_id,usuario_id,inicio,fim,agora))
             self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Horário da coleta confirmado.',f'agenda:{solicitacao_id}:aceita',agora)
+            self.conn.execute("INSERT INTO evento_operacional(tipo,solicitacao_id,detalhes,criado_em) VALUES('AGENDAMENTO_CONFIRMADO',?,?,?)",
+                (solicitacao_id,json.dumps({'inicio':inicio,'fim':fim},sort_keys=True),agora))
         return self.buscar_agendamento(solicitacao_id)
 
     def rejeitar_agendamento(self, solicitacao_id, usuario_id, agora):

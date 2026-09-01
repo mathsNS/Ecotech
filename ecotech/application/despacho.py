@@ -86,12 +86,22 @@ class ServicoDespacho:
             self._dados.marcar_despacho_esgotado(
                 solicitacao_id, self._iso(agora)
             )
+            self._dados.registrar_evento_operacional(
+                'SEM_EMPRESA_ELEGIVEL', solicitacao_id,
+                detalhes={'categorias': sorted(demanda.categorias)},
+                agora=self._iso(agora),
+            )
             return []
         self._dados.salvar_ofertas_coleta(ofertas, self._iso(agora))
         ativas = self._dados.ativar_proxima_rodada_ofertas(
             solicitacao_id, self._iso(agora), self._iso(self._expiracao(agora))
         )
         self._notificar_ativas(ativas)
+        self._dados.registrar_evento_operacional(
+            'OFERTAS_CRIADAS', solicitacao_id,
+            detalhes={'total': len(ofertas), 'ativas': len(ativas)},
+            agora=self._iso(agora),
+        )
         return ativas
 
     def processar_ofertas_expiradas(self, agora: datetime | None = None):
@@ -100,6 +110,11 @@ class ServicoDespacho:
             self._iso(agora), self._iso(self._expiracao(agora))
         )
         self._notificar_ativas(ativas)
+        for oferta in ativas:
+            self._dados.registrar_evento_operacional(
+                'RODADA_ATIVADA', oferta['solicitacao_id'], oferta['id'],
+                {'rodada': oferta['rodada']}, self._iso(agora),
+            )
         return ativas
 
     def aceitar(
@@ -107,9 +122,16 @@ class ServicoDespacho:
         agora: datetime | None = None,
     ):
         agora = agora or datetime.now()
-        return self._dados.aceitar_oferta_coleta(
-            oferta_id, empresa_id, self._iso(agora)
-        )
+        try:
+            return self._dados.aceitar_oferta_coleta(
+                oferta_id, empresa_id, self._iso(agora)
+            )
+        except RuntimeError:
+            self._dados.registrar_evento_operacional(
+                'CONFLITO_ACEITE', oferta_id=oferta_id,
+                detalhes={'empresa_id': empresa_id}, agora=self._iso(agora),
+            )
+            raise
 
     def recusar(self,oferta_id,empresa_id,motivo='',agora=None):
         agora=agora or datetime.now()

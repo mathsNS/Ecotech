@@ -428,9 +428,16 @@ def criar_app() -> Flask:
 
                 coordenadas = None
                 if tipo_coleta == 'domiciliar':
-                    coordenadas = geolocalizador.localizar(
-                        endereco_coleta, latitude_coleta, longitude_coleta
-                    )
+                    try:
+                        coordenadas = geolocalizador.localizar(
+                            endereco_coleta, latitude_coleta, longitude_coleta
+                        )
+                    except ValueError:
+                        dados.registrar_evento_operacional(
+                            'FALHA_GEOCODIFICACAO',
+                            detalhes={'origem': 'nova_solicitacao'},
+                        )
+                        raise
 
                 solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
 

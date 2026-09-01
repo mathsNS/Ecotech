@@ -1,5 +1,18 @@
 {% extends "base.html" %}{% block title %}Diagnóstico de despacho{% endblock %}
 {% block content %}<div class="container" style="padding:24px"><h1>Diagnóstico de despacho</h1><p>Painel somente leitura.</p>
+<div class="stats-grid">
+<div class="stat-card"><strong>{{ diagnostico.metricas.solicitacoes_ofertadas or 0 }}</strong><span>Solicitações ofertadas</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.aceitas or 0 }}</strong><span>Aceitas</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.minutos_ate_primeira_oferta|round(1) if diagnostico.metricas.minutos_ate_primeira_oferta else 0 }}</strong><span>Minutos até primeira oferta</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.minutos_ate_aceite|round(1) if diagnostico.metricas.minutos_ate_aceite else 0 }}</strong><span>Minutos até aceite</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.media_rodadas|round(1) if diagnostico.metricas.media_rodadas else 0 }}</strong><span>Média de rodadas</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.taxa_aceite|round(1) if diagnostico.metricas.taxa_aceite else 0 }}%</strong><span>Taxa de aceite</span></div>
+<div class="stat-card"><strong>{{ diagnostico.metricas.taxa_recusa|round(1) if diagnostico.metricas.taxa_recusa else 0 }}%</strong><span>Taxa de recusa</span></div>
+<div class="stat-card"><strong>{{ diagnostico.eventos.sem_empresa or 0 }}</strong><span>Sem empresa elegível</span></div>
+<div class="stat-card"><strong>{{ diagnostico.eventos.conflitos or 0 }}</strong><span>Conflitos de aceite</span></div>
+<div class="stat-card"><strong>{{ diagnostico.eventos.falhas_geocodificacao or 0 }}</strong><span>Falhas de geocodificação</span></div>
+<div class="stat-card"><strong>{{ diagnostico.tempo_agendamento.minutos_atribuicao_ate_agendamento|round(1) if diagnostico.tempo_agendamento.minutos_atribuicao_ate_agendamento else 0 }}</strong><span>Minutos até agendamento</span></div>
+</div>
 <h2>Ofertas</h2><div class="stats-grid">{% for r in diagnostico.resumo %}<div class="stat-card"><strong>{{ r.total }}</strong><span>{{ r.status }}</span></div>{% endfor %}</div>
 <h2>Buscando empresa</h2><table class="table"><tr><th>Solicitação</th><th>Criada em</th><th>Esgotada em</th></tr>{% for r in diagnostico.pendentes %}<tr><td>{{ r.id[:8] }}</td><td>{{ r.data_criacao }}</td><td>{{ r.despacho_esgotado_em or 'Em andamento' }}</td></tr>{% endfor %}</table>
 <h2>Atribuições recentes</h2><table class="table"><tr><th>Solicitação</th><th>Empresa</th><th>Ofertas</th><th>Rodadas</th></tr>{% for r in diagnostico.atribuicoes %}<tr><td>{{ r.id[:8] }}</td><td>{{ r.empresa_responsavel_id }}</td><td>{{ r.total_ofertas }}</td><td>{{ r.rodadas }}</td></tr>{% endfor %}</table></div>{% endblock %}
