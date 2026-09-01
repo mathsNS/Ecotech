@@ -24,11 +24,13 @@
                 <a href="{{ url_for('operacoes') }}" class="nav-item {% if request.endpoint == 'operacoes' %}active{% endif %}">Operações</a>
                 <a href="{{ url_for('relatorios') }}" class="nav-item {% if request.endpoint == 'relatorios' %}active{% endif %}">Relatórios</a>
                 {% if usuario.tipo == 'administrador' %}
+                <a href="{{ url_for('admin_despacho') }}" class="nav-item {% if request.endpoint == 'admin_despacho' %}active{% endif %}">Despacho</a>
                 <a href="{{ url_for('usuarios') }}" class="nav-item {% if request.endpoint == 'usuarios' %}active{% endif %}">Usuários</a>
                 <a href="{{ url_for('admin_overrides') }}" class="nav-item {% if request.endpoint == 'admin_overrides' %}active{% endif %}">Overrides</a>
                 <a href="{{ url_for('admin_precos') }}" class="nav-item {% if request.endpoint == 'admin_precos' %}active{% endif %}">Preços</a>
                 {% endif %}
                 {% if usuario.tipo == 'empresa' %}
+                <a href="{{ url_for('oportunidades_empresa') }}" class="nav-item {% if request.endpoint == 'oportunidades_empresa' %}active{% endif %}">Oportunidades</a>
                 <a href="{{ url_for('planos') }}" class="nav-item {% if request.endpoint == 'planos' %}active{% endif %}">Planos</a>
                 {% endif %}
             </div>

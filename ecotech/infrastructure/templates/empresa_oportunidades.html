@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Oportunidades{% endblock %}
+{% block content %}<div class="container" style="padding:24px;max-width:900px">
+<h1>Oportunidades de coleta</h1><p>Dados pessoais são liberados somente após você vencer o aceite.</p>
+{% for o in ofertas %}<section class="card" style="padding:18px;margin:14px 0">
+ <h2>{{ o.dados.categorias|join(', ')|title }}</h2>
+ <p>{{ o.dados.peso_estimado_kg }} kg estimados · aproximadamente {{ o.distancia_km|round(1) }} km</p>
+ <p>Janela: {{ o.dados.agendada_para }}</p>
+ <div style="display:flex;gap:10px">
+ <form method="post" action="{{ url_for('aceitar_oferta',oferta_id=o.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="_ui" value="html"><button class="btn btn-primary">Aceitar</button></form>
+ <form method="post" action="{{ url_for('recusar_oferta',oferta_id=o.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="_ui" value="html"><button class="btn btn-secondary">Recusar</button></form>
+ </div></section>{% else %}<div class="empty-state"><p>Nenhuma oportunidade ativa no momento.</p></div>{% endfor %}
+<nav>{% if tem_anterior %}<a href="?pagina={{ pagina-1 }}">Anterior</a>{% endif %} {% if tem_proxima %}<a href="?pagina={{ pagina+1 }}">Próxima</a>{% endif %}</nav>
+</div>{% endblock %}

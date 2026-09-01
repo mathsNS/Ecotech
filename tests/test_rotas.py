@@ -439,6 +439,12 @@ def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
 
     operacoes = client.get('/operacoes')
     assert b'Rua Privada do Aceite, 77' in operacoes.data
+    agenda_ui = client.get(
+        f'/solicitacoes/{ativa["solicitacao_id"]}/agendamento'
+    )
+    assert agenda_ui.status_code == 200
+    assert b'_csrf_token' in agenda_ui.data
+    assert b'Abrir chat' in agenda_ui.data
     client.post(
         f'/solicitacoes/{ativa["solicitacao_id"]}/chat',
         data={'texto': '<script>alert(1)</script>'},
@@ -455,3 +461,27 @@ def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
     assert client.get(
         f'/solicitacoes/{ativa["solicitacao_id"]}/chat'
     ).status_code == 403
+
+
+def test_interfaces_respeitam_papel_privacidade_e_csrf(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    _set_session(client, _ID_CIDADAO, 'João Silva', 'cidadao')
+    client.post('/nova-solicitacao', data=_dados_nova_coleta(
+        endereco_coleta='Rua Invisível Antes do Aceite, 9',
+        horario_fim='16:30',
+    ))
+    db=_dados_mod.Dados()
+    oferta=db.conn.execute("""SELECT * FROM oferta_coleta WHERE status='ATIVA'
+        AND solicitacao_id=(SELECT id FROM solicitacao_descarte
+        WHERE endereco_coleta='Rua Invisível Antes do Aceite, 9' ORDER BY rowid DESC LIMIT 1)
+        ORDER BY prioridade LIMIT 1""").fetchone()
+    assert client.get('/empresa/oportunidades').status_code in (301,302)
+    _set_session(client,oferta['empresa_id'],'Empresa','empresa')
+    pagina=client.get('/empresa/oportunidades?pagina=1')
+    assert pagina.status_code==200
+    assert b'_csrf_token' in pagina.data
+    assert b'score' not in pagina.data.lower()
+    assert 'Rua Invisível Antes do Aceite'.encode() not in pagina.data
+    _set_session(client,_ID_ADMIN,'Admin','administrador')
+    admin=client.get('/admin/despacho')
+    assert admin.status_code==200 and b'Painel somente leitura' in admin.data

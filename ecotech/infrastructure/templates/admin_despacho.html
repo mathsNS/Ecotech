@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}Diagnóstico de despacho{% endblock %}
+{% block content %}<div class="container" style="padding:24px"><h1>Diagnóstico de despacho</h1><p>Painel somente leitura.</p>
+<h2>Ofertas</h2><div class="stats-grid">{% for r in diagnostico.resumo %}<div class="stat-card"><strong>{{ r.total }}</strong><span>{{ r.status }}</span></div>{% endfor %}</div>
+<h2>Buscando empresa</h2><table class="table"><tr><th>Solicitação</th><th>Criada em</th><th>Esgotada em</th></tr>{% for r in diagnostico.pendentes %}<tr><td>{{ r.id[:8] }}</td><td>{{ r.data_criacao }}</td><td>{{ r.despacho_esgotado_em or 'Em andamento' }}</td></tr>{% endfor %}</table>
+<h2>Atribuições recentes</h2><table class="table"><tr><th>Solicitação</th><th>Empresa</th><th>Ofertas</th><th>Rodadas</th></tr>{% for r in diagnostico.atribuicoes %}<tr><td>{{ r.id[:8] }}</td><td>{{ r.empresa_responsavel_id }}</td><td>{{ r.total_ofertas }}</td><td>{{ r.rodadas }}</td></tr>{% endfor %}</table></div>{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Agendamento{% endblock %}
+{% block content %}<div class="container" style="padding:24px;max-width:760px"><h1>Agendamento da coleta</h1>
+{% if agenda %}<div class="card" style="padding:18px"><p>Status: <strong>{{ agenda.status.replace('_',' ').title() }}</strong></p>
+<p>Janela solicitada: {{ agenda.janela_inicio }} até {{ agenda.janela_fim }}</p>
+{% if agenda.proposta_inicio %}<p>Proposta: {{ agenda.proposta_inicio }} até {{ agenda.proposta_fim }}</p>{% endif %}
+{% if agenda.inicio_confirmado %}<p>Confirmado: {{ agenda.inicio_confirmado }} até {{ agenda.fim_confirmado }}</p>{% endif %}</div>
+{% if usuario.tipo != 'administrador' %}<form method="post" action="{{ url_for('propor_agendamento',id_sol=sol.id) }}" class="card" style="padding:18px;margin-top:14px"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="_ui" value="html"><label>Início<input type="datetime-local" name="inicio" required></label><label>Fim<input type="datetime-local" name="fim" required></label><button class="btn btn-secondary">Propor outro horário</button></form>
+<div style="display:flex;gap:10px;margin-top:14px"><form method="post" action="{{ url_for('aceitar_agendamento',id_sol=sol.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="_ui" value="html"><button class="btn btn-primary">Aceitar horário</button></form><form method="post" action="{{ url_for('rejeitar_agendamento',id_sol=sol.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="_ui" value="html"><button class="btn btn-secondary">Rejeitar proposta</button></form></div>
+{% endif %}<p>{% if sol.empresa_responsavel_id %}<a class="btn btn-primary" href="{{ url_for('chat_solicitacao',id_sol=sol.id) }}">Abrir chat</a>{% endif %}</p>{% endif %}</div>{% endblock %}

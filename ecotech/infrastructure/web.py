@@ -38,6 +38,7 @@ from ..application.factories import (
 from ..application.authorization import (
     listar_solicitacoes_visiveis_empresa,
     usuario_pode_operar_solicitacao,
+    usuario_pode_visualizar_solicitacao,
 )
 from ..domain.usuarios import Usuario
 from ..domain.estados import BuscandoEmpresa, Solicitado
@@ -738,6 +739,45 @@ def criar_app() -> Flask:
             return jsonify({'erro': 'Acesso não autorizado'}), 403
         return jsonify({'ofertas': servico_despacho.listar_ofertas_ativas(usuario['id'])})
 
+    @app.route('/empresa/oportunidades')
+    def oportunidades_empresa():
+        if not usuario_logado(): return redirect(url_for('login'))
+        usuario=dados_usuario()
+        if usuario['tipo']!='empresa': return redirect(url_for('dashboard'))
+        pagina=max(1,request.args.get('pagina',1,type=int)); limite=10
+        todas=servico_despacho.listar_ofertas_ativas(usuario['id'])
+        return render_template('empresa_oportunidades.html',usuario=usuario,
+            ofertas=todas[(pagina-1)*limite:pagina*limite],pagina=pagina,
+            tem_anterior=pagina>1,tem_proxima=len(todas)>pagina*limite)
+
+    @app.route('/ofertas/<oferta_id>/recusar',methods=['POST'])
+    def recusar_oferta(oferta_id):
+        if not usuario_logado(): return jsonify({'erro':'Não autenticado'}),401
+        usuario=dados_usuario()
+        if usuario['tipo']!='empresa': return jsonify({'erro':'Acesso não autorizado'}),403
+        try: servico_despacho.recusar(oferta_id,usuario['id'],request.form.get('motivo',''))
+        except LookupError as exc: return jsonify({'erro':str(exc)}),404
+        except ValueError as exc: return jsonify({'erro':str(exc)}),409
+        flash('Oportunidade recusada.','success')
+        return redirect(url_for('oportunidades_empresa'))
+
+    @app.route('/solicitacoes/<id_sol>/agendamento')
+    def pagina_agendamento(id_sol):
+        if not usuario_logado(): return redirect(url_for('login'))
+        usuario=dados_usuario(); sol=servico_descarte.obter_solicitacao(id_sol)
+        if not sol: return jsonify({'erro':'Solicitação não encontrada'}),404
+        if not usuario_pode_visualizar_solicitacao(usuario,sol,dados): return jsonify({'erro':'Acesso não autorizado'}),403
+        return render_template('agendamento.html',usuario=usuario,sol=sol,
+            agenda=dados.buscar_agendamento(id_sol))
+
+    @app.route('/admin/despacho')
+    def admin_despacho():
+        if not usuario_logado(): return redirect(url_for('login'))
+        usuario=dados_usuario()
+        if usuario['tipo']!='administrador': return jsonify({'erro':'Acesso não autorizado'}),403
+        return render_template('admin_despacho.html',usuario=usuario,
+            diagnostico=dados.buscar_diagnostico_despacho())
+
     def _instante_form(nome):
         return datetime.fromisoformat(request.form.get(nome, ''))
 
@@ -747,6 +787,8 @@ def criar_app() -> Flask:
         try:
             row=servico_agendamento.propor(id_sol,session['user_id'],_instante_form('inicio'),_instante_form('fim'))
             servico_chat.evento(id_sol,'PROPOSTA_HORARIO',{'inicio':row['proposta_inicio'],'fim':row['proposta_fim'],'autor_id':session['user_id']})
+            if request.form.get('_ui')=='html':
+                flash('Proposta de horário enviada.','success'); return redirect(url_for('pagina_agendamento',id_sol=id_sol))
             return jsonify({'ok':True,'status':row['status']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -757,6 +799,8 @@ def criar_app() -> Flask:
         try:
             row=servico_agendamento.aceitar(id_sol,session['user_id'])
             servico_chat.evento(id_sol,'HORARIO_ACEITO',{'inicio':row['inicio_confirmado'],'fim':row['fim_confirmado']})
+            if request.form.get('_ui')=='html':
+                flash('Horário confirmado.','success'); return redirect(url_for('pagina_agendamento',id_sol=id_sol))
             return jsonify({'ok':True,'status':row['status'],'inicio':row['inicio_confirmado'],'fim':row['fim_confirmado']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -767,6 +811,8 @@ def criar_app() -> Flask:
         try:
             row=servico_agendamento.rejeitar(id_sol,session['user_id'])
             servico_chat.evento(id_sol,'HORARIO_RECUSADO',{'autor_id':session['user_id']})
+            if request.form.get('_ui')=='html':
+                flash('Proposta rejeitada.','success'); return redirect(url_for('pagina_agendamento',id_sol=id_sol))
             return jsonify({'ok':True,'status':row['status']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -795,6 +841,9 @@ def criar_app() -> Flask:
             sol._estado = Solicitado()
             sol._endereco_coleta = aceita['endereco_coleta']
             sol._nome_contato = aceita['nome_contato']
+        if request.form.get('_ui')=='html':
+            flash('Coleta aceita. Dados completos liberados em Operações.','success')
+            return redirect(url_for('operacoes'))
         return jsonify({
             'ok': True,
             'solicitacao_id': aceita['solicitacao_id'],

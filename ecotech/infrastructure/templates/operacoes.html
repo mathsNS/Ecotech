@@ -133,6 +133,8 @@
                                         title="Ver detalhes">
                                         Ver Detalhes
                                     </button>
+                                    <a class="btn-action" href="{{ url_for('pagina_agendamento',id_sol=sol.id) }}">Agenda</a>
+                                    {% if sol.empresa_responsavel_id %}<a class="btn-action" href="{{ url_for('chat_solicitacao',id_sol=sol.id) }}">Chat</a>{% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
