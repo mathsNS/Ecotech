@@ -702,6 +702,22 @@ class Dados(RepositorioBase):
             ORDER BY o.prioridade
         """, (empresa_id,)).fetchall()
 
+    def recusar_oferta_coleta(self, oferta_id, empresa_id, agora, proxima_expiracao, motivo=''):
+        with self.conn:
+            oferta=self.conn.execute("SELECT * FROM oferta_coleta WHERE id=? AND empresa_id=?",(oferta_id,empresa_id)).fetchone()
+            if not oferta: raise LookupError('oferta não encontrada para esta empresa')
+            if oferta['status']=='RECUSADA': return []
+            if oferta['status']!='ATIVA': raise ValueError('oferta não está ativa')
+            self.conn.execute("UPDATE oferta_coleta SET status='RECUSADA',respondida_em=?,motivo_recusa=? WHERE id=?",(agora,motivo[:500],oferta_id))
+            ativa=self.conn.execute("SELECT 1 FROM oferta_coleta WHERE solicitacao_id=? AND status='ATIVA'",(oferta['solicitacao_id'],)).fetchone()
+            return [] if ativa else self._ativar_proxima_rodada(oferta['solicitacao_id'],agora,proxima_expiracao)
+
+    def buscar_diagnostico_despacho(self):
+        resumo=self.conn.execute("""SELECT status,COUNT(*) total FROM oferta_coleta GROUP BY status ORDER BY status""").fetchall()
+        pendentes=self.conn.execute("""SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY data_criacao DESC LIMIT 100""").fetchall()
+        atribuicoes=self.conn.execute("""SELECT sd.id,sd.empresa_responsavel_id,sd.atribuida_em,COUNT(o.id) total_ofertas,MAX(o.rodada) rodadas FROM solicitacao_descarte sd LEFT JOIN oferta_coleta o ON o.solicitacao_id=sd.id WHERE sd.empresa_responsavel_id IS NOT NULL GROUP BY sd.id ORDER BY sd.atribuida_em DESC LIMIT 100""").fetchall()
+        return {'resumo':resumo,'pendentes':pendentes,'atribuicoes':atribuicoes}
+
     def aceitar_oferta_coleta(
         self, oferta_id: str, empresa_id: str, agora: str
     ):

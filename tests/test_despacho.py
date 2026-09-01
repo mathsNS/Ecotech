@@ -122,6 +122,17 @@ def test_base_nao_elegivel_nao_recebe_oferta(tmp_path, monkeypatch):
     assert dados.buscar_notificacoes_usuario('emp-1') == []
 
 
+def test_recusa_ativa_proximo_lote_e_e_idempotente(tmp_path, monkeypatch):
+    dados, servico, demanda = _preparar(tmp_path, monkeypatch)
+    servico.criar_ofertas('sol-1', demanda, AGORA)
+    primeira = dados.buscar_ofertas_solicitacao('sol-1')[0]
+    servico.recusar(primeira['id'], 'emp-1', 'Sem veículo', AGORA)
+    servico.recusar(primeira['id'], 'emp-1', 'repetida', AGORA)
+    assert [o['status'] for o in dados.buscar_ofertas_solicitacao('sol-1')] == [
+        'RECUSADA', 'ATIVA', 'ATIVA'
+    ]
+
+
 def test_aceite_ativo_atribui_e_cancela_concorrentes(tmp_path, monkeypatch):
     dados, servico, demanda = _preparar(tmp_path, monkeypatch, (2, 1))
     servico.criar_ofertas('sol-1', demanda, AGORA)

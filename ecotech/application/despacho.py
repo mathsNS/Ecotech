@@ -111,6 +111,12 @@ class ServicoDespacho:
             oferta_id, empresa_id, self._iso(agora)
         )
 
+    def recusar(self,oferta_id,empresa_id,motivo='',agora=None):
+        agora=agora or datetime.now()
+        ativas=self._dados.recusar_oferta_coleta(oferta_id,empresa_id,self._iso(agora),self._iso(self._expiracao(agora)),motivo)
+        self._notificar_ativas(ativas)
+        return ativas
+
     def listar_ofertas_ativas(self, empresa_id: str) -> list[dict]:
         resultado = []
         for oferta in self._dados.buscar_ofertas_ativas_empresa(empresa_id):
