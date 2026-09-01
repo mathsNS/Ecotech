@@ -10,6 +10,7 @@ import io
 import hmac
 import os
 import secrets
+import click
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, Response
 from .pdf import gerar_mtr
 from datetime import datetime
@@ -26,6 +27,8 @@ from ..application.services import (
     ServicoBaseOperacional,
 )
 from ..application.geolocalizacao import GeolocalizadorCoordenadasInformadas
+from ..application.despacho import ConfiguracaoDespacho, ServicoDespacho
+from ..application.elegibilidade import DemandaColeta
 from ..application.factories import (
     DispositivoFactory,
     MetodoTratamentoFactory
@@ -35,6 +38,8 @@ from ..application.authorization import (
     usuario_pode_operar_solicitacao,
 )
 from ..domain.usuarios import Usuario
+from ..domain.estados import BuscandoEmpresa
+from ..domain.logistica import Coordenadas
 from ..domain.dispositivos import EstadoProduto
 from ..infrastructure.persistence.dados import Dados
 
@@ -63,6 +68,20 @@ def criar_app() -> Flask:
     servico_saque = ServicoSaque(dados)
     servico_autenticacao = ServicoAutenticacao(servico_usuario)
     servico_base = ServicoBaseOperacional(dados)
+    lotes = tuple(
+        int(valor.strip())
+        for valor in os.environ.get('ECOTECH_DESPACHO_LOTES', '1,2,3').split(',')
+        if valor.strip()
+    )
+    servico_despacho = ServicoDespacho(
+        dados, servico_base,
+        configuracao=ConfiguracaoDespacho(
+            tamanhos_lotes=lotes,
+            prazo_resposta_minutos=int(
+                os.environ.get('ECOTECH_DESPACHO_PRAZO_MINUTOS', '5')
+            ),
+        ),
+    )
     geolocalizador = GeolocalizadorCoordenadasInformadas()
     
     # configura dependencias entre servicos
@@ -425,6 +444,21 @@ def criar_app() -> Flask:
                         solicitacao.id, coordenadas.latitude,
                         coordenadas.longitude, 'navegador_ou_formulario'
                     )
+                    agendada_para = datetime.strptime(
+                        data_agendamento, '%Y-%m-%d %H:%M'
+                    ) if data_agendamento else datetime.now()
+                    servico_despacho.criar_ofertas(
+                        solicitacao.id,
+                        DemandaColeta(
+                            coordenadas=Coordenadas(
+                                coordenadas.latitude, coordenadas.longitude
+                            ),
+                            categorias=frozenset({tipo_dispositivo.lower()}),
+                            peso_kg=peso_kg * quantidade,
+                            agendada_para=agendada_para,
+                        ),
+                    )
+                    solicitacao._estado = BuscandoEmpresa()
 
                 dados.salvar_notificacao(
                     usuario['id'],
@@ -439,15 +473,6 @@ def criar_app() -> Flask:
                             ponto_raw['id_empresa'],
                             f'Nova solicitação de entrega recebida de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para confirmar.'
                         )
-                else:
-                    # domiciliar: notifica todas as empresas
-                    for p in dados.buscar_pontos_para_selecao():
-                        if p['id_empresa']:
-                            dados.salvar_notificacao(
-                                p['id_empresa'],
-                                f'Nova solicitação de coleta domiciliar de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para aceitar.'
-                            )
-
                 flash('Solicitação criada com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
 
@@ -1551,6 +1576,17 @@ def criar_app() -> Flask:
         dados.atualizar_preco_subcategoria(subcategoria, valor_base, valor_minimo)
         flash(f'Preços de "{subcategoria}" atualizados com sucesso.', 'success')
         return redirect(url_for('admin_precos'))
+
+    @app.cli.command('processar-ofertas')
+    @click.option(
+        '--agora', default=None,
+        help='Instante ISO-8601 opcional para execução determinística.'
+    )
+    def processar_ofertas(agora):
+        """Expira ofertas vencidas e ativa o próximo lote, sem espera ativa."""
+        instante = datetime.fromisoformat(agora) if agora else datetime.now()
+        ativadas = servico_despacho.processar_ofertas_expiradas(instante)
+        click.echo(f'{len(ativadas)} oferta(s) ativada(s).')
 
     return app
 

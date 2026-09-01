@@ -22,7 +22,7 @@ from ..domain.tratamento import (
 )
 from ..domain.descarte import PontoColeta
 from ..domain.estados import (
-    Solicitado, Coletado, EmProcessamento,
+    Solicitado, BuscandoEmpresa, Coletado, EmProcessamento,
     Reciclado, Reutilizado, Descartado, Cancelado
 )
 
@@ -176,6 +176,7 @@ class EstadoFactory:
 
     _MAPA = {
         'SOLICITADO': Solicitado,
+        'BUSCANDO_EMPRESA': BuscandoEmpresa,
         'COLETADO': Coletado,
         'EM_PROCESSAMENTO': EmProcessamento,
         'RECICLADO': Reciclado,

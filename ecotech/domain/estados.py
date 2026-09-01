@@ -78,6 +78,19 @@ class Solicitado(EstadoDescarte):
     def _proximo_estado(self, solicitacao: 'SolicitacaoDescarte') -> 'EstadoDescarte':
         return Coletado()
 
+
+class BuscandoEmpresa(EstadoDescarte):
+    """Coleta domiciliar ainda sem empresa responsável."""
+
+    def obter_nome(self) -> str:
+        return "Buscando Empresa"
+
+    def pode_cancelar(self) -> bool:
+        return True
+
+    def _proximo_estado(self, solicitacao: 'SolicitacaoDescarte') -> 'EstadoDescarte':
+        raise ValueError("uma empresa deve aceitar a coleta antes do avanço")
+
 class Coletado(EstadoDescarte):
 
     def obter_nome(self) -> str:
@@ -138,6 +151,3 @@ class Cancelado(EstadoFinal):
 
     def obter_nome(self) -> str:
         return "Cancelado"
-    
-
-    

@@ -365,6 +365,12 @@ def test_coleta_domiciliar_persiste_coordenadas(client):
     assert row['latitude_coleta'] == pytest.approx(-7.2134)
     assert row['longitude_coleta'] == pytest.approx(-39.3153)
     assert row['origem_localizacao'] == 'navegador_ou_formulario'
+    despacho = db.conn.execute("""
+        SELECT estado FROM solicitacao_descarte
+        WHERE endereco_coleta = 'Rua da Localização, 10'
+        ORDER BY rowid DESC LIMIT 1
+    """).fetchone()
+    assert despacho['estado'] == 'BUSCANDO_EMPRESA'
 
 
 def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
@@ -381,3 +387,11 @@ def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
     )
     assert resp.status_code == 200
     assert _dados_mod.Dados().contar_solicitacoes() == antes
+
+
+def test_comando_processar_ofertas_pode_ser_agendado(app):
+    resultado = app.test_cli_runner().invoke(
+        args=['processar-ofertas', '--agora', '2026-09-10T14:36:00']
+    )
+    assert resultado.exit_code == 0
+    assert 'oferta(s) ativada(s)' in resultado.output
