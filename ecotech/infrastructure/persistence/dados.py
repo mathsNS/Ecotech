@@ -797,6 +797,71 @@ class Dados(RepositorioBase):
                 WHERE id = ? AND tipo_coleta = 'domiciliar'
             """, (agora, solicitacao_id))
 
+    def registrar_janela_agendamento(self, solicitacao_id, cidadao_id, inicio, fim, agora):
+        with self.conn:
+            sol = self.conn.execute("SELECT id_usuario FROM solicitacao_descarte WHERE id=?", (solicitacao_id,)).fetchone()
+            if not sol or sol['id_usuario'] != cidadao_id: raise PermissionError('solicitação não pertence ao cidadão')
+            self.conn.execute("""INSERT INTO agendamento_coleta
+                (solicitacao_id,janela_inicio,janela_fim,status,atualizado_em)
+                VALUES(?,?,?,'AGUARDANDO_AGENDAMENTO',?)
+                ON CONFLICT(solicitacao_id) DO NOTHING""", (solicitacao_id,inicio,fim,agora))
+            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'JANELA_SOLICITADA',?,?,?)", (solicitacao_id,cidadao_id,inicio,fim,agora))
+        return self.buscar_agendamento(solicitacao_id)
+
+    def _participante_agendamento(self, solicitacao_id, usuario_id):
+        sol=self.conn.execute("SELECT id_usuario,empresa_responsavel_id FROM solicitacao_descarte WHERE id=?",(solicitacao_id,)).fetchone()
+        if not sol or usuario_id not in (sol['id_usuario'],sol['empresa_responsavel_id']): raise PermissionError('usuário não participa da coleta')
+        return sol
+
+    def _notificar_agendamento(self, sol, solicitacao_id, autor_id, mensagem, chave, agora):
+        destinatario = sol['empresa_responsavel_id'] if autor_id == sol['id_usuario'] else sol['id_usuario']
+        self.conn.execute("""INSERT OR IGNORE INTO notificacao
+            (id_usuario,timestamp,mensagem,chave_idempotencia) VALUES(?,?,?,?)""",
+            (destinatario,datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),mensagem,chave))
+
+    def propor_agendamento(self, solicitacao_id, usuario_id, inicio, fim, agora):
+        with self.conn:
+            sol=self._participante_agendamento(solicitacao_id,usuario_id)
+            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+            if not atual: raise LookupError('janela não encontrada')
+            if atual['status']=='AGENDADO': return atual
+            self.conn.execute("""UPDATE agendamento_coleta SET proposta_inicio=?,proposta_fim=?,proposta_por=?,status='PROPOSTA_PENDENTE',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(inicio,fim,usuario_id,agora,solicitacao_id))
+            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'PROPOSTA',?,?,?)",(solicitacao_id,usuario_id,inicio,fim,agora))
+            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Nova proposta de horário para a coleta.',f'agenda:{solicitacao_id}:proposta:{atual["versao"]+1}',agora)
+        return self.buscar_agendamento(solicitacao_id)
+
+    def aceitar_agendamento(self, solicitacao_id, usuario_id, agora):
+        with self.conn:
+            sol=self._participante_agendamento(solicitacao_id,usuario_id)
+            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+            if not atual: raise LookupError('janela não encontrada')
+            if atual['status']=='AGENDADO': return atual
+            if atual['status']=='PROPOSTA_PENDENTE':
+                if atual['proposta_por']==usuario_id: raise PermissionError('autor não pode aceitar a própria proposta')
+                inicio,fim=atual['proposta_inicio'],atual['proposta_fim']
+            else:
+                if usuario_id != sol['empresa_responsavel_id']: raise PermissionError('apenas a empresa pode aceitar a janela inicial')
+                inicio,fim=atual['janela_inicio'],atual['janela_fim']
+            self.conn.execute("""UPDATE agendamento_coleta SET inicio_confirmado=?,fim_confirmado=?,status='AGENDADO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(inicio,fim,agora,solicitacao_id))
+            self.conn.execute("UPDATE solicitacao_descarte SET data_agendamento=? WHERE id=?",(inicio,solicitacao_id))
+            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'ACEITA',?,?,?)",(solicitacao_id,usuario_id,inicio,fim,agora))
+            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Horário da coleta confirmado.',f'agenda:{solicitacao_id}:aceita',agora)
+        return self.buscar_agendamento(solicitacao_id)
+
+    def rejeitar_agendamento(self, solicitacao_id, usuario_id, agora):
+        with self.conn:
+            sol=self._participante_agendamento(solicitacao_id,usuario_id)
+            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+            if not atual or atual['status']!='PROPOSTA_PENDENTE': raise ValueError('não existe proposta pendente')
+            if atual['proposta_por']==usuario_id: raise PermissionError('autor não pode rejeitar a própria proposta')
+            self.conn.execute("""UPDATE agendamento_coleta SET proposta_inicio=NULL,proposta_fim=NULL,proposta_por=NULL,status='AGUARDANDO_AGENDAMENTO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(agora,solicitacao_id))
+            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,criado_em) VALUES(?,?,'REJEITADA',?)",(solicitacao_id,usuario_id,agora))
+            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Proposta de horário rejeitada; a negociação permanece aberta.',f'agenda:{solicitacao_id}:rejeita:{atual["versao"]+1}',agora)
+        return self.buscar_agendamento(solicitacao_id)
+
+    def buscar_agendamento(self, solicitacao_id):
+        return self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+
     # -------------------
     # DESATIVAR (soft-delete)
     # -------------------
