@@ -128,6 +128,8 @@
                                         data-peso="{{ sol.calcular_peso_total()|round(2) }}"
                                         data-data="{{ sol.data_criacao.strftime('%d/%m/%Y') }}"
                                         data-itens="{{ sol.itens|length }}"
+                                        data-endereco="{{ sol.endereco_coleta or '' }}"
+                                        data-contato="{{ sol.nome_contato or '' }}"
                                         title="Ver detalhes">
                                         Ver Detalhes
                                     </button>
@@ -181,6 +183,8 @@
             <div class="detail-row"><strong>Peso total:</strong> <span id="modal-peso"></span> kg</div>
             <div class="detail-row"><strong>Data:</strong> <span id="modal-data"></span></div>
             <div class="detail-row"><strong>Itens:</strong> <span id="modal-itens"></span></div>
+            <div class="detail-row"><strong>Endereço da coleta:</strong> <span id="modal-endereco"></span></div>
+            <div class="detail-row"><strong>Contato:</strong> <span id="modal-contato"></span></div>
 
             {% if is_admin or usuario.tipo == 'empresa' %}
             <!-- secao avanco de estado — visivel apenas quando pode avançar -->
@@ -238,6 +242,8 @@ function abrirDetalhes(btn) {
     _solIdAtual = d.id;
 
     document.getElementById('modal-id').textContent      = d.id;
+    document.getElementById('modal-endereco').textContent = d.endereco || 'Não informado';
+    document.getElementById('modal-contato').textContent = d.contato || 'Não informado';
     document.getElementById('modal-usuario').textContent = d.usuario;
     document.getElementById('modal-ponto').textContent   = d.ponto;
     document.getElementById('modal-peso').textContent    = d.peso;

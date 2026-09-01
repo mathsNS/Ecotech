@@ -299,6 +299,18 @@ def test_csrf_rejeita_post_sem_token_quando_habilitado(client, app):
     assert resp.is_json
 
 
+def test_csrf_protege_aceite_de_oferta(client, app):
+    _set_session(client, _ID_EMPRESA_FREE, 'Recicla Kariri', 'empresa')
+    app.config['TESTING'] = False
+    app.config['CSRF_ENABLED'] = True
+    try:
+        resp = client.post('/ofertas/oferta-inexistente/aceitar')
+    finally:
+        app.config['TESTING'] = True
+    assert resp.status_code == 400
+    assert resp.is_json
+
+
 def test_empresa_lista_suas_bases_operacionais(client):
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
     resp = client.get('/empresa/bases')
@@ -395,3 +407,41 @@ def test_comando_processar_ofertas_pode_ser_agendado(app):
     )
     assert resultado.exit_code == 0
     assert 'oferta(s) ativada(s)' in resultado.output
+
+
+def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    _set_session(client, _ID_CIDADAO, 'João Silva', 'cidadao')
+    client.post('/nova-solicitacao', data=_dados_nova_coleta(
+        endereco_coleta='Rua Privada do Aceite, 77', nome_contato='Contato Secreto'
+    ))
+    db = _dados_mod.Dados()
+    ofertas = db.conn.execute("""
+        SELECT * FROM oferta_coleta
+        WHERE solicitacao_id = (
+            SELECT id FROM solicitacao_descarte
+            WHERE endereco_coleta = 'Rua Privada do Aceite, 77'
+            ORDER BY rowid DESC LIMIT 1
+        ) ORDER BY prioridade
+    """).fetchall()
+    ativa = ofertas[0]
+
+    with client.session_transaction() as sess:
+        sess.clear()
+    assert client.post(f'/ofertas/{ativa["id"]}/aceitar').status_code == 401
+
+    _set_session(client, ativa['empresa_id'], 'Empresa Vencedora', 'empresa')
+    resumo = client.get('/api/empresa/ofertas').get_json()['ofertas'][0]
+    assert 'endereco_coleta' not in str(resumo)
+    resposta = client.post(f'/ofertas/{ativa["id"]}/aceitar')
+    assert resposta.status_code == 200
+    assert resposta.get_json()['endereco_coleta'] == 'Rua Privada do Aceite, 77'
+
+    operacoes = client.get('/operacoes')
+    assert b'Rua Privada do Aceite, 77' in operacoes.data
+
+    perdedora = next(o for o in ofertas if o['empresa_id'] != ativa['empresa_id'])
+    _set_session(client, perdedora['empresa_id'], 'Empresa Perdedora', 'empresa')
+    conflito = client.post(f'/ofertas/{perdedora["id"]}/aceitar')
+    assert conflito.status_code == 409
+    assert b'Rua Privada do Aceite, 77' not in client.get('/operacoes').data

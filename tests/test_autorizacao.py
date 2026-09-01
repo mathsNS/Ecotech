@@ -47,6 +47,18 @@ def test_coleta_domiciliar_sem_atribuicao_nao_pode_ser_operada_por_empresa():
     assert not empresa_pode_operar_solicitacao('empresa-a', solicitacao, repositorio)
 
 
+def test_empresa_atribuida_pode_operar_coleta_domiciliar():
+    solicitacao = criar_solicitacao('sol-domiciliar')
+    solicitacao._empresa_responsavel_id = 'empresa-vencedora'
+    repositorio = RepositorioPontosFake({})
+    assert empresa_pode_operar_solicitacao(
+        'empresa-vencedora', solicitacao, repositorio
+    )
+    assert not empresa_pode_operar_solicitacao(
+        'empresa-perdedora', solicitacao, repositorio
+    )
+
+
 def test_admin_pode_operar_qualquer_solicitacao():
     solicitacao = criar_solicitacao('sol-1')
     repositorio = RepositorioPontosFake({})

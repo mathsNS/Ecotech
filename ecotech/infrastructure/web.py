@@ -38,7 +38,7 @@ from ..application.authorization import (
     usuario_pode_operar_solicitacao,
 )
 from ..domain.usuarios import Usuario
-from ..domain.estados import BuscandoEmpresa
+from ..domain.estados import BuscandoEmpresa, Solicitado
 from ..domain.logistica import Coordenadas
 from ..domain.dispositivos import EstadoProduto
 from ..infrastructure.persistence.dados import Dados
@@ -130,7 +130,7 @@ def criar_app() -> Flask:
         esperado = session.get('_csrf_token')
         recebido = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
         if not esperado or not recebido or not hmac.compare_digest(esperado, recebido):
-            if request.path.startswith(('/operacoes/', '/solicitacao/', '/usuarios/', '/admin/')):
+            if request.path.startswith(('/operacoes/', '/solicitacao/', '/ofertas/', '/usuarios/', '/admin/')):
                 return jsonify({'erro': 'Token CSRF inválido ou ausente'}), 400
             return 'Token CSRF inválido ou ausente', 400
         return None
@@ -716,6 +716,47 @@ def criar_app() -> Flask:
             usuario=usuario,
             notificacoes=notificacoes
         )
+
+    @app.route('/api/empresa/ofertas')
+    def ofertas_ativas_empresa():
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            return jsonify({'erro': 'Acesso não autorizado'}), 403
+        return jsonify({'ofertas': servico_despacho.listar_ofertas_ativas(usuario['id'])})
+
+    @app.route('/ofertas/<oferta_id>/aceitar', methods=['POST'])
+    def aceitar_oferta(oferta_id):
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+        usuario = dados_usuario()
+        if usuario['tipo'] != 'empresa':
+            return jsonify({'erro': 'Acesso não autorizado'}), 403
+        try:
+            aceita = servico_despacho.aceitar(oferta_id, usuario['id'])
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except TimeoutError as exc:
+            return jsonify({'erro': str(exc)}), 410
+        except (RuntimeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 409
+
+        sol = servico_descarte.obter_solicitacao(aceita['solicitacao_id'])
+        if sol:
+            sol._empresa_responsavel_id = usuario['id']
+            sol._base_operacional_id = aceita['base_operacional_id']
+            sol._atribuida_em = datetime.fromisoformat(aceita['respondida_em'])
+            sol._estado = Solicitado()
+            sol._endereco_coleta = aceita['endereco_coleta']
+            sol._nome_contato = aceita['nome_contato']
+        return jsonify({
+            'ok': True,
+            'solicitacao_id': aceita['solicitacao_id'],
+            'endereco_coleta': aceita['endereco_coleta'],
+            'nome_contato': aceita['nome_contato'],
+            'data_agendamento': aceita['data_agendamento'],
+        })
     
     @app.route('/ultimas-entregas')
     def ultimas_entregas():

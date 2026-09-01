@@ -12,6 +12,10 @@ def empresa_pode_operar_solicitacao(
 ) -> bool:
     """Retorna se a empresa é responsável pela operação da solicitação."""
     empresa_responsavel_id = getattr(solicitacao, "empresa_responsavel_id", None)
+    if empresa_responsavel_id is None and hasattr(repositorio, 'buscar_solicitacao'):
+        row = repositorio.buscar_solicitacao(solicitacao.id)
+        if row and 'empresa_responsavel_id' in row.keys():
+            empresa_responsavel_id = row['empresa_responsavel_id']
     if empresa_responsavel_id is not None:
         return empresa_responsavel_id == empresa_id
 
