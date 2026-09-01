@@ -282,6 +282,30 @@ Edite `run.py` e altere o parâmetro `port=5000` para outra porta.
 
 ## Comandos Úteis
 
+### Processamento de ofertas de coleta
+
+O despacho usa lotes progressivos de 1, 2 e 3 empresas, com prazo padrão de
+cinco minutos. Os valores podem ser configurados antes de iniciar a aplicação:
+
+```powershell
+$env:ECOTECH_DESPACHO_LOTES = "1,2,3"
+$env:ECOTECH_DESPACHO_PRAZO_MINUTOS = "5"
+```
+
+Execute periodicamente o comando abaixo pelo agendador do sistema. Cada
+execução expira as ofertas vencidas e ativa o próximo lote de forma idempotente,
+sem manter um processo em espera:
+
+```powershell
+flask --app ecotech.infrastructure.web:criar_app processar-ofertas
+```
+
+Para validações determinísticas, também é possível informar um instante ISO-8601:
+
+```powershell
+flask --app ecotech.infrastructure.web:criar_app processar-ofertas --agora 2026-09-01T10:00:00
+```
+
 ```powershell
 # Ver versão do Python
 python --version
