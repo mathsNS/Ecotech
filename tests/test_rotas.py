@@ -439,9 +439,19 @@ def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
 
     operacoes = client.get('/operacoes')
     assert b'Rua Privada do Aceite, 77' in operacoes.data
+    client.post(
+        f'/solicitacoes/{ativa["solicitacao_id"]}/chat',
+        data={'texto': '<script>alert(1)</script>'},
+    )
+    pagina_chat = client.get(f'/solicitacoes/{ativa["solicitacao_id"]}/chat')
+    assert b'&lt;script&gt;alert(1)&lt;/script&gt;' in pagina_chat.data
+    assert b'<script>alert(1)</script>' not in pagina_chat.data
 
     perdedora = next(o for o in ofertas if o['empresa_id'] != ativa['empresa_id'])
     _set_session(client, perdedora['empresa_id'], 'Empresa Perdedora', 'empresa')
     conflito = client.post(f'/ofertas/{perdedora["id"]}/aceitar')
     assert conflito.status_code == 409
     assert b'Rua Privada do Aceite, 77' not in client.get('/operacoes').data
+    assert client.get(
+        f'/solicitacoes/{ativa["solicitacao_id"]}/chat'
+    ).status_code == 403

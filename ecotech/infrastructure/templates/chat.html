@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Chat da coleta{% endblock %}
+{% block content %}
+<div class="container" style="max-width:760px;padding:24px">
+  <h1>Conversa da coleta</h1>
+  <div class="card" style="padding:16px">
+  {% for m in mensagens %}
+    <article style="padding:10px;border-bottom:1px solid #ddd">
+      <strong>{{ 'Evento do sistema' if m.tipo != 'MENSAGEM' else 'Mensagem' }}</strong>
+      {% if m.texto %}<p style="white-space:pre-wrap">{{ m.texto }}</p>{% endif %}
+      {% if m.tipo != 'MENSAGEM' %}<small>{{ m.tipo.replace('_',' ').title() }}</small>{% endif %}
+      <time style="display:block;color:#666">{{ m.criado_em }}</time>
+    </article>
+  {% else %}<p>Nenhuma mensagem.</p>{% endfor %}
+  </div>
+  <form method="post" style="margin-top:16px">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <textarea name="texto" maxlength="2000" required class="form-control-new"></textarea>
+    <button class="btn btn-primary" type="submit">Enviar</button>
+  </form>
+</div>
+{% endblock %}

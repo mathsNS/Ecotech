@@ -30,6 +30,7 @@ from ..application.geolocalizacao import GeolocalizadorCoordenadasInformadas
 from ..application.despacho import ConfiguracaoDespacho, ServicoDespacho
 from ..application.elegibilidade import DemandaColeta
 from ..application.agendamento import ServicoAgendamento
+from ..application.chat import ServicoChat
 from ..application.factories import (
     DispositivoFactory,
     MetodoTratamentoFactory
@@ -84,6 +85,7 @@ def criar_app() -> Flask:
         ),
     )
     servico_agendamento = ServicoAgendamento(dados)
+    servico_chat = ServicoChat(dados)
     geolocalizador = GeolocalizadorCoordenadasInformadas()
     
     # configura dependencias entre servicos
@@ -132,7 +134,7 @@ def criar_app() -> Flask:
         esperado = session.get('_csrf_token')
         recebido = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
         if not esperado or not recebido or not hmac.compare_digest(esperado, recebido):
-            if request.path.startswith(('/operacoes/', '/solicitacao/', '/ofertas/', '/usuarios/', '/admin/')):
+            if request.path.startswith(('/operacoes/', '/solicitacao/', '/solicitacoes/', '/ofertas/', '/usuarios/', '/admin/')):
                 return jsonify({'erro': 'Token CSRF inválido ou ausente'}), 400
             return 'Token CSRF inválido ou ausente', 400
         return None
@@ -744,6 +746,7 @@ def criar_app() -> Flask:
         if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
         try:
             row=servico_agendamento.propor(id_sol,session['user_id'],_instante_form('inicio'),_instante_form('fim'))
+            servico_chat.evento(id_sol,'PROPOSTA_HORARIO',{'inicio':row['proposta_inicio'],'fim':row['proposta_fim'],'autor_id':session['user_id']})
             return jsonify({'ok':True,'status':row['status']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -753,6 +756,7 @@ def criar_app() -> Flask:
         if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
         try:
             row=servico_agendamento.aceitar(id_sol,session['user_id'])
+            servico_chat.evento(id_sol,'HORARIO_ACEITO',{'inicio':row['inicio_confirmado'],'fim':row['fim_confirmado']})
             return jsonify({'ok':True,'status':row['status'],'inicio':row['inicio_confirmado'],'fim':row['fim_confirmado']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -762,6 +766,7 @@ def criar_app() -> Flask:
         if not usuario_logado(): return jsonify({'erro':'Não autenticado'}), 401
         try:
             row=servico_agendamento.rejeitar(id_sol,session['user_id'])
+            servico_chat.evento(id_sol,'HORARIO_RECUSADO',{'autor_id':session['user_id']})
             return jsonify({'ok':True,'status':row['status']})
         except PermissionError as exc: return jsonify({'erro':str(exc)}),403
         except (ValueError,LookupError) as exc: return jsonify({'erro':str(exc)}),400
@@ -797,6 +802,22 @@ def criar_app() -> Flask:
             'nome_contato': aceita['nome_contato'],
             'data_agendamento': aceita['data_agendamento'],
         })
+
+    @app.route('/solicitacoes/<id_sol>/chat', methods=['GET','POST'])
+    def chat_solicitacao(id_sol):
+        if not usuario_logado(): return redirect(url_for('login'))
+        usuario=dados_usuario()
+        try:
+            if request.method=='POST':
+                servico_chat.enviar(id_sol,usuario['id'],request.form.get('texto',''))
+                return redirect(url_for('chat_solicitacao',id_sol=id_sol))
+            pagina=request.args.get('pagina',1,type=int)
+            mensagens=servico_chat.listar(id_sol,usuario['id'],pagina)
+            servico_chat.marcar_lidas(id_sol,usuario['id'])
+            return render_template('chat.html',usuario=usuario,mensagens=mensagens,id_sol=id_sol,pagina=pagina)
+        except PermissionError: return jsonify({'erro':'Acesso não autorizado'}),403
+        except LookupError: return jsonify({'erro':'Conversa não encontrada'}),404
+        except ValueError as exc: return jsonify({'erro':str(exc)}),400
     
     @app.route('/ultimas-entregas')
     def ultimas_entregas():
