@@ -401,6 +401,15 @@ def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
     assert _dados_mod.Dados().contar_solicitacoes() == antes
 
 
+def test_formulario_domiciliar_usa_endereco_sem_coordenadas_visiveis(client):
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    resp = client.get('/nova-solicitacao?tipo=domiciliar')
+    assert resp.status_code == 200
+    assert b'CEP' in resp.data
+    assert b'latitude_manual' not in resp.data
+    assert b'longitude_manual' not in resp.data
+
+
 def test_comando_processar_ofertas_pode_ser_agendado(app):
     resultado = app.test_cli_runner().invoke(
         args=['processar-ofertas', '--agora', '2026-09-10T14:36:00']

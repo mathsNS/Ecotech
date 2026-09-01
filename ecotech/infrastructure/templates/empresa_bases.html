@@ -1,56 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Bases Operacionais — EcoTech{% endblock %}
-
 {% block content %}
-<div class="container" style="max-width:980px;margin:0 auto;padding:2rem 1rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
-        <div>
-            <h1 style="color:#1D854D;margin:0;">Bases operacionais</h1>
-            <p>Cadastre os locais de onde partem suas coletas domiciliares.</p>
+<div class="ecotech-page"><div class="container">
+  <div class="page-header">
+    <div class="header-text"><h1>Bases operacionais</h1><p class="subtitle">Cadastre os endereços de partida das coletas domiciliares.</p></div>
+    <a href="{{ url_for('empresa_pontos') }}" class="btn btn-secondary">← Pontos de coleta</a>
+  </div>
+
+  <section class="ecotech-panel">
+    <div class="section-header"><div><h2>Nova base</h2><p>Informe o CEP e complete o número do endereço.</p></div></div>
+    <form method="POST" action="{{ url_for('empresa_bases') }}" class="address-form" data-address-form>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="latitude"><input type="hidden" name="longitude">
+      <div class="form-grid-2">
+        <div class="form-group-new"><label>Nome da base</label><input class="form-control-new" name="nome" required></div>
+        <div class="form-group-new"><label>CEP</label><input class="form-control-new cep-input" name="cep" inputmode="numeric" maxlength="9" placeholder="00000-000" required></div>
+        <div class="form-group-new"><label>Endereço</label><input class="form-control-new street-input" name="endereco" required></div>
+        <div class="form-group-new"><label>Número</label><input class="form-control-new" name="numero" required></div>
+        <div class="form-group-new"><label>Complemento</label><input class="form-control-new" name="complemento" placeholder="Opcional"></div>
+        <div class="form-group-new"><label>Bairro</label><input class="form-control-new neighborhood-input" name="bairro" required></div>
+        <div class="form-group-new"><label>Cidade</label><input class="form-control-new city-input" name="cidade" required></div>
+        <div class="form-group-new"><label>UF</label><input class="form-control-new state-input" name="uf" maxlength="2" required></div>
+        <div class="form-group-new"><label>Raio de atendimento (km)</label><input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="25" required></div>
+        <div class="form-group-new"><label>Capacidade (kg)</label><input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="1000" required></div>
+      </div>
+      <p class="address-status" aria-live="polite"></p>
+      <label class="check-field"><input type="checkbox" name="realiza_coleta_domiciliar" checked> Realiza coleta domiciliar</label>
+      <button class="btn btn-primary" type="submit">Cadastrar base</button>
+    </form>
+  </section>
+
+  <div class="ecotech-list">
+  {% for base in bases %}
+    <section class="ecotech-panel base-item {% if not base.ativa %}is-inactive{% endif %}">
+      <div class="section-header"><div><h2>{{ base.nome }}</h2><p>{{ base.endereco }}</p></div><span class="status-pill {{ 'success' if base.ativa else 'neutral' }}">{{ 'Ativa' if base.ativa else 'Inativa' }}</span></div>
+      <form method="POST" action="{{ url_for('editar_base', id_base=base.id) }}" class="address-form" data-address-form>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="latitude" value="{{ base.latitude }}"><input type="hidden" name="longitude" value="{{ base.longitude }}">
+        <div class="form-grid-2">
+          <div class="form-group-new"><label>Nome da base</label><input class="form-control-new" name="nome" value="{{ base.nome }}" required></div>
+          <div class="form-group-new"><label>CEP para atualizar localização</label><input class="form-control-new cep-input" name="cep" inputmode="numeric" maxlength="9" placeholder="Preencha somente se mudar o endereço"></div>
+          <div class="form-group-new"><label>Endereço completo</label><input class="form-control-new street-input" name="endereco" value="{{ base.endereco }}" required></div>
+          <div class="form-group-new"><label>Número</label><input class="form-control-new" name="numero" placeholder="Se necessário"></div>
+          <div class="form-group-new"><label>Complemento</label><input class="form-control-new" name="complemento"></div>
+          <div class="form-group-new"><label>Bairro</label><input class="form-control-new neighborhood-input" name="bairro"></div>
+          <div class="form-group-new"><label>Cidade</label><input class="form-control-new city-input" name="cidade"></div>
+          <div class="form-group-new"><label>UF</label><input class="form-control-new state-input" name="uf" maxlength="2"></div>
+          <div class="form-group-new"><label>Raio de atendimento (km)</label><input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="{{ base.raio_atendimento_km }}" required></div>
+          <div class="form-group-new"><label>Capacidade (kg)</label><input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="{{ base.capacidade_kg }}" required></div>
         </div>
-        <a href="{{ url_for('empresa_pontos') }}" class="btn">← Pontos de coleta</a>
-    </div>
-
-    <section class="card" style="padding:1.25rem;margin:1.5rem 0;">
-        <h2 style="font-size:1.1rem;">Nova base</h2>
-        <form method="POST" action="{{ url_for('empresa_bases') }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <div class="form-grid-2">
-                <label>Nome<input class="form-control-new" name="nome" required></label>
-                <label>Endereço<input class="form-control-new" name="endereco" required></label>
-                <label>Latitude<input class="form-control-new" type="number" step="any" name="latitude" min="-90" max="90" required></label>
-                <label>Longitude<input class="form-control-new" type="number" step="any" name="longitude" min="-180" max="180" required></label>
-                <label>Raio de atendimento (km)<input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="25" required></label>
-                <label>Capacidade (kg)<input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="1000" required></label>
-            </div>
-            <label style="display:block;margin:.75rem 0;"><input type="checkbox" name="realiza_coleta_domiciliar" checked> Realiza coleta domiciliar</label>
-            <button class="btn" type="submit">Cadastrar base</button>
-        </form>
+        <p class="address-status" aria-live="polite"></p>
+        <label class="check-field"><input type="checkbox" name="realiza_coleta_domiciliar" {% if base.realiza_coleta_domiciliar %}checked{% endif %}> Realiza coleta domiciliar</label>
+        <button class="btn btn-primary" type="submit">Salvar alterações</button>
+      </form>
+      <form method="POST" action="{{ url_for('atividade_base', id_base=base.id) }}" class="inline-action">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="ativa" value="{{ 0 if base.ativa else 1 }}">
+        <button class="btn btn-secondary" type="submit">{{ 'Desativar' if base.ativa else 'Ativar' }} base</button>
+      </form>
     </section>
-
-    {% for base in bases %}
-    <section class="card" style="padding:1.25rem;margin-bottom:1rem;opacity:{{ 1 if base.ativa else 0.65 }};">
-        <form method="POST" action="{{ url_for('editar_base', id_base=base.id) }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <div class="form-grid-2">
-                <label>Nome<input class="form-control-new" name="nome" value="{{ base.nome }}" required></label>
-                <label>Endereço<input class="form-control-new" name="endereco" value="{{ base.endereco }}" required></label>
-                <label>Latitude<input class="form-control-new" type="number" step="any" name="latitude" value="{{ base.latitude }}" required></label>
-                <label>Longitude<input class="form-control-new" type="number" step="any" name="longitude" value="{{ base.longitude }}" required></label>
-                <label>Raio (km)<input class="form-control-new" type="number" step="0.1" min="0.1" name="raio_atendimento_km" value="{{ base.raio_atendimento_km }}" required></label>
-                <label>Capacidade (kg)<input class="form-control-new" type="number" step="0.1" min="0.1" name="capacidade_kg" value="{{ base.capacidade_kg }}" required></label>
-            </div>
-            <label style="display:block;margin:.75rem 0;"><input type="checkbox" name="realiza_coleta_domiciliar" {% if base.realiza_coleta_domiciliar %}checked{% endif %}> Realiza coleta domiciliar</label>
-            <button class="btn" type="submit">Salvar alterações</button>
-        </form>
-        <form method="POST" action="{{ url_for('atividade_base', id_base=base.id) }}" style="margin-top:.75rem;">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="ativa" value="{{ 0 if base.ativa else 1 }}">
-            <button class="btn" type="submit">{{ 'Desativar' if base.ativa else 'Ativar' }} base</button>
-        </form>
-    </section>
-    {% else %}
-    <p>Nenhuma base operacional cadastrada.</p>
-    {% endfor %}
-</div>
+  {% else %}<div class="empty-state"><h3>Nenhuma base cadastrada</h3><p>Cadastre a primeira base para começar a receber oportunidades.</p></div>{% endfor %}
+  </div>
+</div></div>
+<script src="{{ url_for('static', filename='js/endereco.js') }}"></script>
 {% endblock %}

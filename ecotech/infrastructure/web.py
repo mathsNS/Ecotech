@@ -26,7 +26,7 @@ from ..application.services import (
     ServicoAutenticacao,
     ServicoBaseOperacional,
 )
-from ..application.geolocalizacao import GeolocalizadorCoordenadasInformadas
+from ..application.geolocalizacao import GeolocalizadorPorCep
 from ..application.despacho import ConfiguracaoDespacho, ServicoDespacho
 from ..application.elegibilidade import DemandaColeta
 from ..application.agendamento import ServicoAgendamento
@@ -87,7 +87,7 @@ def criar_app() -> Flask:
     )
     servico_agendamento = ServicoAgendamento(dados)
     servico_chat = ServicoChat(dados)
-    geolocalizador = GeolocalizadorCoordenadasInformadas()
+    geolocalizador = GeolocalizadorPorCep()
     
     # configura dependencias entre servicos
     servico_descarte.set_servicos(servico_usuario, servico_ponto)
@@ -430,7 +430,8 @@ def criar_app() -> Flask:
                 if tipo_coleta == 'domiciliar':
                     try:
                         coordenadas = geolocalizador.localizar(
-                            endereco_coleta, latitude_coleta, longitude_coleta
+                            endereco_coleta, latitude_coleta, longitude_coleta,
+                            request.form.get('cep_coleta', ''),
                         )
                     except ValueError:
                         dados.registrar_evento_operacional(
@@ -585,11 +586,26 @@ def criar_app() -> Flask:
         )
 
     def _dados_form_base():
+        endereco = ', '.join(filter(None, [
+            request.form.get('endereco', '').strip(),
+            request.form.get('numero', '').strip(),
+            request.form.get('complemento', '').strip(),
+            request.form.get('bairro', '').strip(),
+            request.form.get('cidade', '').strip(),
+            request.form.get('uf', '').strip().upper(),
+            request.form.get('cep', '').strip(),
+        ]))
+        coordenadas = geolocalizador.localizar(
+            endereco,
+            request.form.get('latitude', '').strip(),
+            request.form.get('longitude', '').strip(),
+            request.form.get('cep', '').strip(),
+        )
         return {
             'nome': request.form.get('nome', '').strip(),
-            'endereco': request.form.get('endereco', '').strip(),
-            'latitude': request.form.get('latitude', '').strip(),
-            'longitude': request.form.get('longitude', '').strip(),
+            'endereco': endereco,
+            'latitude': coordenadas.latitude,
+            'longitude': coordenadas.longitude,
             'raio_atendimento_km': request.form.get(
                 'raio_atendimento_km', ''
             ).strip(),
@@ -598,6 +614,15 @@ def criar_app() -> Flask:
                 request.form.get('realiza_coleta_domiciliar') == 'on'
             ),
         }
+
+    @app.route('/api/cep/<cep>')
+    def consultar_cep(cep):
+        if not usuario_logado():
+            return jsonify({'erro': 'Não autenticado'}), 401
+        try:
+            return jsonify(geolocalizador.consultar_cep(cep))
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
 
     @app.route('/empresa/bases', methods=['GET', 'POST'])
     def empresa_bases():
@@ -755,7 +780,8 @@ def criar_app() -> Flask:
         todas=servico_despacho.listar_ofertas_ativas(usuario['id'])
         return render_template('empresa_oportunidades.html',usuario=usuario,
             ofertas=todas[(pagina-1)*limite:pagina*limite],pagina=pagina,
-            tem_anterior=pagina>1,tem_proxima=len(todas)>pagina*limite)
+            tem_anterior=pagina>1,tem_proxima=len(todas)>pagina*limite,
+            bases=servico_base.listar_empresa(usuario['id']))
 
     @app.route('/ofertas/<oferta_id>/recusar',methods=['POST'])
     def recusar_oferta(oferta_id):

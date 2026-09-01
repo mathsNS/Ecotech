@@ -8,6 +8,7 @@ import pytest
 from ecotech.application.geolocalizacao import (
     DistanciaHaversine,
     GeolocalizadorCoordenadasInformadas,
+    GeolocalizadorPorCep,
 )
 from ecotech.application.services import ServicoBaseOperacional
 from ecotech.domain.logistica import BaseOperacional, Coordenadas, JanelaAtendimento
@@ -42,6 +43,23 @@ def test_geolocalizador_exige_endereco_e_coordenadas():
         geolocalizador.localizar('', '-7.2', '-39.3')
     with pytest.raises(ValueError, match='localização'):
         geolocalizador.localizar('Rua A', '', '')
+
+
+def test_geolocalizador_por_cep_oculta_coordenadas_do_usuario(monkeypatch):
+    class Resposta:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self):
+            return b'{"street":"Rua A","city":"Crato","state":"CE","location":{"coordinates":{"latitude":"-7.2","longitude":"-39.4"}}}'
+
+    monkeypatch.setattr(
+        'ecotech.application.geolocalizacao.urlopen',
+        lambda requisicao, timeout: Resposta(),
+    )
+    localizador = GeolocalizadorPorCep()
+    dados = localizador.consultar_cep('63100-000')
+    assert dados['latitude'] == -7.2
+    assert localizador.localizar('Rua A', cep='63100000') == Coordenadas(-7.2, -39.4)
 
 
 def test_base_operacional_valida_capacidade_e_raio():
