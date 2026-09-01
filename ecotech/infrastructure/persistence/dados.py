@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import uuid
 from datetime import datetime
 from werkzeug.security import generate_password_hash
 from ...domain.usuarios import Cidadao, Empresa, Administrador
@@ -777,6 +778,9 @@ class Dados(RepositorioBase):
                 'Coleta aceita com sucesso. Os dados completos já estão disponíveis em Operações.',
                 f'coleta:{oferta["solicitacao_id"]}:atribuida:empresa',
             ))
+            self.conn.execute("""INSERT OR IGNORE INTO conversa_solicitacao
+                (id,solicitacao_id,cidadao_id,empresa_id,criada_em)
+                VALUES(?,?,?,?,?)""",(str(uuid.uuid4()),oferta['solicitacao_id'],oferta['id_usuario'],empresa_id,agora))
             self.conn.commit()
             return self.conn.execute("""
                 SELECT o.*, sd.endereco_coleta, sd.nome_contato,
@@ -861,6 +865,42 @@ class Dados(RepositorioBase):
 
     def buscar_agendamento(self, solicitacao_id):
         return self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+
+    def criar_conversa_solicitacao(self, solicitacao_id, agora):
+        with self.conn:
+            sol=self.conn.execute("SELECT id_usuario,empresa_responsavel_id FROM solicitacao_descarte WHERE id=?",(solicitacao_id,)).fetchone()
+            if not sol or not sol['empresa_responsavel_id']: raise ValueError('chat indisponível antes da atribuição')
+            self.conn.execute("INSERT OR IGNORE INTO conversa_solicitacao(id,solicitacao_id,cidadao_id,empresa_id,criada_em) VALUES(?,?,?,?,?)",(str(uuid.uuid4()),solicitacao_id,sol['id_usuario'],sol['empresa_responsavel_id'],agora))
+        return self.conn.execute("SELECT * FROM conversa_solicitacao WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+
+    def _conversa_autorizada(self, solicitacao_id, usuario_id, sistema=False):
+        row=self.conn.execute("""SELECT c.*,u.tipo AS usuario_tipo FROM conversa_solicitacao c
+            LEFT JOIN usuario u ON u.id=? WHERE c.solicitacao_id=?""",(usuario_id,solicitacao_id)).fetchone()
+        if not row: raise LookupError('conversa não encontrada')
+        if not sistema and usuario_id not in (row['cidadao_id'],row['empresa_id']) and row['usuario_tipo']!='administrador': raise PermissionError('acesso negado à conversa')
+        return row
+
+    def salvar_mensagem_chat(self,id_mensagem,solicitacao_id,remetente_id,tipo,texto,payload,agora,sistema=False):
+        conversa=self._conversa_autorizada(solicitacao_id,remetente_id,sistema)
+        if conversa['encerrada_em']: raise ValueError('conversa encerrada')
+        with self.conn:
+            self.conn.execute("INSERT INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",(id_mensagem,conversa['id'],remetente_id,tipo,texto,payload,agora))
+        return self.conn.execute("SELECT * FROM mensagem_chat WHERE id=?",(id_mensagem,)).fetchone()
+
+    def buscar_mensagens_chat(self,solicitacao_id,usuario_id,pagina,limite):
+        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
+        return self.conn.execute("SELECT * FROM mensagem_chat WHERE conversa_id=? ORDER BY criado_em,id LIMIT ? OFFSET ?",(conversa['id'],limite,(pagina-1)*limite)).fetchall()
+
+    def marcar_mensagens_chat_lidas(self,solicitacao_id,usuario_id,agora):
+        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
+        with self.conn:
+            cursor=self.conn.execute("UPDATE mensagem_chat SET lida_em=? WHERE conversa_id=? AND lida_em IS NULL AND (remetente_id IS NULL OR remetente_id<>?)",(agora,conversa['id'],usuario_id))
+        return cursor.rowcount
+
+    def encerrar_conversa_solicitacao(self,solicitacao_id,usuario_id,agora):
+        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
+        with self.conn: self.conn.execute("UPDATE conversa_solicitacao SET encerrada_em=COALESCE(encerrada_em,?) WHERE id=?",(agora,conversa['id']))
+        return self.conn.execute("SELECT * FROM conversa_solicitacao WHERE id=?",(conversa['id'],)).fetchone()
 
     # -------------------
     # DESATIVAR (soft-delete)

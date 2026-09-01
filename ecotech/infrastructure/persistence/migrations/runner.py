@@ -9,6 +9,7 @@ from .v004_elegibilidade_ranking import aplicar as aplicar_v004
 from .v005_ofertas_despacho import aplicar as aplicar_v005
 from .v006_aceite_atribuicao import aplicar as aplicar_v006
 from .v007_agendamento import aplicar as aplicar_v007
+from .v008_chat import aplicar as aplicar_v008
 
 
 MIGRATIONS = (
@@ -19,6 +20,7 @@ MIGRATIONS = (
     (5, "ofertas_despacho_progressivo", aplicar_v005),
     (6, "aceite_atribuição_atomica", aplicar_v006),
     (7, "negociacao_agendamento", aplicar_v007),
+    (8, "chat_solicitacao", aplicar_v008),
 )
 
 
