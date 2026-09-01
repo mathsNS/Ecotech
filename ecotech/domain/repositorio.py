@@ -222,6 +222,14 @@ class RepositorioBase(ABC):
     ) -> None: ...
 
     @abstractmethod
+    def aceitar_oferta_coleta(
+        self, oferta_id: str, empresa_id: str, agora: str
+    ) -> Any: ...
+
+    @abstractmethod
+    def buscar_ofertas_ativas_empresa(self, empresa_id: str) -> List[Any]: ...
+
+    @abstractmethod
     def buscar_notificacoes_usuario(self, id_usuario: str) -> List[Any]:
         """Retorna todas as notificações de um usuário."""
         ...

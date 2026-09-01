@@ -7,6 +7,7 @@ from .v002_idempotencia_financeira import aplicar as aplicar_v002
 from .v003_bases_localizacao import aplicar as aplicar_v003
 from .v004_elegibilidade_ranking import aplicar as aplicar_v004
 from .v005_ofertas_despacho import aplicar as aplicar_v005
+from .v006_aceite_atribuicao import aplicar as aplicar_v006
 
 
 MIGRATIONS = (
@@ -15,6 +16,7 @@ MIGRATIONS = (
     (3, "bases_operacionais_localizacao", aplicar_v003),
     (4, "elegibilidade_ranking", aplicar_v004),
     (5, "ofertas_despacho_progressivo", aplicar_v005),
+    (6, "aceite_atribuição_atomica", aplicar_v006),
 )
 
 

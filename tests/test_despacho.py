@@ -15,7 +15,7 @@ from ecotech.infrastructure.persistence.dados import Dados
 AGORA = datetime(2026, 9, 1, 9, 0)
 
 
-def _preparar(tmp_path, monkeypatch):
+def _preparar(tmp_path, monkeypatch, lotes=(1, 2)):
     caminho = str(tmp_path / 'despacho.db')
     original = sqlite3.connect
     monkeypatch.setattr(
@@ -53,7 +53,7 @@ def _preparar(tmp_path, monkeypatch):
     )
     servico = ServicoDespacho(
         dados, bases,
-        configuracao=ConfiguracaoDespacho((1, 2), 5),
+        configuracao=ConfiguracaoDespacho(lotes, 5),
     )
     return dados, servico, demanda
 
@@ -120,3 +120,64 @@ def test_base_nao_elegivel_nao_recebe_oferta(tmp_path, monkeypatch):
     }
     assert 'base-1' not in bases_ofertadas
     assert dados.buscar_notificacoes_usuario('emp-1') == []
+
+
+def test_aceite_ativo_atribui_e_cancela_concorrentes(tmp_path, monkeypatch):
+    dados, servico, demanda = _preparar(tmp_path, monkeypatch, (2, 1))
+    servico.criar_ofertas('sol-1', demanda, AGORA)
+    oferta = dados.buscar_ofertas_solicitacao('sol-1')[0]
+    aceita = servico.aceitar(oferta['id'], oferta['empresa_id'], AGORA + timedelta(minutes=1))
+    solicitacao = dados.buscar_solicitacao('sol-1')
+    assert aceita['endereco_coleta'] == 'Rua Secreta, 123'
+    assert solicitacao['empresa_responsavel_id'] == oferta['empresa_id']
+    assert solicitacao['base_operacional_id'] == oferta['base_operacional_id']
+    assert [o['status'] for o in dados.buscar_ofertas_solicitacao('sol-1')] == [
+        'ACEITA', 'CANCELADA', 'CANCELADA'
+    ]
+    assert len(dados.buscar_notificacoes_usuario('cid-1')) == 1
+
+
+def test_repetir_aceite_vencedor_e_idempotente(tmp_path, monkeypatch):
+    dados, servico, demanda = _preparar(tmp_path, monkeypatch)
+    servico.criar_ofertas('sol-1', demanda, AGORA)
+    oferta = dados.buscar_ofertas_solicitacao('sol-1')[0]
+    servico.aceitar(oferta['id'], 'emp-1', AGORA + timedelta(minutes=1))
+    servico.aceitar(oferta['id'], 'emp-1', AGORA + timedelta(minutes=2))
+    assert dados.buscar_solicitacao('sol-1')['versao_atribuicao'] == 1
+    assert len(dados.buscar_notificacoes_usuario('cid-1')) == 1
+
+
+def test_oferta_expirada_e_empresa_sem_oferta_nao_aceitam(tmp_path, monkeypatch):
+    dados, servico, demanda = _preparar(tmp_path, monkeypatch)
+    servico.criar_ofertas('sol-1', demanda, AGORA)
+    oferta = dados.buscar_ofertas_solicitacao('sol-1')[0]
+    import pytest
+    with pytest.raises(TimeoutError):
+        servico.aceitar(oferta['id'], 'emp-1', AGORA + timedelta(minutes=6))
+    with pytest.raises(LookupError):
+        servico.aceitar(oferta['id'], 'emp-2', AGORA + timedelta(minutes=1))
+
+
+def test_aceites_concorrentes_produzem_um_unico_vencedor(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    dados, servico, demanda = _preparar(tmp_path, monkeypatch, (2, 1))
+    servico.criar_ofertas('sol-1', demanda, AGORA)
+    ofertas = dados.buscar_ofertas_solicitacao('sol-1')[:2]
+    repositorios = [Dados(), Dados()]
+
+    def aceitar(indice):
+        oferta = ofertas[indice]
+        try:
+            ServicoDespacho(repositorios[indice]).aceitar(
+                oferta['id'], oferta['empresa_id'], AGORA + timedelta(minutes=1)
+            )
+            return 'aceita'
+        except RuntimeError:
+            return 'conflito'
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        resultados = list(executor.map(aceitar, (0, 1)))
+    assert sorted(resultados) == ['aceita', 'conflito']
+    assert dados.conn.execute(
+        "SELECT COUNT(*) FROM oferta_coleta WHERE status = 'ACEITA'"
+    ).fetchone()[0] == 1

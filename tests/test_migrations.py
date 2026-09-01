@@ -28,7 +28,7 @@ def dados(tmp_path, monkeypatch):
 
 
 def test_banco_vazio_sobe_na_versao_atual(dados):
-    assert dados.buscar_versao_schema() == 5
+    assert dados.buscar_versao_schema() == 6
     aplicadas = dados.conn.execute(
         "SELECT versao, nome FROM schema_migration ORDER BY versao"
     ).fetchall()
@@ -38,6 +38,7 @@ def test_banco_vazio_sobe_na_versao_atual(dados):
         (3, 'bases_operacionais_localizacao'),
         (4, 'elegibilidade_ranking'),
         (5, 'ofertas_despacho_progressivo'),
+        (6, 'aceite_atribuição_atomica'),
     ]
 
 
@@ -47,7 +48,7 @@ def test_reexecutar_migrations_e_idempotente(dados):
     total = dados.conn.execute(
         "SELECT COUNT(*) FROM schema_migration"
     ).fetchone()[0]
-    assert total == 5
+    assert total == 6
 
 
 def test_migration_cria_estruturas_de_elegibilidade(dados):
@@ -82,6 +83,12 @@ def test_migration_cria_ofertas_e_idempotencia_de_notificacao(dados):
         row['name'] for row in dados.conn.execute("PRAGMA table_info(notificacao)")
     }
     assert 'chave_idempotencia' in colunas_notificacao
+    colunas_solicitacao = {
+        row['name'] for row in dados.conn.execute(
+            "PRAGMA table_info(solicitacao_descarte)"
+        )
+    }
+    assert {'empresa_responsavel_id', 'atribuida_em', 'versao_atribuicao'} <= colunas_solicitacao
 
 
 def test_colunas_legadas_sao_adicionadas_sem_ocultar_erros(tmp_path, monkeypatch):
@@ -107,7 +114,7 @@ def test_colunas_legadas_sao_adicionadas_sem_ocultar_erros(tmp_path, monkeypatch
         row['name'] for row in repositorio.conn.execute("PRAGMA table_info(usuario)")
     }
     assert 'password_hash' in colunas
-    assert repositorio.buscar_versao_schema() == 5
+    assert repositorio.buscar_versao_schema() == 6
 
 
 def test_migration_cria_base_para_ponto_empresarial(dados):

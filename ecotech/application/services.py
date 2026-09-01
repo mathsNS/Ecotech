@@ -92,6 +92,13 @@ class ServicoDescarte:
                 
                 # reconstroi a solicitacao
                 solicitacao = SolicitacaoDescarte(row['id'], usuario, ponto)
+                if 'empresa_responsavel_id' in row.keys():
+                    solicitacao._empresa_responsavel_id = row['empresa_responsavel_id']
+                    solicitacao._base_operacional_id = row['base_operacional_id']
+                    if row['atribuida_em']:
+                        solicitacao._atribuida_em = datetime.fromisoformat(row['atribuida_em'])
+                    solicitacao._endereco_coleta = row['endereco_coleta']
+                    solicitacao._nome_contato = row['nome_contato']
                 
                 # reconstroi o estado correto do banco
                 estado = EstadoFactory.criar_do_banco(row['estado'])

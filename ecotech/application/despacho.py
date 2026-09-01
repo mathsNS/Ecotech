@@ -102,6 +102,29 @@ class ServicoDespacho:
         self._notificar_ativas(ativas)
         return ativas
 
+    def aceitar(
+        self, oferta_id: str, empresa_id: str,
+        agora: datetime | None = None,
+    ):
+        agora = agora or datetime.now()
+        return self._dados.aceitar_oferta_coleta(
+            oferta_id, empresa_id, self._iso(agora)
+        )
+
+    def listar_ofertas_ativas(self, empresa_id: str) -> list[dict]:
+        resultado = []
+        for oferta in self._dados.buscar_ofertas_ativas_empresa(empresa_id):
+            snapshot = json.loads(oferta['snapshot_fatores'])
+            resultado.append({
+                'id': oferta['id'],
+                'solicitacao_id': oferta['solicitacao_id'],
+                'base_operacional_id': oferta['base_operacional_id'],
+                'distancia_km': oferta['distancia_km'],
+                'expira_em': oferta['expira_em'],
+                'dados': snapshot.get('dados_visiveis', {}),
+            })
+        return resultado
+
     def _notificar_ativas(self, ofertas) -> None:
         for oferta in ofertas:
             snapshot = json.loads(oferta['snapshot_fatores'])

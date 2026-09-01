@@ -215,6 +215,11 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._impacto_evitado_db: float = 0.0
         self._data_criacao = datetime.now()
         self._data_agendamento: Optional[datetime] = None
+        self._empresa_responsavel_id: Optional[str] = None
+        self._base_operacional_id: Optional[str] = None
+        self._atribuida_em: Optional[datetime] = None
+        self._endereco_coleta: Optional[str] = None
+        self._nome_contato: Optional[str] = None
         self._rastreamento = RastreamentoEntrega(f"R-{id}")
         self.registrar_log("Solicitação criada", f"ID: {id}")
 
@@ -280,6 +285,26 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
     @property
     def data_criacao(self) -> datetime:
         return self._data_criacao
+
+    @property
+    def empresa_responsavel_id(self):
+        return self._empresa_responsavel_id
+
+    @property
+    def base_operacional_id(self):
+        return self._base_operacional_id
+
+    @property
+    def atribuida_em(self):
+        return self._atribuida_em
+
+    @property
+    def endereco_coleta(self):
+        return self._endereco_coleta
+
+    @property
+    def nome_contato(self):
+        return self._nome_contato
 
     def adicionar_item(self, item: ItemDescarte):
         self._itens.append(item)

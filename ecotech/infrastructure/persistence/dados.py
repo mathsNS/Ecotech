@@ -691,6 +691,104 @@ class Dados(RepositorioBase):
             ORDER BY prioridade
         """, (solicitacao_id,)).fetchall()
 
+    def buscar_ofertas_ativas_empresa(self, empresa_id: str):
+        return self.conn.execute("""
+            SELECT o.id, o.solicitacao_id, o.base_operacional_id,
+                   o.distancia_km, o.prioridade, o.rodada,
+                   o.snapshot_fatores, o.expira_em
+            FROM oferta_coleta o
+            WHERE o.empresa_id = ? AND o.status = 'ATIVA'
+            ORDER BY o.prioridade
+        """, (empresa_id,)).fetchall()
+
+    def aceitar_oferta_coleta(
+        self, oferta_id: str, empresa_id: str, agora: str
+    ):
+        """Executa todo o aceite sob lock de escrita; o cache nunca decide."""
+        self.conn.commit()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            oferta = self.conn.execute("""
+                SELECT o.*, sd.id_usuario, sd.empresa_responsavel_id,
+                       sd.endereco_coleta, sd.nome_contato, sd.data_agendamento,
+                       u.nome AS nome_empresa
+                FROM oferta_coleta o
+                JOIN solicitacao_descarte sd ON sd.id = o.solicitacao_id
+                JOIN usuario u ON u.id = o.empresa_id
+                WHERE o.id = ? AND o.empresa_id = ?
+            """, (oferta_id, empresa_id)).fetchone()
+            if not oferta:
+                raise LookupError("oferta não encontrada para esta empresa")
+            if oferta['empresa_responsavel_id']:
+                if oferta['empresa_responsavel_id'] == empresa_id and oferta['status'] == 'ACEITA':
+                    self.conn.commit()
+                    return oferta
+                raise RuntimeError("coleta já atribuída a outra empresa")
+            if oferta['status'] != 'ATIVA':
+                raise ValueError("oferta não está ativa")
+            if not oferta['expira_em'] or oferta['expira_em'] <= agora:
+                self.conn.execute("""
+                    UPDATE oferta_coleta SET status = 'EXPIRADA', respondida_em = ?
+                    WHERE id = ? AND status = 'ATIVA'
+                """, (agora, oferta_id))
+                self.conn.commit()
+                raise TimeoutError("oferta expirada")
+            cursor = self.conn.execute("""
+                UPDATE solicitacao_descarte
+                SET empresa_responsavel_id = ?, base_operacional_id = ?,
+                    atribuida_em = ?, versao_atribuicao = versao_atribuicao + 1,
+                    estado = 'SOLICITADO', despacho_esgotado_em = NULL
+                WHERE id = ? AND empresa_responsavel_id IS NULL
+                  AND estado = 'BUSCANDO_EMPRESA'
+            """, (
+                empresa_id, oferta['base_operacional_id'], agora,
+                oferta['solicitacao_id'],
+            ))
+            if cursor.rowcount != 1:
+                raise RuntimeError("coleta já atribuída a outra empresa")
+            self.conn.execute("""
+                UPDATE oferta_coleta SET status = 'ACEITA', respondida_em = ?
+                WHERE id = ? AND status = 'ATIVA'
+            """, (agora, oferta_id))
+            self.conn.execute("""
+                UPDATE oferta_coleta SET status = 'CANCELADA', respondida_em = ?
+                WHERE solicitacao_id = ? AND id <> ?
+                  AND status IN ('AGUARDANDO', 'ATIVA')
+            """, (agora, oferta['solicitacao_id'], oferta_id))
+            self.conn.execute("""
+                INSERT INTO historico_rastreamento(id_solicitacao, timestamp, mensagem)
+                VALUES (?, ?, ?)
+            """, (oferta['solicitacao_id'], agora, f'Coleta atribuída à base {oferta["base_operacional_id"]}'))
+            chave = f'coleta:{oferta["solicitacao_id"]}:atribuida'
+            self.conn.execute("""
+                INSERT OR IGNORE INTO notificacao(
+                    id_usuario, timestamp, mensagem, chave_idempotencia
+                ) VALUES (?, ?, ?, ?)
+            """, (
+                oferta['id_usuario'], datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
+                f'A empresa {oferta["nome_empresa"]} aceitou sua coleta domiciliar.', chave,
+            ))
+            self.conn.execute("""
+                INSERT OR IGNORE INTO notificacao(
+                    id_usuario, timestamp, mensagem, chave_idempotencia
+                ) VALUES (?, ?, ?, ?)
+            """, (
+                empresa_id, datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
+                'Coleta aceita com sucesso. Os dados completos já estão disponíveis em Operações.',
+                f'coleta:{oferta["solicitacao_id"]}:atribuida:empresa',
+            ))
+            self.conn.commit()
+            return self.conn.execute("""
+                SELECT o.*, sd.endereco_coleta, sd.nome_contato,
+                       sd.data_agendamento, sd.empresa_responsavel_id
+                FROM oferta_coleta o JOIN solicitacao_descarte sd
+                  ON sd.id = o.solicitacao_id WHERE o.id = ?
+            """, (oferta_id,)).fetchone()
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+
     def marcar_despacho_esgotado(self, solicitacao_id: str, agora: str) -> None:
         with self.conn:
             self.conn.execute("""
