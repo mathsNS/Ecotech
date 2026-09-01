@@ -24,6 +24,10 @@ O EcoTech é um sistema de gerenciamento de descarte de lixo eletrônico que fac
 - Cálculo automático de impacto ambiental
 - Relatórios de reciclagem e sustentabilidade
 - Gerenciamento de pontos de coleta
+- Coleta domiciliar com geolocalização, elegibilidade e ofertas progressivas
+- Aceite atômico, chat privado e negociação de agendamento
+- Jornadas separadas para cidadãos, empresas e administradores
+- Diagnóstico operacional do despacho e trilha de eventos
 
 ## Arquitetura
 
@@ -105,10 +109,13 @@ Exemplo: `SolicitacaoDescarte(LoggableMixin, NotificavelMixin)` herda de dois Mi
 
 ### Testes
 
-O projeto conta com **85 testes automatizados** cobrindo:
+O projeto conta com testes automatizados cobrindo:
 
 - Domínio: dispositivos, estados, tratamento, descarte, mixins
 - Aplicação: factories, serviços
+- Persistência: migrações incrementais e concorrência no aceite
+- Web: permissões, privacidade e jornadas por perfil
+- Fluxo integrado de coleta domiciliar com relógio controlado
 - Todos os testes passam com `pytest`
 
 ## Instalação e Execução
@@ -140,6 +147,32 @@ A aplicação estará disponível em http://localhost:5000
 ```bash
 pytest -v
 ```
+
+Com Docker:
+
+```bash
+docker compose run --rm website pytest -q
+```
+
+### Operação da coleta domiciliar
+
+O banco SQLite é atualizado automaticamente por migrações incrementais na
+inicialização. O despacho progressivo é processado por um comando idempotente,
+que deve ser executado periodicamente pelo agendador do ambiente:
+
+```bash
+flask --app ecotech.infrastructure.web:criar_app processar-ofertas
+```
+
+Variáveis de ambiente relevantes:
+
+- `ECOTECH_SECRET_KEY`: chave privada usada pela sessão Flask.
+- `ECOTECH_DESPACHO_LOTES`: tamanhos dos lotes, por exemplo `1,2,3`.
+- `ECOTECH_DESPACHO_PRAZO_MINUTOS`: validade de cada rodada de ofertas.
+
+As telas operacionais ficam em `/empresa/oportunidades`, `/empresa/bases` e
+`/admin/despacho`. Cidadãos e a empresa responsável acessam agendamento e chat
+pela solicitação; o endereço privado só é revelado à empresa vencedora.
 
 ## Tecnologias Utilizadas
 

@@ -306,6 +306,22 @@ Para validações determinísticas, também é possível informar um instante IS
 flask --app ecotech.infrastructure.web:criar_app processar-ofertas --agora 2026-09-01T10:00:00
 ```
 
+### Banco de dados e observabilidade
+
+As migrações SQLite são aplicadas automaticamente quando a aplicação inicia.
+O schema inclui solicitações, endereços privados, bases operacionais, ofertas,
+mensagens, propostas de horário e eventos operacionais. Não altere essas tabelas
+manualmente; novas mudanças de schema devem ser adicionadas como migrações.
+
+O painel `/admin/despacho` apresenta volume de ofertas, rodadas, aceite,
+conflitos e tempos operacionais. Os eventos persistidos permitem diagnosticar
+ausência de empresas elegíveis, criação de lotes, conflitos de aceite e
+confirmação do agendamento.
+
+As telas da empresa ficam em `/empresa/oportunidades` e `/empresa/bases`.
+Agendamento e chat são acessados a partir dos detalhes da solicitação e
+respeitam as permissões do cidadão e da empresa vencedora.
+
 ```powershell
 # Ver versão do Python
 python --version
