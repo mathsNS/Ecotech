@@ -180,3 +180,19 @@ def test_registrar_email_ja_cadastrado_retorna_400(client):
     })
     assert resp.status_code == 400
 
+
+# ---------------------------------------------------------------------------
+# CORS, necessario para o app flutter web acessar a api de outra origem
+# ---------------------------------------------------------------------------
+
+def test_rota_api_libera_cors(client):
+    resp = client.post("/api/v1/auth/login", json={
+        "tipo": "cidadao", "credencial": _CPF_CIDADAO, "senha": _SENHA_CIDADAO,
+    })
+    assert resp.headers["Access-Control-Allow-Origin"] == "*"
+
+
+def test_rota_html_nao_libera_cors(client):
+    resp = client.get("/login")
+    assert "Access-Control-Allow-Origin" not in resp.headers
+

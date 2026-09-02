@@ -172,6 +172,15 @@ def criar_app() -> Flask:
     from .api import criar_blueprint_api_v1
     app.register_blueprint(criar_blueprint_api_v1(servico_autenticacao, servico_usuario))
 
+    @app.after_request
+    def liberar_cors_api_mobile(response):
+        """Libera CORS so para a API mobile, que autentica por token e nao por cookie."""
+        if request.path.startswith('/api/v1/'):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+        return response
+
     @app.before_request
     def proteger_csrf():
         """Valida requisições mutáveis que utilizam a sessão Flask."""
