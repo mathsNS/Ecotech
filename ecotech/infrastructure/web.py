@@ -973,16 +973,6 @@ def criar_app() -> Flask:
             flash('Coleta aceita. Dados completos liberados em Operações.','success')
             return redirect(url_for('operacoes'))
 
-        registro = dados.buscar_solicitacao(sol.id)
-        empresa_id = registro['empresa_responsavel_id']
-        if not empresa_id and registro['id_ponto_coleta']:
-            ponto = dados.buscar_ponto_coleta(registro['id_ponto_coleta'])
-            empresa_id = ponto['id_empresa'] if ponto else None
-        empresa_mtr = dados.buscar_empresa(empresa_id) if empresa_id else None
-        base_mtr = dados.buscar_base_operacional(registro['base_operacional_id']) if registro['base_operacional_id'] else None
-        sol._mtr_registro = dict(registro)
-        sol._mtr_empresa = dict(empresa_mtr) if empresa_mtr else {}
-        sol._mtr_base = dict(base_mtr) if base_mtr else {}
         return jsonify({
             'ok': True,
             'solicitacao_id': aceita['solicitacao_id'],
@@ -1633,6 +1623,17 @@ def criar_app() -> Flask:
         if not usuario_pode_operar_solicitacao(usuario, sol, dados):
             flash('Acesso não autorizado a esta solicitação.', 'error')
             return redirect(url_for('operacoes'))
+
+        registro = dados.buscar_solicitacao(sol.id)
+        empresa_id = registro['empresa_responsavel_id']
+        if not empresa_id and registro['id_ponto_coleta']:
+            ponto = dados.buscar_ponto_coleta(registro['id_ponto_coleta'])
+            empresa_id = ponto['id_empresa'] if ponto else None
+        empresa_mtr = dados.buscar_empresa(empresa_id) if empresa_id else None
+        base_mtr = dados.buscar_base_operacional(registro['base_operacional_id']) if registro['base_operacional_id'] else None
+        sol._mtr_registro = dict(registro)
+        sol._mtr_empresa = dict(empresa_mtr) if empresa_mtr else {}
+        sol._mtr_base = dict(base_mtr) if base_mtr else {}
 
         pdf_bytes = gerar_mtr(sol)
         numero_mtr = f"MTR-{sol.id[:8].upper()}"
