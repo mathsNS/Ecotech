@@ -739,9 +739,19 @@ class Dados(RepositorioBase):
           FROM evento_operacional e JOIN solicitacao_descarte sd
             ON sd.id=e.solicitacao_id
           WHERE e.tipo='AGENDAMENTO_CONFIRMADO'""").fetchone()
+        destinatarios=self.conn.execute("""SELECT
+          o.solicitacao_id,o.status,o.rodada,o.enviada_em,
+          u.nome empresa_nome,b.nome base_nome
+          FROM oferta_coleta o
+          JOIN usuario u ON u.id=o.empresa_id
+          JOIN base_operacional b ON b.id=o.base_operacional_id
+          WHERE o.enviada_em IS NOT NULL
+          ORDER BY o.enviada_em DESC,o.solicitacao_id,o.prioridade
+          LIMIT 200""").fetchall()
         return {'resumo':resumo,'pendentes':pendentes,'atribuicoes':atribuicoes,
                 'metricas':metricas,'eventos':eventos,
-                'tempo_agendamento':tempo_agendamento}
+                'tempo_agendamento':tempo_agendamento,
+                'destinatarios':destinatarios}
 
     def registrar_evento_operacional(self, tipo, solicitacao_id=None,
                                      oferta_id=None, detalhes=None, agora=None):
@@ -940,11 +950,30 @@ class Dados(RepositorioBase):
         if conversa['encerrada_em']: raise ValueError('conversa encerrada')
         with self.conn:
             self.conn.execute("INSERT INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",(id_mensagem,conversa['id'],remetente_id,tipo,texto,payload,agora))
+            if tipo == 'MENSAGEM' and remetente_id:
+                destinatario = (
+                    conversa['empresa_id'] if remetente_id == conversa['cidadao_id']
+                    else conversa['cidadao_id']
+                )
+                remetente = self.conn.execute(
+                    "SELECT nome FROM usuario WHERE id=?", (remetente_id,)
+                ).fetchone()
+                self.conn.execute("""INSERT OR IGNORE INTO notificacao(
+                    id_usuario,timestamp,mensagem,chave_idempotencia
+                    ) VALUES(?,?,?,?)""", (
+                    destinatario,
+                    datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
+                    f'Nova mensagem de {remetente["nome"]} na coleta.',
+                    f'chat:{id_mensagem}',
+                ))
         return self.conn.execute("SELECT * FROM mensagem_chat WHERE id=?",(id_mensagem,)).fetchone()
 
     def buscar_mensagens_chat(self,solicitacao_id,usuario_id,pagina,limite):
         conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
-        return self.conn.execute("SELECT * FROM mensagem_chat WHERE conversa_id=? ORDER BY criado_em,id LIMIT ? OFFSET ?",(conversa['id'],limite,(pagina-1)*limite)).fetchall()
+        return self.conn.execute("""SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
+            FROM mensagem_chat m LEFT JOIN usuario u ON u.id=m.remetente_id
+            WHERE m.conversa_id=? ORDER BY m.criado_em,m.id LIMIT ? OFFSET ?""",
+            (conversa['id'],limite,(pagina-1)*limite)).fetchall()
 
     def marcar_mensagens_chat_lidas(self,solicitacao_id,usuario_id,agora):
         conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
@@ -1140,6 +1169,22 @@ class Dados(RepositorioBase):
             ORDER BY timestamp DESC
         """, (id_usuario,))
         return c.fetchall()
+
+    def contar_notificacoes_nao_lidas(self, id_usuario):
+        return self.conn.execute("""SELECT COUNT(*) total FROM notificacao
+            WHERE id_usuario=? AND lida_em IS NULL""", (id_usuario,)).fetchone()['total']
+
+    def marcar_notificacoes_lidas(self, id_usuario, agora=None):
+        with self.conn:
+            cursor = self.conn.execute("""UPDATE notificacao SET lida_em=?
+                WHERE id_usuario=? AND lida_em IS NULL""", (
+                agora or datetime.now().isoformat(timespec='seconds'), id_usuario,
+            ))
+        return cursor.rowcount
+
+    def contar_ofertas_ativas_empresa(self, id_empresa):
+        return self.conn.execute("""SELECT COUNT(*) total FROM oferta_coleta
+            WHERE empresa_id=? AND status='ATIVA'""", (id_empresa,)).fetchone()['total']
 
     def contar_usuarios(self):
         """Conta total de usuários no sistema."""

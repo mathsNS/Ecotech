@@ -32,15 +32,16 @@
                 <a href="{{ url_for('admin_precos') }}" class="nav-item {% if request.endpoint == 'admin_precos' %}active{% endif %}">Preços</a>
                 {% endif %}
                 {% if usuario.tipo == 'empresa' %}
-                <a href="{{ url_for('oportunidades_empresa') }}" class="nav-item {% if request.endpoint == 'oportunidades_empresa' %}active{% endif %}">Oportunidades</a>
+                <a href="{{ url_for('oportunidades_empresa') }}" class="nav-item nav-item-badged {% if request.endpoint == 'oportunidades_empresa' %}active{% endif %}">Oportunidades{% if oportunidades_ativas %}<span class="nav-count">{{ oportunidades_ativas if oportunidades_ativas < 100 else '99+' }}</span>{% endif %}</a>
                 <a href="{{ url_for('planos') }}" class="nav-item {% if request.endpoint == 'planos' %}active{% endif %}">Planos</a>
                 {% endif %}
             </div>
             
             <!-- bloco direito icones -->
             <div class="navbar-actions">
-                <a href="{{ url_for('notificacoes') }}" class="nav-icon">
+                <a href="{{ url_for('notificacoes') }}" class="nav-icon nav-icon-badged">
                     <img src="{{ url_for('static', filename='images/sino.png') }}" alt="Notificações">
+                    {% if novas_notificacoes %}<span class="notification-count">{{ novas_notificacoes if novas_notificacoes < 100 else '99+' }}</span>{% endif %}
                 </a>
                 <a href="{{ url_for('perfil') }}" class="nav-avatar">
                     <img src="{{ url_for('static', filename='images/icone perfil base.png') }}" alt="Perfil">

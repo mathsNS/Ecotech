@@ -47,6 +47,36 @@ from ..domain.dispositivos import EstadoProduto
 from ..infrastructure.persistence.dados import Dados
 
 
+def formatar_data_br(valor, variante='data_hora'):
+    """Formata datas de diferentes origens para exibição brasileira."""
+    if valor in (None, ''):
+        return ''
+    if isinstance(valor, datetime):
+        instante = valor
+    else:
+        texto = str(valor).strip()
+        instante = None
+        try:
+            instante = datetime.fromisoformat(texto.replace('Z', '+00:00'))
+        except ValueError:
+            for formato in (
+                '%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%d/%m/%Y',
+                '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d',
+            ):
+                try:
+                    instante = datetime.strptime(texto, formato)
+                    break
+                except ValueError:
+                    continue
+        if instante is None:
+            return texto
+    formatos = {
+        'data': '%d/%m/%Y', 'data_hora': '%d/%m/%Y %H:%M',
+        'curta': '%d/%m', 'mes_ano': '%m/%y', 'hora': '%H:%M',
+    }
+    return instante.strftime(formatos.get(variante, formatos['data_hora']))
+
+
 def criar_app() -> Flask:
     """
     Cria e configura a aplicação Flask.
@@ -59,6 +89,7 @@ def criar_app() -> Flask:
     app.secret_key = os.environ.get('ECOTECH_SECRET_KEY') or secrets.token_hex(32)
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
     app.config.setdefault('CSRF_ENABLED', True)
+    app.add_template_filter(formatar_data_br, 'data_br')
     
     # instancia unica de dados compartilhada por todos os servicos
     dados = Dados()
@@ -113,6 +144,20 @@ def criar_app() -> Flask:
                 'tipo': session.get('user_tipo')
             }
         return None
+
+    @app.context_processor
+    def indicadores_navegacao():
+        usuario = dados_usuario()
+        if not usuario:
+            return {'novas_notificacoes': 0, 'oportunidades_ativas': 0}
+        oportunidades = (
+            dados.contar_ofertas_ativas_empresa(usuario['id'])
+            if usuario['tipo'] == 'empresa' else 0
+        )
+        return {
+            'novas_notificacoes': dados.contar_notificacoes_nao_lidas(usuario['id']),
+            'oportunidades_ativas': oportunidades,
+        }
 
     def csrf_token():
         """Cria ou devolve o token CSRF associado à sessão atual."""
@@ -751,10 +796,11 @@ def criar_app() -> Flask:
                 'titulo': n['mensagem'][:70] + ('…' if len(n['mensagem']) > 70 else ''),
                 'mensagem': n['mensagem'],
                 'data': datetime.strptime(n['timestamp'], '%d/%m/%Y %H:%M:%S'),
-                'lida': False,
+                'lida': bool(n['lida_em']),
                 'tipo': tipo,
                 'icone': icone,
             })
+        dados.marcar_notificacoes_lidas(usuario['id'])
         
         return render_template(
             'notificacoes.html',

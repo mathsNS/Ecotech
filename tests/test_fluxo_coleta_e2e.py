@@ -26,6 +26,9 @@ def test_fluxo_domiciliar_completo_sem_espera_real(tmp_path,monkeypatch):
     assert dados.buscar_solicitacao('sol-1')['empresa_responsavel_id']==vencedora['empresa_id']
 
     chat.enviar('sol-1','cid-1','Podemos ajustar o horário?',AGORA)
+    mensagens = chat.listar('sol-1', vencedora['empresa_id'])
+    assert mensagens[0]['remetente_nome'] == 'Nome Privado'
+    assert dados.contar_notificacoes_nao_lidas(vencedora['empresa_id']) >= 1
     novo=inicio+timedelta(hours=1)
     agenda.propor('sol-1',vencedora['empresa_id'],novo,novo+timedelta(hours=2),AGORA)
     chat.evento('sol-1','PROPOSTA_HORARIO',{'inicio':novo.isoformat()},AGORA)
@@ -40,3 +43,4 @@ def test_fluxo_domiciliar_completo_sem_espera_real(tmp_path,monkeypatch):
     assert diagnostico['metricas']['aceitas'] == 1
     assert diagnostico['eventos']['conflitos'] == 1
     assert diagnostico['tempo_agendamento']['minutos_atribuicao_ate_agendamento'] is not None
+    assert diagnostico['destinatarios'][0]['empresa_nome']
