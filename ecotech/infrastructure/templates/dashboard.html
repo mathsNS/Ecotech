@@ -70,13 +70,6 @@
             <!-- Empresa ve metricas de processamento -->
             <div class="stat-card-new">
                 <div class="stat-top">
-                    <img src="{{ url_for('static', filename='images/credito.png') }}" alt="Sistema" class="stat-icon-img">
-                    <span class="stat-label">Total processado</span>
-                </div>
-                <h3 class="stat-value">{{ total_sistema|round(2) }}kg</h3>
-            </div>
-            <div class="stat-card-new">
-                <div class="stat-top">
                     <img src="{{ url_for('static', filename='images/trofeu.png') }}" alt="Finalizadas" class="stat-icon-img">
                     <span class="stat-label">Finalizadas</span>
                 </div>
@@ -85,9 +78,9 @@
             <div class="stat-card-new">
                 <div class="stat-top">
                     <img src="{{ url_for('static', filename='images/planta.png') }}" alt="Processamento" class="stat-icon-img">
-                    <span class="stat-label">Em processamento</span>
+                    <span class="stat-label">Operações ativas</span>
                 </div>
-                <h3 class="stat-value">{{ solicitacoes|length }}</h3>
+                <h3 class="stat-value">{{ total_ativas }}</h3>
             </div>
             <div class="stat-card-new">
                 <div class="stat-top">
@@ -190,10 +183,10 @@
             
             {% if is_empresa %}
             <section class="company-insights">
-                <div class="insights-heading"><div><h2>Desempenho e impacto</h2><p>VisÃ£o dos Ãºltimos seis meses e distribuiÃ§Ã£o dos materiais recebidos.</p></div><strong class="monthly-change {{ 'negative' if comparativo_mensal < 0 else '' }}">{{ '%+.1f'|format(comparativo_mensal) }}% <small>vs. mÃªs anterior</small></strong></div>
+                <div class="insights-heading"><div><h2>Desempenho e impacto</h2><p>Visão dos últimos seis meses e distribuição dos materiais processados.</p></div>{% if comparativo_mensal is not none %}<strong class="monthly-change {{ 'negative' if comparativo_mensal < 0 else '' }}">{{ '%+.1f'|format(comparativo_mensal) }}% <small>comparado ao mês anterior</small></strong>{% else %}<span class="monthly-no-data">Comparativo disponível após dois meses com movimentação</span>{% endif %}</div>
                 <div class="insights-grid">
-                    <div class="chart-card"><h3>Peso processado por mÃªs</h3><div class="monthly-chart">{% for mes in meses %}<div class="month-column"><strong>{{ mes.peso }} kg</strong><div class="bar-track"><span style="height:{{ (mes.peso / maior_mes * 100)|round }}%"></span></div><small>{{ mes.rotulo }}</small></div>{% endfor %}</div></div>
-                    <div class="impact-card"><h3>Impacto acumulado</h3><div class="impact-kpis"><div><strong>{{ co2_evitado }} kg</strong><span>COâ‚‚ evitado</span></div><div><strong>{{ taxa_reciclagem }}%</strong><span>taxa de reciclagem</span></div><div><strong>{{ total_descartado|round(2) }} kg</strong><span>peso processado</span></div></div>{% if por_categoria %}<div class="category-bars">{% set maior_categoria = por_categoria.values()|max %}{% for cat,peso in por_categoria.items() %}<div><span><b>{{ cat }}</b><small>{{ peso }} kg</small></span><div><i style="width:{{ (peso / maior_categoria * 100)|round }}%"></i></div></div>{% endfor %}</div>{% endif %}</div>
+                    <div class="chart-card"><h3>Peso processado por mês</h3><div class="monthly-chart">{% for mes in meses %}<div class="month-column"><strong>{{ mes.peso }} kg</strong><div class="bar-track"><span style="height:{{ (mes.peso / maior_mes * 100)|round }}%"></span></div><small>{{ mes.rotulo }}</small></div>{% endfor %}</div></div>
+                    <div class="impact-card"><h3>Impacto acumulado</h3><div class="impact-kpis"><div><strong>{{ co2_evitado }} kg</strong><span>CO₂ evitado</span></div><div><strong>{{ taxa_reciclagem }}%</strong><span>taxa de reciclagem</span></div><div><strong>{{ total_descartado|round(2) }} kg</strong><span>peso processado</span></div></div>{% if por_categoria %}<div class="category-bars">{% set maior_categoria = por_categoria.values()|max %}{% for cat,peso in por_categoria.items() %}<div><span><b>{{ cat }}</b><small>{{ peso }} kg</small></span><div><i style="width:{{ (peso / maior_categoria * 100)|round }}%"></i></div></div>{% endfor %}</div>{% endif %}</div>
                 </div>
             </section>
             {% endif %}

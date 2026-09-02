@@ -41,7 +41,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações recicladas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if isinstance(sol.estado, Reciclado):
+            if sol.estado.obter_nome() == 'Reciclado':
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -49,7 +49,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações reutilizadas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if isinstance(sol.estado, Reutilizado):
+            if sol.estado.obter_nome() == 'Reutilizado':
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -57,7 +57,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações descartadas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if isinstance(sol.estado, Descartado):
+            if sol.estado.obter_nome() == 'Descartado':
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -72,7 +72,7 @@ class RelatorioAmbiental:
         """Percentual do peso reciclado/reutilizado sobre o total processado."""
         total = sum(
             sol.calcular_peso_total() for sol in self._solicitacoes
-            if isinstance(sol.estado, (Reciclado, Reutilizado, Descartado))
+            if sol.estado.obter_nome() in {'Reciclado', 'Reutilizado', 'Descartado'}
         )
         if total == 0:
             return 0.0
