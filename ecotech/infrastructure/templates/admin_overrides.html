@@ -65,7 +65,7 @@
                             <td>
                                 <span class="cpf-cnpj" title="{{ ov.id }}">{{ ov.id[:8].upper() }}…</span>
                             </td>
-                            <td>{{ ov.data_criacao }}</td>
+                            <td>{{ ov.data_criacao|data_br('data_hora') }}</td>
                             <td>
                                 <div class="usuario-name-cell">
                                     <span class="usuario-name">{{ ov.nome_usuario }}</span>

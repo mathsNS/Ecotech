@@ -21,7 +21,7 @@
             <div class="entrega-info">
                 <h3>{{ sol.nome_ponto }}</h3>
                 <p class="empresa">
-                    {% if sol.data_agendamento %}Agendada para: <strong>{{ sol.data_agendamento }}</strong>
+                    {% if sol.data_agendamento %}Agendada para: <strong>{{ sol.data_agendamento|data_br('data_hora') }}</strong>
                     {% else %}Sem data agendada{% endif %}
                 </p>
                 <span class="entrega-id">ID: {{ sol.id[:8] }}…</span>

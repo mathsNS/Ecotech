@@ -11,6 +11,8 @@ import sqlite3
 import os
 import pytest
 
+from ecotech.infrastructure.web import formatar_data_br
+
 from ecotech.infrastructure.persistence.dados import Dados
 
 
@@ -461,6 +463,11 @@ def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
     pagina_chat = client.get(f'/solicitacoes/{ativa["solicitacao_id"]}/chat')
     assert b'&lt;script&gt;alert(1)&lt;/script&gt;' in pagina_chat.data
     assert b'<script>alert(1)</script>' not in pagina_chat.data
+    nome_remetente = db.conn.execute(
+        'SELECT nome FROM usuario WHERE id=?', (ativa['empresa_id'],)
+    ).fetchone()['nome']
+    assert nome_remetente.encode() in pagina_chat.data
+    assert b'2026-09-' not in pagina_chat.data
 
     perdedora = next(o for o in ofertas if o['empresa_id'] != ativa['empresa_id'])
     _set_session(client, perdedora['empresa_id'], 'Empresa Perdedora', 'empresa')
@@ -494,3 +501,10 @@ def test_interfaces_respeitam_papel_privacidade_e_csrf(client):
     _set_session(client,_ID_ADMIN,'Admin','administrador')
     admin=client.get('/admin/despacho')
     assert admin.status_code==200 and b'Painel somente leitura' in admin.data
+
+
+def test_formatacao_brasileira_de_datas():
+    assert formatar_data_br('2026-09-02T11:13:51.192632') == '02/09/2026 11:13'
+    assert formatar_data_br('2026-09-02', 'data') == '02/09/2026'
+    assert formatar_data_br('2026-09-02', 'curta') == '02/09'
+    assert formatar_data_br('2026-09-02', 'mes_ano') == '09/26'

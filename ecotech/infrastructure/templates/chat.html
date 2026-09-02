@@ -1,22 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Chat da coleta{% endblock %}
+{% block title %}Conversa da coleta — EcoTech{% endblock %}
 {% block content %}
-<div class="container" style="max-width:760px;padding:24px">
-  <h1>Conversa da coleta</h1>
-  <div class="card" style="padding:16px">
-  {% for m in mensagens %}
-    <article style="padding:10px;border-bottom:1px solid #ddd">
-      <strong>{{ 'Evento do sistema' if m.tipo != 'MENSAGEM' else 'Mensagem' }}</strong>
-      {% if m.texto %}<p style="white-space:pre-wrap">{{ m.texto }}</p>{% endif %}
-      {% if m.tipo != 'MENSAGEM' %}<small>{{ m.tipo.replace('_',' ').title() }}</small>{% endif %}
-      <time style="display:block;color:#666">{{ m.criado_em }}</time>
-    </article>
-  {% else %}<p>Nenhuma mensagem.</p>{% endfor %}
+<div class="ecotech-page"><div class="container narrow-container">
+  <div class="page-header">
+    <div class="header-text"><h1>Conversa da coleta</h1><p class="subtitle">Canal privado entre cidadão e empresa responsável.</p></div>
+    <a href="{{ url_for('pagina_agendamento', id_sol=id_sol) }}" class="btn btn-secondary">Voltar para Agendamento</a>
   </div>
-  <form method="post" style="margin-top:16px">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    <textarea name="texto" maxlength="2000" required class="form-control-new"></textarea>
-    <button class="btn btn-primary" type="submit">Enviar</button>
-  </form>
-</div>
+  <section class="chat-panel">
+    <div class="chat-messages">
+      {% for m in mensagens %}
+        {% if m.tipo == 'MENSAGEM' %}
+        <article class="chat-row {{ 'mine' if m.remetente_id == usuario.id else 'theirs' }}">
+          <div class="chat-bubble">
+            <div class="chat-sender"><strong>{{ m.remetente_nome }}</strong><span>{{ 'Empresa' if m.remetente_tipo == 'empresa' else 'Cidadão' }}</span></div>
+            <p>{{ m.texto }}</p>
+            <time>{{ m.criado_em|data_br('data_hora') }}</time>
+          </div>
+        </article>
+        {% else %}
+        <article class="chat-system"><span>{{ m.tipo.replace('_',' ').title() }}</span><time>{{ m.criado_em|data_br('data_hora') }}</time></article>
+        {% endif %}
+      {% else %}<div class="chat-empty"><p>Nenhuma mensagem ainda. Inicie a conversa abaixo.</p></div>{% endfor %}
+    </div>
+    <form method="post" class="chat-compose">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group-new"><label for="chat-texto">Mensagem</label><textarea id="chat-texto" name="texto" maxlength="2000" required class="form-control-new" placeholder="Escreva uma mensagem..."></textarea></div>
+      <button class="btn btn-primary" type="submit">Enviar mensagem</button>
+    </form>
+  </section>
+  {% if pagina > 1 %}<nav class="pagination"><a class="btn btn-secondary" href="?pagina={{ pagina-1 }}">Mensagens anteriores</a></nav>{% endif %}
+</div></div>
 {% endblock %}

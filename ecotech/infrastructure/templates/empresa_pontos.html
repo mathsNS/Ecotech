@@ -70,7 +70,7 @@
                         {% for sol in solicitacoes %}
                         <tr style="border-bottom:1px solid #f0f0f0;" id="row-{{ sol.id }}">
                             <td style="padding:.7rem .75rem;">{{ sol.nome_usuario }}</td>
-                            <td style="padding:.7rem .75rem;">{{ sol.data_agendamento or '—' }}</td>
+                            <td style="padding:.7rem .75rem;">{{ sol.data_agendamento|data_br('data_hora') if sol.data_agendamento else '—' }}</td>
                             <td style="padding:.7rem .75rem; text-align:right;">{{ '%.1f'|format(sol.peso_total) }}</td>
                             <td style="padding:.7rem .75rem; text-align:center;">
                                 <span style="background:#e0f2fe; color:#0369a1; border-radius:999px; padding:.2rem .7rem; font-size:.8rem; font-weight:600;">

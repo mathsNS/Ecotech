@@ -20,3 +20,65 @@
     object-fit: contain;
     flex: 0 0 auto;
 }
+
+.nav-item-badged,
+.nav-icon-badged {
+    position: relative;
+}
+
+.nav-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    margin-left: 6px;
+    border-radius: 10px;
+    background: #d93636;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.opportunity-deadline { color: #b42318; }
+.opportunity-card { border-top: 4px solid #1d854d; }
+
+.notification-count {
+    position: absolute;
+    top: -7px;
+    right: -9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border: 2px solid #fff;
+    border-radius: 10px;
+    background: #d93636;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.chat-panel { overflow: hidden; background: #fff; border: 1px solid #e1e9e3; border-radius: 16px; box-shadow: 0 5px 20px rgba(20,72,45,.07); }
+.chat-messages { display: flex; flex-direction: column; gap: 14px; min-height: 360px; max-height: 580px; padding: 24px; overflow-y: auto; background: #f7faf8; }
+.chat-row { display: flex; }
+.chat-row.mine { justify-content: flex-end; }
+.chat-row.theirs { justify-content: flex-start; }
+.chat-bubble { width: fit-content; max-width: min(78%,560px); padding: 12px 15px 9px; border: 1px solid #dde7e0; border-radius: 14px 14px 14px 4px; background: #fff; }
+.chat-row.mine .chat-bubble { border-color: #1d854d; border-radius: 14px 14px 4px 14px; background: #1d854d; color: #fff; }
+.chat-sender { display: flex; align-items: baseline; gap: 7px; margin-bottom: 5px; }
+.chat-sender span { color: #738078; font-size: 11px; }
+.chat-row.mine .chat-sender span { color: #d7eee0; }
+.chat-bubble p { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.chat-bubble time { display: block; margin-top: 6px; color: #7b8780; font-size: 10px; text-align: right; }
+.chat-row.mine .chat-bubble time { color: #d7eee0; }
+.chat-system { align-self: center; display: flex; gap: 8px; padding: 7px 12px; border-radius: 12px; background: #e8eeea; color: #5f6b63; font-size: 11px; }
+.chat-compose { display: flex; align-items: flex-end; gap: 12px; padding: 18px; border-top: 1px solid #e5ebe7; }
+.chat-compose .form-group-new { flex: 1; }
+.chat-compose textarea { min-height: 52px; max-height: 130px; }
+.chat-empty { margin: auto; color: #66736b; text-align: center; }
+@media (max-width:700px) { .chat-bubble { max-width: 90%; } .chat-compose { align-items: stretch; flex-direction: column; } }
