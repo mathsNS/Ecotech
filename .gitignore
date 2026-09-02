@@ -103,6 +103,10 @@ FLUTTER_PORT_PLAN.md
 FLUTTER_PORT_PROGRESS.md
 docs/mobile/
 
+# a regra "lib/" acima e para empacotamento Python, nao deve pegar o app Flutter
+!mobile/lib/
+!mobile/lib/**
+
 # PEP 582
 __pypackages__/
 
