@@ -132,3 +132,51 @@ def test_me_com_token_valido_retorna_dados_do_usuario(client):
     assert resp.status_code == 200
     assert corpo["tipo"] == "cidadao"
     assert corpo["email"]
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/auth/registrar
+# ---------------------------------------------------------------------------
+
+def test_registrar_cidadao_com_dados_validos(client):
+    resp = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Nova Pessoa", "email": "nova.pessoa@example.com",
+        "senha": "senha123", "senha_confirmacao": "senha123", "cpf": "52998224725",
+    })
+    corpo = resp.get_json()
+    assert resp.status_code == 200
+    assert corpo["usuario"]["tipo"] == "cidadao"
+    assert corpo["access_token"]
+
+
+def test_registrar_senhas_diferentes_retorna_400(client):
+    resp = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Fulano", "email": "fulano@example.com",
+        "senha": "senha123", "senha_confirmacao": "outra-senha", "cpf": "11144477735",
+    })
+    assert resp.status_code == 400
+
+
+def test_registrar_senha_curta_retorna_400(client):
+    resp = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Fulano", "email": "fulano2@example.com",
+        "senha": "123", "senha_confirmacao": "123", "cpf": "11144477735",
+    })
+    assert resp.status_code == 400
+
+
+def test_registrar_cpf_invalido_retorna_400(client):
+    resp = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Fulano", "email": "fulano3@example.com",
+        "senha": "senha123", "senha_confirmacao": "senha123", "cpf": "00000000000",
+    })
+    assert resp.status_code == 400
+
+
+def test_registrar_email_ja_cadastrado_retorna_400(client):
+    resp = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Joao Duplicado", "email": "joao@ecotech.com",
+        "senha": "senha123", "senha_confirmacao": "senha123", "cpf": "39053344705",
+    })
+    assert resp.status_code == 400
+
