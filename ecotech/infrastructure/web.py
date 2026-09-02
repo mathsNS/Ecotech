@@ -334,7 +334,8 @@ def criar_app() -> Flask:
             _ESTADOS_FINAIS = {'Reciclado', 'Reutilizado', 'Descartado'}
             sols_finais = [s for s in solicitacoes_usuario if s.estado.obter_nome() in _ESTADOS_FINAIS]
             sols_reciclados = [s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Reciclado']
-            co2_evitado = round(metricas_usuario['peso_total'] * 3.0, 1)
+            peso_processado = round(sum(s.calcular_peso_total() for s in sols_finais), 2)
+            co2_evitado = round(peso_processado * 3.0, 1)
             taxa_reciclagem = round((len(sols_reciclados) / len(sols_finais) * 100), 1) if sols_finais else 0.0
 
             # tonelagem por categoria de dispositivo
@@ -343,7 +344,7 @@ def criar_app() -> Flask:
                 'Eletrodomestico': 'Eletrodomésticos', 'Eletrodoméstico': 'Eletrodomésticos',
             }
             por_categoria: dict = {}
-            for sol in solicitacoes_usuario:
+            for sol in sols_finais:
                 for item in sol.itens:
                     tipo = type(item.dispositivo).__name__
                     nome_cat = _MAPA_CATEGORIA.get(tipo, tipo)
@@ -357,28 +358,30 @@ def criar_app() -> Flask:
             meses = []
             ano, mes = hoje.year, hoje.month
             for _ in range(6):
-                peso_mes = sum(s.calcular_peso_total() for s in solicitacoes_usuario
+                peso_mes = sum(s.calcular_peso_total() for s in sols_finais
                                if s.data_criacao.year == ano and s.data_criacao.month == mes)
                 meses.append({'rotulo':f'{mes:02d}/{str(ano)[2:]}','peso':round(peso_mes,2)})
                 mes -= 1
                 if mes == 0: mes, ano = 12, ano - 1
             meses.reverse()
             maior_mes = max([m['peso'] for m in meses] or [1]) or 1
-            comparativo_mensal = 0
-            if len(meses) > 1 and meses[-2]['peso']:
+            comparativo_mensal = None
+            if len(meses) > 1 and meses[-1]['peso'] and meses[-2]['peso']:
                 comparativo_mensal = round((meses[-1]['peso'] - meses[-2]['peso']) / meses[-2]['peso'] * 100, 1)
             em_processamento = [s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Em Processamento']
+            total_ativas = sum(1 for s in solicitacoes_usuario if s.estado.obter_nome() not in _ESTADOS_FINAIS | {'Cancelado'})
 
             return render_template(
                 'dashboard.html',
                 usuario=usuario,
                 solicitacoes=em_processamento[:5],
                 total_em_processamento=len(em_processamento),
-                total_descartado=metricas_usuario['peso_total'],
+                total_descartado=peso_processado,
                 impacto_evitado=metricas_usuario['impacto_total'],
                 pontos_acumulados=metricas_usuario['pontos'],
                 total_sistema=metricas_sistema['peso_total'],
-                total_processadas=metricas_sistema['total_processadas'],
+                total_processadas=len(sols_finais),
+                total_ativas=total_ativas,
                 co2_evitado=co2_evitado,
                 taxa_reciclagem=taxa_reciclagem,
                 por_categoria=por_categoria,
@@ -474,10 +477,10 @@ def criar_app() -> Flask:
                     if not valida:
                         raise ValueError('Envie somente fotos JPG, PNG ou WebP.')
                     if len(conteudo) > 5 * 1024 * 1024:
-                        raise ValueError('Cada foto pode ter no mÃ¡ximo 5 MB.')
+                        raise ValueError('Cada foto pode ter no máximo 5 MB.')
                     fotos_recebidas.append((arquivo.filename[:180], arquivo.mimetype, conteudo))
                 if len(fotos_recebidas) > 5:
-                    raise ValueError('Envie no mÃ¡ximo 5 fotos por solicitaÃ§Ã£o.')
+                    raise ValueError('Envie no máximo 5 fotos por solicitação.')
                 tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
                 subcategoria      = request.form.get('subcategoria', '').strip()
                 nome_dispositivo  = request.form.get('nome', '').strip()
@@ -976,6 +979,10 @@ def criar_app() -> Flask:
         if not usuario_logado(): return redirect(url_for('login'))
         usuario=dados_usuario()
         try:
+            sol=servico_descarte.obter_solicitacao(id_sol)
+            if not sol or not usuario_pode_visualizar_solicitacao(usuario,sol,dados):
+                return jsonify({'erro':'Acesso não autorizado'}),403
+            dados.criar_conversa_solicitacao(id_sol,datetime.now().isoformat())
             if request.method=='POST':
                 servico_chat.enviar(id_sol,usuario['id'],request.form.get('texto',''))
                 return redirect(url_for('chat_solicitacao',id_sol=id_sol))

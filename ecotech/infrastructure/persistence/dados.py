@@ -933,9 +933,12 @@ class Dados(RepositorioBase):
 
     def criar_conversa_solicitacao(self, solicitacao_id, agora):
         with self.conn:
-            sol=self.conn.execute("SELECT id_usuario,empresa_responsavel_id FROM solicitacao_descarte WHERE id=?",(solicitacao_id,)).fetchone()
-            if not sol or not sol['empresa_responsavel_id']: raise ValueError('chat indisponível antes da atribuição')
-            self.conn.execute("INSERT OR IGNORE INTO conversa_solicitacao(id,solicitacao_id,cidadao_id,empresa_id,criada_em) VALUES(?,?,?,?,?)",(str(uuid.uuid4()),solicitacao_id,sol['id_usuario'],sol['empresa_responsavel_id'],agora))
+            sol=self.conn.execute("""SELECT sd.id_usuario,
+                COALESCE(sd.empresa_responsavel_id,pc.id_empresa) empresa_id
+                FROM solicitacao_descarte sd LEFT JOIN ponto_coleta pc ON pc.id=sd.id_ponto_coleta
+                WHERE sd.id=?""",(solicitacao_id,)).fetchone()
+            if not sol or not sol['empresa_id']: raise ValueError('chat indisponível antes da atribuição')
+            self.conn.execute("INSERT OR IGNORE INTO conversa_solicitacao(id,solicitacao_id,cidadao_id,empresa_id,criada_em) VALUES(?,?,?,?,?)",(str(uuid.uuid4()),solicitacao_id,sol['id_usuario'],sol['empresa_id'],agora))
         return self.conn.execute("SELECT * FROM conversa_solicitacao WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
 
     def _conversa_autorizada(self, solicitacao_id, usuario_id, sistema=False):
