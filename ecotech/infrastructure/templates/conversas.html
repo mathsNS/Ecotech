@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Conversas â€” EcoTech{% endblock %}
+{% block content %}
+<div class="ecotech-page"><div class="container narrow-container">
+  <div class="page-header"><div class="header-text"><h1>Central de conversas</h1><p class="subtitle">Selecione um cliente ou uma coleta para continuar o atendimento.</p></div></div>
+  <section class="conversation-center">
+    {% for conversa in conversas %}
+    <a class="conversation-card {{ 'has-unread' if conversa.nao_lidas else '' }}" href="{{ url_for('chat_solicitacao',id_sol=conversa.solicitacao_id) }}">
+      <div class="conversation-avatar">{{ conversa.contato_nome[:1]|upper }}</div>
+      <div class="conversation-summary"><div><strong>{{ conversa.contato_nome }}</strong><span>Coleta #{{ conversa.solicitacao_id[:8] }}</span></div><p>{{ conversa.ultima_mensagem or 'Conversa disponÃ­vel. Envie a primeira mensagem.' }}</p></div>
+      <div class="conversation-meta"><time>{{ conversa.ultima_mensagem_em|data_br('data_hora') }}</time>{% if conversa.nao_lidas %}<span>{{ conversa.nao_lidas }} nova{{ 's' if conversa.nao_lidas != 1 else '' }}</span>{% endif %}</div>
+    </a>
+    {% else %}<div class="empty-state"><p>Nenhuma conversa disponÃ­vel. Elas aparecem apÃ³s uma coleta ser atribuÃ­da.</p></div>{% endfor %}
+  </section>
+</div></div>
+{% endblock %}

@@ -33,6 +33,7 @@
                 {% endif %}
                 {% if usuario.tipo == 'empresa' %}
                 <a href="{{ url_for('oportunidades_empresa') }}" class="nav-item nav-item-badged {% if request.endpoint == 'oportunidades_empresa' %}active{% endif %}">Oportunidades{% if oportunidades_ativas %}<span class="nav-count">{{ oportunidades_ativas if oportunidades_ativas < 100 else '99+' }}</span>{% endif %}</a>
+                <a href="{{ url_for('central_conversas') }}" class="nav-item {% if request.endpoint in ('central_conversas','chat_solicitacao') %}active{% endif %}">Conversas</a>
                 <a href="{{ url_for('planos') }}" class="nav-item {% if request.endpoint == 'planos' %}active{% endif %}">Planos</a>
                 {% endif %}
             </div>
