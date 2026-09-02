@@ -98,6 +98,11 @@ poetry.lock
 # pdm
 .pdm.toml
 
+# Documentacao de apoio ao port Flutter, contexto local entre sessoes
+FLUTTER_PORT_PLAN.md
+FLUTTER_PORT_PROGRESS.md
+docs/mobile/
+
 # PEP 582
 __pypackages__/
 
