@@ -188,6 +188,16 @@
             </div>
             {% endif %}
             
+            {% if is_empresa %}
+            <section class="company-insights">
+                <div class="insights-heading"><div><h2>Desempenho e impacto</h2><p>VisÃ£o dos Ãºltimos seis meses e distribuiÃ§Ã£o dos materiais recebidos.</p></div><strong class="monthly-change {{ 'negative' if comparativo_mensal < 0 else '' }}">{{ '%+.1f'|format(comparativo_mensal) }}% <small>vs. mÃªs anterior</small></strong></div>
+                <div class="insights-grid">
+                    <div class="chart-card"><h3>Peso processado por mÃªs</h3><div class="monthly-chart">{% for mes in meses %}<div class="month-column"><strong>{{ mes.peso }} kg</strong><div class="bar-track"><span style="height:{{ (mes.peso / maior_mes * 100)|round }}%"></span></div><small>{{ mes.rotulo }}</small></div>{% endfor %}</div></div>
+                    <div class="impact-card"><h3>Impacto acumulado</h3><div class="impact-kpis"><div><strong>{{ co2_evitado }} kg</strong><span>COâ‚‚ evitado</span></div><div><strong>{{ taxa_reciclagem }}%</strong><span>taxa de reciclagem</span></div><div><strong>{{ total_descartado|round(2) }} kg</strong><span>peso processado</span></div></div>{% if por_categoria %}<div class="category-bars">{% set maior_categoria = por_categoria.values()|max %}{% for cat,peso in por_categoria.items() %}<div><span><b>{{ cat }}</b><small>{{ peso }} kg</small></span><div><i style="width:{{ (peso / maior_categoria * 100)|round }}%"></i></div></div>{% endfor %}</div>{% endif %}</div>
+                </div>
+            </section>
+            {% endif %}
+
             <!-- Grid com entregas e acoes lado a lado -->
             <div class="dashboard-row-bottom">
                 <!-- Secao de entregas -->
@@ -198,7 +208,7 @@
                         <a href="{{ url_for('operacoes') }}">Ver todas</a>
                         {% elif is_empresa %}
                         <h2>Solicitações em processamento</h2>
-                        <a href="{{ url_for('operacoes') }}">Ver todas</a>
+                        <a href="{{ url_for('operacoes', estado='Em Processamento') }}">Ver todas{% if total_em_processamento %} ({{ total_em_processamento }}){% endif %}</a>
                         {% else %}
                         <h2>Últimas entregas</h2>
                         <a href="{{ url_for('ultimas_entregas') }}">Ver todas</a>
@@ -349,7 +359,7 @@
             </div>
         </div>
 
-        {% if is_empresa %}
+        {% if false and is_empresa %}
         <!-- Bloco ESG — visível apenas para empresa -->
         <div class="esg-section">
             <h2 class="section-title-dash">Impacto ESG</h2>
