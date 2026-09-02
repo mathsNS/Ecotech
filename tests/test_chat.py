@@ -42,3 +42,11 @@ def test_encerramento_preserva_historico_e_bloqueia_envio(tmp_path,monkeypatch):
     chat.encerrar('sol-1','emp-1',AGORA)
     assert len(chat.listar('sol-1','cid-1'))==1
     with pytest.raises(ValueError): chat.enviar('sol-1','cid-1','Depois',AGORA)
+
+def test_central_lista_contato_ultima_mensagem_e_nao_lidas(tmp_path,monkeypatch):
+    dados,chat=preparar(tmp_path,monkeypatch)
+    chat.enviar('sol-1','cid-1','Tenho uma dÃºvida',AGORA)
+    conversas=dados.listar_conversas_usuario('emp-1')
+    assert len(conversas)==1
+    assert conversas[0]['ultima_mensagem']=='Tenho uma dÃºvida'
+    assert conversas[0]['nao_lidas']==1

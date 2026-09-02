@@ -353,10 +353,27 @@ def criar_app() -> Flask:
 
             saldo_empresa = dados.buscar_saldo_empresa(usuario['id'])
 
+            hoje = datetime.now()
+            meses = []
+            ano, mes = hoje.year, hoje.month
+            for _ in range(6):
+                peso_mes = sum(s.calcular_peso_total() for s in solicitacoes_usuario
+                               if s.data_criacao.year == ano and s.data_criacao.month == mes)
+                meses.append({'rotulo':f'{mes:02d}/{str(ano)[2:]}','peso':round(peso_mes,2)})
+                mes -= 1
+                if mes == 0: mes, ano = 12, ano - 1
+            meses.reverse()
+            maior_mes = max([m['peso'] for m in meses] or [1]) or 1
+            comparativo_mensal = 0
+            if len(meses) > 1 and meses[-2]['peso']:
+                comparativo_mensal = round((meses[-1]['peso'] - meses[-2]['peso']) / meses[-2]['peso'] * 100, 1)
+            em_processamento = [s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Em Processamento']
+
             return render_template(
                 'dashboard.html',
                 usuario=usuario,
-                solicitacoes=solicitacoes_usuario,
+                solicitacoes=em_processamento[:5],
+                total_em_processamento=len(em_processamento),
                 total_descartado=metricas_usuario['peso_total'],
                 impacto_evitado=metricas_usuario['impacto_total'],
                 pontos_acumulados=metricas_usuario['pontos'],
@@ -366,6 +383,9 @@ def criar_app() -> Flask:
                 taxa_reciclagem=taxa_reciclagem,
                 por_categoria=por_categoria,
                 saldo_empresa=saldo_empresa,
+                meses=meses,
+                maior_mes=maior_mes,
+                comparativo_mensal=comparativo_mensal,
                 is_empresa=True,
                 is_admin=False
             )
@@ -443,6 +463,21 @@ def criar_app() -> Flask:
         
         if request.method == 'POST':
             try:
+                fotos_recebidas = []
+                for arquivo in request.files.getlist('fotos'):
+                    if not arquivo or not arquivo.filename:
+                        continue
+                    conteudo = arquivo.read()
+                    valida = (conteudo.startswith(b'\xff\xd8\xff') or
+                              conteudo.startswith(b'\x89PNG\r\n\x1a\n') or
+                              (len(conteudo) > 12 and conteudo[:4] == b'RIFF' and conteudo[8:12] == b'WEBP'))
+                    if not valida:
+                        raise ValueError('Envie somente fotos JPG, PNG ou WebP.')
+                    if len(conteudo) > 5 * 1024 * 1024:
+                        raise ValueError('Cada foto pode ter no mÃ¡ximo 5 MB.')
+                    fotos_recebidas.append((arquivo.filename[:180], arquivo.mimetype, conteudo))
+                if len(fotos_recebidas) > 5:
+                    raise ValueError('Envie no mÃ¡ximo 5 fotos por solicitaÃ§Ã£o.')
                 tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
                 subcategoria      = request.form.get('subcategoria', '').strip()
                 nome_dispositivo  = request.form.get('nome', '').strip()
@@ -496,6 +531,11 @@ def criar_app() -> Flask:
                 dados.atualizar_detalhes_coleta(
                     solicitacao.id, tipo_coleta, endereco_coleta, nome_contato, data_agendamento
                 )
+                for nome_arquivo, mime_type, conteudo in fotos_recebidas:
+                    dados.salvar_foto_solicitacao(
+                        str(__import__('uuid').uuid4()), solicitacao.id, nome_arquivo,
+                        mime_type, conteudo, datetime.now().isoformat()
+                    )
 
                 if tipo_coleta == 'domiciliar':
                     dados.atualizar_localizacao_coleta(
@@ -947,6 +987,42 @@ def criar_app() -> Flask:
         except LookupError: return jsonify({'erro':'Conversa não encontrada'}),404
         except ValueError as exc: return jsonify({'erro':str(exc)}),400
     
+    @app.route('/conversas')
+    def central_conversas():
+        if not usuario_logado(): return redirect(url_for('login'))
+        usuario=dados_usuario()
+        return render_template('conversas.html', usuario=usuario,
+            conversas=dados.listar_conversas_usuario(usuario['id']))
+
+    @app.route('/api/solicitacoes/<id_sol>/detalhes')
+    def detalhes_solicitacao(id_sol):
+        if not usuario_logado(): return jsonify({'erro':'Nao autenticado'}),401
+        usuario=dados_usuario(); sol=servico_descarte.obter_solicitacao(id_sol)
+        if not sol: return jsonify({'erro':'Solicitacao nao encontrada'}),404
+        if not usuario_pode_visualizar_solicitacao(usuario,sol,dados):
+            return jsonify({'erro':'Acesso nao autorizado'}),403
+        raw=dados.buscar_solicitacao(id_sol)
+        itens=[dict(i) for i in dados.buscar_itens_solicitacao(id_sol)]
+        fotos=[dict(f) | {'url':url_for('foto_solicitacao',foto_id=f['id'])}
+               for f in dados.listar_fotos_solicitacao(id_sol)]
+        return jsonify({'id':sol.id,'cidadao':sol.usuario.nome,
+            'estado':sol.estado.obter_nome(),'criada_em':formatar_data_br(sol.data_criacao,'data_hora'),
+            'peso_total':round(sol.calcular_peso_total(),2),'tipo_coleta':raw['tipo_coleta'] or 'Nao informado',
+            'endereco':raw['endereco_coleta'] or 'Nao informado','contato':raw['nome_contato'] or 'Nao informado',
+            'agendamento':formatar_data_br(raw['data_agendamento'],'data_hora'),
+            'itens':itens,'fotos':fotos})
+
+    @app.route('/fotos-solicitacoes/<foto_id>')
+    def foto_solicitacao(foto_id):
+        if not usuario_logado(): return redirect(url_for('login'))
+        foto=dados.buscar_foto_solicitacao(foto_id)
+        if not foto: return jsonify({'erro':'Foto nao encontrada'}),404
+        usuario=dados_usuario(); sol=servico_descarte.obter_solicitacao(foto['solicitacao_id'])
+        if not sol or not usuario_pode_visualizar_solicitacao(usuario,sol,dados):
+            return jsonify({'erro':'Acesso nao autorizado'}),403
+        return Response(foto['conteudo'], mimetype=foto['mime_type'],
+            headers={'Content-Disposition':f'inline; filename="{foto["nome_arquivo"]}"'})
+
     @app.route('/ultimas-entregas')
     def ultimas_entregas():
         """Página de últimas entregas (histórico completo)."""

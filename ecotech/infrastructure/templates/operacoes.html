@@ -187,6 +187,10 @@
             <div class="detail-row"><strong>Itens:</strong> <span id="modal-itens"></span></div>
             <div class="detail-row"><strong>Endereço da coleta:</strong> <span id="modal-endereco"></span></div>
             <div class="detail-row"><strong>Contato:</strong> <span id="modal-contato"></span></div>
+            <details class="request-expanded" open>
+                <summary>InformaÃ§Ãµes dos produtos e coleta</summary>
+                <div id="modal-expanded"><p>Carregando informaÃ§Ãµes...</p></div>
+            </details>
 
             {% if is_admin or usuario.tipo == 'empresa' %}
             <!-- secao avanco de estado — visivel apenas quando pode avançar -->
@@ -275,6 +279,24 @@ function abrirDetalhes(btn) {
     }
 
     document.getElementById('modal-detalhes').style.display = 'flex';
+    carregarDetalhesCompletos(d.id);
+}
+
+async function carregarDetalhesCompletos(id) {
+    const area = document.getElementById('modal-expanded');
+    area.innerHTML = '<p>Carregando informaÃ§Ãµes...</p>';
+    try {
+        const resposta = await fetch('/api/solicitacoes/' + id + '/detalhes');
+        const dados = await resposta.json();
+        if (!resposta.ok) throw new Error(dados.erro || 'Falha ao carregar detalhes');
+        const itens = dados.itens.map(item => `<article class="product-detail"><strong>${escapar(item.nome)}</strong><span>${escapar(item.tipo)}${item.subcategoria ? ' â€” ' + escapar(item.subcategoria) : ''}</span><span>Quantidade: ${item.quantidade} Â· Peso unitÃ¡rio: ${item.peso_kg} kg</span>${item.observacoes ? `<p>${escapar(item.observacoes)}</p>` : ''}</article>`).join('');
+        const fotos = dados.fotos.length ? `<div class="request-photos">${dados.fotos.map(f => `<a href="${f.url}" target="_blank"><img src="${f.url}" alt="Foto do produto"></a>`).join('')}</div>` : '<p class="muted">Nenhuma foto foi enviada.</p>';
+        area.innerHTML = `<dl class="detail-grid"><div><dt>Tipo de coleta</dt><dd>${escapar(dados.tipo_coleta)}</dd></div><div><dt>Agendamento</dt><dd>${escapar(dados.agendamento || 'NÃ£o definido')}</dd></div><div><dt>EndereÃ§o</dt><dd>${escapar(dados.endereco)}</dd></div><div><dt>Contato</dt><dd>${escapar(dados.contato)}</dd></div></dl><h3>Produtos</h3>${itens}<h3>Fotos</h3>${fotos}`;
+    } catch (erro) { area.innerHTML = `<p class="error-text">${escapar(erro.message)}</p>`; }
+}
+
+function escapar(valor) {
+    const el = document.createElement('span'); el.textContent = valor == null ? '' : String(valor); return el.innerHTML;
 }
 
 function fecharModal() {

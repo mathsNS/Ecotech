@@ -12,6 +12,7 @@ from .v007_agendamento import aplicar as aplicar_v007
 from .v008_chat import aplicar as aplicar_v008
 from .v009_observabilidade import aplicar as aplicar_v009
 from .v010_notificacoes_lidas import aplicar as aplicar_v010
+from .v011_fotos_solicitacao import aplicar as aplicar_v011
 
 
 MIGRATIONS = (
@@ -25,6 +26,7 @@ MIGRATIONS = (
     (8, "chat_solicitacao", aplicar_v008),
     (9, "eventos_operacionais", aplicar_v009),
     (10, "leitura_notificacoes", aplicar_v010),
+    (11, "fotos_solicitacao", aplicar_v011),
 )
 
 

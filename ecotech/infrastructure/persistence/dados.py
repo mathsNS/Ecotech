@@ -975,6 +975,32 @@ class Dados(RepositorioBase):
             WHERE m.conversa_id=? ORDER BY m.criado_em,m.id LIMIT ? OFFSET ?""",
             (conversa['id'],limite,(pagina-1)*limite)).fetchall()
 
+    def listar_conversas_usuario(self, usuario_id):
+        return self.conn.execute("""SELECT c.*, sd.estado, sd.data_criacao,
+            CASE WHEN c.empresa_id=? THEN cid.nome ELSE emp.nome END contato_nome,
+            (SELECT texto FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem,
+            (SELECT criado_em FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem_em,
+            (SELECT COUNT(*) FROM mensagem_chat m WHERE m.conversa_id=c.id AND m.lida_em IS NULL AND (m.remetente_id IS NULL OR m.remetente_id<>?)) nao_lidas
+            FROM conversa_solicitacao c
+            JOIN solicitacao_descarte sd ON sd.id=c.solicitacao_id
+            JOIN usuario cid ON cid.id=c.cidadao_id JOIN usuario emp ON emp.id=c.empresa_id
+            WHERE c.cidadao_id=? OR c.empresa_id=?
+            ORDER BY COALESCE(ultima_mensagem_em,c.criada_em) DESC""",
+            (usuario_id,usuario_id,usuario_id,usuario_id)).fetchall()
+
+    def salvar_foto_solicitacao(self, foto_id, solicitacao_id, nome, mime_type, conteudo, agora):
+        with self.conn:
+            self.conn.execute("""INSERT INTO solicitacao_foto
+                (id,solicitacao_id,nome_arquivo,mime_type,tamanho,conteudo,criada_em)
+                VALUES(?,?,?,?,?,?,?)""", (foto_id,solicitacao_id,nome,mime_type,len(conteudo),conteudo,agora))
+
+    def listar_fotos_solicitacao(self, solicitacao_id):
+        return self.conn.execute("""SELECT id,nome_arquivo,mime_type,tamanho,criada_em
+            FROM solicitacao_foto WHERE solicitacao_id=? ORDER BY criada_em,id""", (solicitacao_id,)).fetchall()
+
+    def buscar_foto_solicitacao(self, foto_id):
+        return self.conn.execute("SELECT * FROM solicitacao_foto WHERE id=?", (foto_id,)).fetchone()
+
     def marcar_mensagens_chat_lidas(self,solicitacao_id,usuario_id,agora):
         conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
         with self.conn:
