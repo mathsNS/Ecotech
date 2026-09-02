@@ -280,6 +280,17 @@ def test_mtr_outra_empresa_nao_e_gerado(client):
     assert '/operacoes' in resp.headers['Location']
 
 
+def test_admin_gera_mtr_pdf_valido(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    db = _dados_mod.Dados()
+    row = db.conn.execute("SELECT id FROM solicitacao_descarte LIMIT 1").fetchone()
+    _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
+    resp = client.get(f"/solicitacao/{row['id']}/mtr")
+    assert resp.status_code == 200
+    assert resp.mimetype == 'application/pdf'
+    assert resp.data.startswith(b'%PDF')
+
+
 def test_saque_negado_para_empresa(client):
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
     resp = client.get('/saque', follow_redirects=False)

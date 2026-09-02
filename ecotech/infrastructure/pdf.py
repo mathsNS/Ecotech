@@ -178,7 +178,8 @@ def gerar_mtr(sol) -> bytes:
     pdf.set_text_color(*COR_CINZA)
     pdf.cell(0, 5, f"Documento gerado automaticamente pelo sistema EcoTech em {data_emissao}. Numero: {numero_mtr}", align="C")
 
-    return bytes(pdf.output())
+    conteudo = pdf.output(dest='S')
+    return conteudo.encode('latin-1') if isinstance(conteudo, str) else bytes(conteudo)
 
 
 # --------------------------------------------------------------------------
