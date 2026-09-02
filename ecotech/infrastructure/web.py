@@ -169,12 +169,18 @@ def criar_app() -> Flask:
 
     app.jinja_env.globals['csrf_token'] = csrf_token
 
+    from .api import criar_blueprint_api_v1
+    app.register_blueprint(criar_blueprint_api_v1(servico_autenticacao, servico_usuario))
+
     @app.before_request
     def proteger_csrf():
         """Valida requisições mutáveis que utilizam a sessão Flask."""
         if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
             return None
         if not app.config.get('CSRF_ENABLED', True) or app.testing:
+            return None
+        if request.path.startswith('/api/v1/'):
+            # a api mobile autentica por token, o csrf de sessao nao se aplica aqui
             return None
 
         esperado = session.get('_csrf_token')
