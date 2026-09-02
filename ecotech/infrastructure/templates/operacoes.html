@@ -195,6 +195,11 @@
             {% if is_admin or usuario.tipo == 'empresa' %}
             <!-- secao avanco de estado — visivel apenas quando pode avançar -->
             <div id="avanco-section" style="display:none; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <div id="peso-afericao-row" style="display:none; margin-bottom:12px;">
+                    <label for="peso-aferido-input" style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Peso aferido no recebimento (kg)</label>
+                    <input type="number" id="peso-aferido-input" class="filter-select" style="width:100%;" min="0.001" step="0.001" placeholder="Use o valor medido na balança da empresa">
+                    <small>Obrigatório para confirmar o recebimento. Este valor substituirá a estimativa.</small>
+                </div>
                 <div id="metodo-row" style="display:none; margin-bottom: 12px;">
                     <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Método de tratamento</label>
                     <select id="metodo-select" class="filter-select" style="width:100%;">
@@ -273,6 +278,8 @@ function abrirDetalhes(btn) {
         const podeAvancar = !ESTADOS_FINAIS.includes(d.estado);
         avancoSection.style.display = podeAvancar ? 'block' : 'none';
         const isProcessamento = d.estado === 'Em Processamento';
+        const pesoRow = document.getElementById('peso-afericao-row');
+        if (pesoRow) pesoRow.style.display = d.estado === 'Solicitado' ? 'block' : 'none';
         if (metodoRow)    metodoRow.style.display    = isProcessamento ? 'block' : 'none';
         const avaliacaoRow = document.getElementById('avaliacao-row');
         if (avaliacaoRow) avaliacaoRow.style.display = isProcessamento ? 'block' : 'none';
@@ -291,7 +298,10 @@ async function carregarDetalhesCompletos(id) {
         if (!resposta.ok) throw new Error(dados.erro || 'Falha ao carregar detalhes');
         const itens = dados.itens.map(item => `<article class="product-detail"><strong>${escapar(item.nome)}</strong><span>${escapar(item.tipo)}${item.subcategoria ? ' — ' + escapar(item.subcategoria) : ''}</span><span>Quantidade: ${item.quantidade} · Peso unitário: ${item.peso_kg} kg</span>${item.observacoes ? `<p>${escapar(item.observacoes)}</p>` : ''}</article>`).join('');
         const fotos = dados.fotos.length ? `<div class="request-photos">${dados.fotos.map(f => `<a href="${f.url}" target="_blank"><img src="${f.url}" alt="Foto do produto"></a>`).join('')}</div>` : '<p class="muted">Nenhuma foto foi enviada.</p>';
-        area.innerHTML = `<dl class="detail-grid"><div><dt>Tipo de coleta</dt><dd>${escapar(dados.tipo_coleta)}</dd></div><div><dt>Agendamento</dt><dd>${escapar(dados.agendamento || 'Não definido')}</dd></div><div><dt>Endereço</dt><dd>${escapar(dados.endereco)}</dd></div><div><dt>Contato</dt><dd>${escapar(dados.contato)}</dd></div></dl><h3>Produtos</h3>${itens}<h3>Fotos</h3>${fotos}`;
+        const peso = dados.peso_confirmado != null
+            ? `${dados.peso_confirmado} kg — aferido pela empresa em ${escapar(dados.peso_confirmado_em)}`
+            : `${dados.peso_estimado || dados.peso_total} kg — ${dados.peso_informado_cidadao ? 'informado pelo cidadão, aguardando aferição' : 'estimativa do sistema, aguardando aferição'}`;
+        area.innerHTML = `<dl class="detail-grid"><div><dt>Peso</dt><dd>${peso}</dd></div><div><dt>Tipo de coleta</dt><dd>${escapar(dados.tipo_coleta)}</dd></div><div><dt>Agendamento</dt><dd>${escapar(dados.agendamento || 'Não definido')}</dd></div><div><dt>Endereço</dt><dd>${escapar(dados.endereco)}</dd></div><div><dt>Contato</dt><dd>${escapar(dados.contato)}</dd></div></dl><h3>Produtos</h3>${itens}<h3>Fotos</h3>${fotos}`;
     } catch (erro) { area.innerHTML = `<p class="error-text">${escapar(erro.message)}</p>`; }
 }
 
@@ -315,6 +325,7 @@ function avancarEstado() {
     const estadoProdutoSelect = document.getElementById('estado-produto-select');
     const valorPropostoInput  = document.getElementById('valor-proposto-input');
     const justificativaInput  = document.getElementById('justificativa-input');
+    const pesoAferidoInput = document.getElementById('peso-aferido-input');
 
     const body = new URLSearchParams();
     const estadoAtual = document.getElementById('modal-estado').textContent;
@@ -328,6 +339,9 @@ function avancarEstado() {
             body.append('valor_proposto', vp);
             body.append('justificativa', justificativaInput ? justificativaInput.value.trim() : '');
         }
+    }
+    if (estadoAtual === 'Solicitado' && pesoAferidoInput && pesoAferidoInput.value) {
+        body.append('peso_aferido_kg', pesoAferidoInput.value);
     }
 
     btn.disabled = true;
@@ -364,6 +378,8 @@ function avancarEstado() {
             const isProcessamento = data.novo_estado === 'Em Processamento';
             if (metodoRow)    metodoRow.style.display    = isProcessamento ? 'block' : 'none';
             if (avaliacaoRow) avaliacaoRow.style.display = isProcessamento ? 'block' : 'none';
+            const pesoRow = document.getElementById('peso-afericao-row');
+            if (pesoRow) pesoRow.style.display = data.novo_estado === 'Solicitado' ? 'block' : 'none';
             if (!data.pode_avancar) {
                 document.getElementById('avanco-section').style.display = 'none';
             }

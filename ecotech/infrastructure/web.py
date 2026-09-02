@@ -484,7 +484,10 @@ def criar_app() -> Flask:
                 tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
                 subcategoria      = request.form.get('subcategoria', '').strip()
                 nome_dispositivo  = request.form.get('nome', '').strip()
-                peso_kg           = float(request.form.get('peso_kg', 1.0))
+                peso_digitado     = request.form.get('peso_kg', '').strip()
+                peso_informado    = bool(peso_digitado)
+                pesos_estimados   = {'celular': 0.2, 'computador': 5.0, 'eletrodomestico': 15.0}
+                peso_kg           = float(peso_digitado) if peso_informado else pesos_estimados.get(tipo_dispositivo, 1.0)
                 quantidade        = int(request.form.get('quantidade', 1))
                 observacoes       = request.form.get('observacoes_endereco', '').strip()
                 ponto_id          = request.form.get('ponto_id', '').strip()
@@ -533,6 +536,9 @@ def criar_app() -> Flask:
 
                 dados.atualizar_detalhes_coleta(
                     solicitacao.id, tipo_coleta, endereco_coleta, nome_contato, data_agendamento
+                )
+                dados.registrar_peso_estimado(
+                    solicitacao.id, peso_kg * quantidade, peso_informado
                 )
                 for nome_arquivo, mime_type, conteudo in fotos_recebidas:
                     dados.salvar_foto_solicitacao(
@@ -1017,6 +1023,10 @@ def criar_app() -> Flask:
             'peso_total':round(sol.calcular_peso_total(),2),'tipo_coleta':raw['tipo_coleta'] or 'Nao informado',
             'endereco':raw['endereco_coleta'] or 'Nao informado','contato':raw['nome_contato'] or 'Nao informado',
             'agendamento':formatar_data_br(raw['data_agendamento'],'data_hora'),
+            'peso_estimado':raw['peso_estimado_kg'],
+            'peso_informado_cidadao':bool(raw['peso_informado_cidadao']),
+            'peso_confirmado':raw['peso_confirmado_kg'],
+            'peso_confirmado_em':formatar_data_br(raw['peso_confirmado_em'],'data_hora'),
             'itens':itens,'fotos':fotos})
 
     @app.route('/fotos-solicitacoes/<foto_id>')
@@ -1348,6 +1358,17 @@ def criar_app() -> Flask:
 
         # se EmProcessamento, exige método de tratamento e avalia o produto
         estado_atual = sol.estado.obter_nome()
+        if estado_atual == 'Solicitado' and sol.peso_confirmado_kg is None:
+            peso_aferido = request.form.get('peso_aferido_kg', '').strip()
+            if not peso_aferido:
+                return jsonify({'erro': 'Informe o peso aferido no recebimento.'}), 400
+            try:
+                peso_aferido = dados.confirmar_peso_solicitacao(
+                    sol.id, peso_aferido, usuario['id'], datetime.now().isoformat()
+                )
+                sol.confirmar_peso(peso_aferido)
+            except ValueError as exc:
+                return jsonify({'erro': str(exc)}), 400
         if estado_atual == 'Em Processamento':
             metodo_str = request.form.get('metodo', '').strip()
             if not metodo_str:

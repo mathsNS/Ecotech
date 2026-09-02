@@ -171,7 +171,9 @@ def test_avancar_estado_avanca_solicitado_para_coletado(client, app):
         pytest.skip("Nenhuma solicitação em estado SOLICITADO no banco de seed")
 
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
-    resp = client.post(f"/operacoes/{row['id']}/avancar")
+    resp = client.post(
+        f"/operacoes/{row['id']}/avancar", data={'peso_aferido_kg': '2.35'}
+    )
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("novo_estado") == "Coletado"
@@ -254,7 +256,7 @@ def test_avancar_rota_outra_empresa_retorna_403(client):
         pytest.skip("Sem solicitação de outra empresa no seed")
 
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
-    resp = client.post(f"/operacoes/{row['id']}/avancar")
+    resp = client.post(f"/operacoes/{row['id']}/avancar", data={'peso_aferido_kg': '2.35'})
 
     assert resp.status_code == 403
     assert resp.is_json
@@ -396,6 +398,23 @@ def test_coleta_domiciliar_persiste_coordenadas(client):
         ORDER BY rowid DESC LIMIT 1
     """).fetchone()
     assert despacho['estado'] == 'BUSCANDO_EMPRESA'
+
+
+def test_coleta_sem_peso_usa_estimativa_nao_confirmada(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    formulario = _dados_nova_coleta(
+        peso_kg='', endereco_coleta='Rua sem balança, 20'
+    )
+    resp = client.post('/nova-solicitacao', data=formulario)
+    assert resp.status_code in (301, 302)
+    db = _dados_mod.Dados()
+    row = db.conn.execute("""SELECT peso_estimado_kg,peso_informado_cidadao,
+        peso_confirmado_kg FROM solicitacao_descarte
+        WHERE endereco_coleta='Rua sem balança, 20' ORDER BY rowid DESC LIMIT 1""").fetchone()
+    assert row['peso_estimado_kg'] == pytest.approx(0.2)
+    assert row['peso_informado_cidadao'] == 0
+    assert row['peso_confirmado_kg'] is None
 
 
 def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):

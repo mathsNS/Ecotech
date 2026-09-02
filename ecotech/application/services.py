@@ -99,6 +99,8 @@ class ServicoDescarte:
                         solicitacao._atribuida_em = datetime.fromisoformat(row['atribuida_em'])
                     solicitacao._endereco_coleta = row['endereco_coleta']
                     solicitacao._nome_contato = row['nome_contato']
+                    if 'peso_confirmado_kg' in row.keys() and row['peso_confirmado_kg'] is not None:
+                        solicitacao._peso_confirmado_kg = float(row['peso_confirmado_kg'])
                 
                 # reconstroi o estado correto do banco
                 estado = EstadoFactory.criar_do_banco(row['estado'])

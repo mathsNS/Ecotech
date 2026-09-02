@@ -98,12 +98,14 @@
                             </div>
 
                             <div class="form-group-new">
-                                <label for="peso_kg">Peso aproximado <span class="required">*</span></label>
+                                <label for="peso_kg">Peso aproximado <span class="field-hint">Opcional</span></label>
                                 <div class="input-with-unit">
                                     <input type="number" id="peso_kg" name="peso_kg" class="form-control-new" 
-                                           step="0.1" min="0.1" value="1.0" required>
+                                           step="0.01" min="0.01" placeholder="Se souber, informe aqui">
                                     <span class="unit-label">kg</span>
                                 </div>
+                                <label class="weight-unknown"><input type="checkbox" id="peso_desconhecido"> Não sei informar o peso</label>
+                                <small id="peso-estimativa">Sem problema: o peso será conferido pela empresa.</small>
                             </div>
                         </div>
 
@@ -369,9 +371,24 @@ const tipoColeta = "{{ tipo_coleta }}";
 let currentStep = 1;
 const totalSteps = 3;
 
+const estimativasPeso = {celular: 0.2, computador: 5, eletrodomestico: 15};
+const pesoInput = document.getElementById('peso_kg');
+const pesoDesconhecido = document.getElementById('peso_desconhecido');
+const pesoEstimativa = document.getElementById('peso-estimativa');
+function atualizarPesoOpcional() {
+    const tipo = document.getElementById('tipo_dispositivo').value;
+    const estimativa = estimativasPeso[tipo] || 1;
+    pesoInput.disabled = pesoDesconhecido.checked;
+    if (pesoDesconhecido.checked) pesoInput.value = '';
+    pesoEstimativa.textContent = `Estimativa do sistema: ${estimativa.toLocaleString('pt-BR')} kg por unidade. A empresa confirmará no recebimento.`;
+}
+pesoDesconhecido.addEventListener('change', atualizarPesoOpcional);
+document.getElementById('tipo_dispositivo').addEventListener('change', atualizarPesoOpcional);
+atualizarPesoOpcional();
+
 // campos obrigatorios por passo
 const requiredByStep = {
-    1: ['nome', 'peso_kg', 'quantidade'],
+    1: ['nome', 'quantidade'],
     2: tipoColeta === 'entrega_ponto' ? ['nome_contato'] : ['cep_coleta', 'numero_coleta', 'logradouro_coleta', 'bairro_coleta', 'cidade_coleta', 'uf_coleta'],
     3: ['data_coleta', 'horario_coleta', 'horario_fim']
 };

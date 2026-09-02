@@ -1277,6 +1277,22 @@ class Dados(RepositorioBase):
             """, (tipo_coleta, endereco_coleta or None, nome_contato or None,
                   data_agendamento or None, id_sol))
 
+    def registrar_peso_estimado(self, id_sol, peso_kg, informado_cidadao):
+        with self.conn:
+            self.conn.execute("""UPDATE solicitacao_descarte
+                SET peso_estimado_kg=?, peso_informado_cidadao=? WHERE id=?""",
+                (round(float(peso_kg),3), 1 if informado_cidadao else 0, id_sol))
+
+    def confirmar_peso_solicitacao(self, id_sol, peso_kg, usuario_id, agora):
+        peso = round(float(peso_kg), 3)
+        if peso <= 0:
+            raise ValueError('O peso aferido deve ser maior que zero.')
+        with self.conn:
+            self.conn.execute("""UPDATE solicitacao_descarte SET peso_confirmado_kg=?,
+                peso_confirmado_por=?,peso_confirmado_em=? WHERE id=?""",
+                (peso,usuario_id,agora,id_sol))
+        return peso
+
     def buscar_todos_cidadaos_admin(self):
         c = self.conn.cursor()
         c.execute("""

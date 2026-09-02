@@ -220,6 +220,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._atribuida_em: Optional[datetime] = None
         self._endereco_coleta: Optional[str] = None
         self._nome_contato: Optional[str] = None
+        self._peso_confirmado_kg: Optional[float] = None
         self._rastreamento = RastreamentoEntrega(f"R-{id}")
         self.registrar_log("Solicitação criada", f"ID: {id}")
 
@@ -321,10 +322,25 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._itens.remove(item)
 
     def calcular_peso_total(self) -> float:
+        if self._peso_confirmado_kg is not None:
+            return self._peso_confirmado_kg
         return sum(item.calcular_peso_total() for item in self._itens)
 
+    @property
+    def peso_confirmado_kg(self) -> Optional[float]:
+        return self._peso_confirmado_kg
+
+    def confirmar_peso(self, peso_kg: float) -> None:
+        if peso_kg <= 0:
+            raise ValueError('O peso aferido deve ser maior que zero.')
+        self._peso_confirmado_kg = round(float(peso_kg), 3)
+
     def calcular_impacto_total(self) -> float:
-        return sum(item.calcular_impacto_total() for item in self._itens)
+        impacto_estimado = sum(item.calcular_impacto_total() for item in self._itens)
+        peso_estimado = sum(item.calcular_peso_total() for item in self._itens)
+        if self._peso_confirmado_kg is not None and peso_estimado > 0:
+            return impacto_estimado * self._peso_confirmado_kg / peso_estimado
+        return impacto_estimado
 
     def avancar_estado(self):
         """Transiciona para o próximo estado e registra no rastreamento."""
