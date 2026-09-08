@@ -1,17 +1,17 @@
-# ecotech_mobile
+# Aplicativo EcoTech
 
-A new Flutter project.
+O aplicativo usa automaticamente `http://localhost:5000` no Flutter Web e
+`http://10.0.2.2:5000` no emulador Android.
 
-## Getting Started
+Para executar em um dispositivo físico ou apontar para outro ambiente, informe
+o endereço do backend explicitamente:
 
-This project is a starting point for a Flutter application.
+```powershell
+flutter run --dart-define=ECOTECH_API_BASE_URL=http://192.168.0.10:5000
+```
 
-A few resources to get you started if this is your first Flutter project:
+O backend pode ser iniciado na raiz do repositório:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+docker compose up --build
+```
