@@ -77,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     Image.asset(
                       'assets/images/Ecotech logo completa.png',
-                      height: 72,
+                      height: 148,
                     ),
                     const SizedBox(height: 32),
                     Text('Entrar no sistema', style: Theme.of(context).textTheme.titleLarge),
