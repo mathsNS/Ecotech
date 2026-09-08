@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth/auth_repository.dart';
 import '../../data/models/usuario.dart';
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => AuthRepository(),
+);
 
 /// Estado de autenticacao do app: null = deslogado, Usuario = logado.
 class AuthController extends AsyncNotifier<Usuario?> {
@@ -24,11 +26,9 @@ class AuthController extends AsyncNotifier<Usuario?> {
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(authRepositoryProvider).login(
-            tipo: tipo,
-            credencial: credencial,
-            senha: senha,
-          ),
+      () => ref
+          .read(authRepositoryProvider)
+          .login(tipo: tipo, credencial: credencial, senha: senha),
     );
   }
 
@@ -44,7 +44,9 @@ class AuthController extends AsyncNotifier<Usuario?> {
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(authRepositoryProvider).registrar(
+      () => ref
+          .read(authRepositoryProvider)
+          .registrar(
             tipo: tipo,
             nome: nome,
             email: email,
@@ -60,6 +62,10 @@ class AuthController extends AsyncNotifier<Usuario?> {
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
+  }
+
+  void atualizarUsuario(Usuario usuario) {
+    state = AsyncData(usuario);
   }
 }
 
