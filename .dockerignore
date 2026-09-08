@@ -1,0 +1,8 @@
+.git
+.gitignore
+.pytest_cache
+.pytest-tmp-*
+venv
+backups
+website
+*.db
