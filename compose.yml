@@ -6,4 +6,4 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./website:/usr/local/ecotech
+      - .:/usr/src/ecotech
