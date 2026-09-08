@@ -170,7 +170,13 @@ def criar_app() -> Flask:
     app.jinja_env.globals['csrf_token'] = csrf_token
 
     from .api import criar_blueprint_api_v1
-    app.register_blueprint(criar_blueprint_api_v1(servico_autenticacao, servico_usuario))
+    app.register_blueprint(criar_blueprint_api_v1(
+        servico_autenticacao,
+        servico_usuario,
+        servico_descarte,
+        servico_saque,
+        dados,
+    ))
 
     @app.after_request
     def liberar_cors_api_mobile(response):

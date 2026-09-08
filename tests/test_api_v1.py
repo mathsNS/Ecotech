@@ -135,6 +135,85 @@ def test_me_com_token_valido_retorna_dados_do_usuario(client):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/v1/dashboard
+# ---------------------------------------------------------------------------
+
+def test_dashboard_sem_token_retorna_401(client):
+    assert client.get("/api/v1/dashboard").status_code == 401
+
+
+@pytest.mark.parametrize(
+    "tipo,credencial,senha,chaves_metricas",
+    [
+        ("cidadao", _CPF_CIDADAO, _SENHA_CIDADAO, {"saldo", "pontos", "tier", "dispositivos"}),
+        ("empresa", _CNPJ_EMPRESA, _SENHA_EMPRESA, {"finalizadas", "ativas", "peso_processado_kg", "saldo"}),
+        ("administrador", _EMAIL_ADMIN, _SENHA_ADMIN, {"peso_total_kg", "solicitacoes", "finalizadas", "receita"}),
+    ],
+)
+def test_dashboard_retorna_contrato_especifico_por_perfil(
+    client, tipo, credencial, senha, chaves_metricas
+):
+    token = _obter_token(client, tipo, credencial, senha)
+    resp = client.get(
+        "/api/v1/dashboard",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    corpo = resp.get_json()
+    assert resp.status_code == 200
+    assert corpo["tipo"] == tipo
+    assert corpo["usuario"]["tipo"] == tipo
+    assert chaves_metricas <= corpo["metricas"].keys()
+
+
+# ---------------------------------------------------------------------------
+# GET/PATCH /api/v1/perfil
+# ---------------------------------------------------------------------------
+
+def test_perfil_retorna_dados_especificos_do_cidadao(client):
+    token = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    resp = client.get(
+        "/api/v1/perfil",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    corpo = resp.get_json()
+    assert resp.status_code == 200
+    assert corpo["usuario"]["cpf"] == _CPF_CIDADAO
+    assert "tier" in corpo["resumo"]
+    assert len(corpo["resumo"]["conquistas"]) == 4
+
+
+def test_perfil_pode_atualizar_nome_email_e_senha(client):
+    cadastro = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao",
+        "nome": "Perfil Mobile",
+        "email": "perfil.mobile@example.com",
+        "senha": "senha123",
+        "senha_confirmacao": "senha123",
+        "cpf": "11144477735",
+    })
+    token = cadastro.get_json()["access_token"]
+    resp = client.patch(
+        "/api/v1/perfil",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "nome": "Perfil Atualizado",
+            "email": "perfil.atualizado@example.com",
+            "senha_atual": "senha123",
+            "nova_senha": "senha456",
+            "confirma_senha": "senha456",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["usuario"]["nome"] == "Perfil Atualizado"
+    novo_login = client.post("/api/v1/auth/login", json={
+        "tipo": "cidadao",
+        "credencial": "11144477735",
+        "senha": "senha456",
+    })
+    assert novo_login.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------
 
