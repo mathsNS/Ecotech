@@ -3,6 +3,9 @@
 .pytest_cache
 .pytest-tmp-*
 .tmp
+mobile/.dart_tool
+mobile/android/.gradle
+mobile/build
 venv
 backups
 website
