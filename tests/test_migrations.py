@@ -28,7 +28,7 @@ def dados(tmp_path, monkeypatch):
 
 
 def test_banco_vazio_sobe_na_versao_atual(dados):
-    assert dados.buscar_versao_schema() == 12
+    assert dados.buscar_versao_schema() == 13
     aplicadas = dados.conn.execute(
         "SELECT versao, nome FROM schema_migration ORDER BY versao"
     ).fetchall()
@@ -45,6 +45,7 @@ def test_banco_vazio_sobe_na_versao_atual(dados):
         (10, 'leitura_notificacoes'),
         (11, 'fotos_solicitacao'),
         (12, 'peso_aferido'),
+        (13, 'ano_dispositivo'),
     ]
 
 
@@ -54,7 +55,7 @@ def test_reexecutar_migrations_e_idempotente(dados):
     total = dados.conn.execute(
         "SELECT COUNT(*) FROM schema_migration"
     ).fetchone()[0]
-    assert total == 12
+    assert total == 13
 
 
 def test_migration_cria_estruturas_de_elegibilidade(dados):
@@ -124,7 +125,16 @@ def test_colunas_legadas_sao_adicionadas_sem_ocultar_erros(tmp_path, monkeypatch
         row['name'] for row in repositorio.conn.execute("PRAGMA table_info(usuario)")
     }
     assert 'password_hash' in colunas
-    assert repositorio.buscar_versao_schema() == 12
+    assert repositorio.buscar_versao_schema() == 13
+
+
+def test_migration_adiciona_ano_de_fabricacao_ao_dispositivo(dados):
+    colunas = {
+        row['name'] for row in dados.conn.execute(
+            "PRAGMA table_info(dispositivo)"
+        )
+    }
+    assert 'ano_fabricacao' in colunas
 
 
 def test_migration_cria_base_para_ponto_empresarial(dados):

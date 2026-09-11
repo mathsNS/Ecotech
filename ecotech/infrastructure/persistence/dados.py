@@ -106,6 +106,9 @@ class Dados(RepositorioBase):
         self._adicionar_coluna_se_ausente(
             'dispositivo', 'tipo', "TEXT DEFAULT 'celular'"
         )
+        self._adicionar_coluna_se_ausente(
+            'dispositivo', 'ano_fabricacao', 'INTEGER'
+        )
 
         # Tabela de Ponto de Coleta
         c.execute("""
@@ -322,9 +325,15 @@ class Dados(RepositorioBase):
     def salvar_dispositivo(self, dispositivo):
         with self.conn:
             self.conn.execute("""
-            INSERT OR IGNORE INTO dispositivo (id, nome, peso_kg, marca, modelo, tipo, subcategoria)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (dispositivo.id, dispositivo.nome, dispositivo.peso_kg, dispositivo.marca, dispositivo.modelo, dispositivo.obter_tipo().lower(), dispositivo.subcategoria))
+            INSERT OR IGNORE INTO dispositivo
+                (id, nome, peso_kg, marca, modelo, tipo, subcategoria, ano_fabricacao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                dispositivo.id, dispositivo.nome, dispositivo.peso_kg,
+                dispositivo.marca, dispositivo.modelo,
+                dispositivo.obter_tipo().lower(), dispositivo.subcategoria,
+                getattr(dispositivo, 'ano_fabricacao', None),
+            ))
 
     def salvar_ponto(self, ponto_coleta):
         with self.conn:
@@ -1173,7 +1182,8 @@ class Dados(RepositorioBase):
         """Retorna todos os itens de uma solicitação."""
         c = self.conn.cursor()
         c.execute("""
-            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo, d.subcategoria
+            SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo,
+                   d.subcategoria, d.ano_fabricacao
             FROM item_descarte i
             JOIN dispositivo d ON i.id_dispositivo = d.id
             WHERE i.id_solicitacao = ?
@@ -1198,6 +1208,12 @@ class Dados(RepositorioBase):
             ORDER BY timestamp DESC
         """, (id_usuario,))
         return c.fetchall()
+
+    def buscar_historico_solicitacao(self, id_solicitacao):
+        return self.conn.execute("""
+            SELECT timestamp, mensagem FROM historico_rastreamento
+            WHERE id_solicitacao = ? ORDER BY id
+        """, (id_solicitacao,)).fetchall()
 
     def contar_notificacoes_nao_lidas(self, id_usuario):
         return self.conn.execute("""SELECT COUNT(*) total FROM notificacao

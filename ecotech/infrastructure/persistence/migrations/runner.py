@@ -14,6 +14,7 @@ from .v009_observabilidade import aplicar as aplicar_v009
 from .v010_notificacoes_lidas import aplicar as aplicar_v010
 from .v011_fotos_solicitacao import aplicar as aplicar_v011
 from .v012_peso_aferido import aplicar as aplicar_v012
+from .v013_ano_dispositivo import aplicar as aplicar_v013
 
 
 MIGRATIONS = (
@@ -29,6 +30,7 @@ MIGRATIONS = (
     (10, "leitura_notificacoes", aplicar_v010),
     (11, "fotos_solicitacao", aplicar_v011),
     (12, "peso_aferido", aplicar_v012),
+    (13, "ano_dispositivo", aplicar_v013),
 )
 
 
