@@ -20,7 +20,8 @@ from ..application.authorization import (
     usuario_pode_visualizar_solicitacao,
 )
 from ..application.elegibilidade import DemandaColeta
-from ..application.factories import DispositivoFactory
+from ..application.factories import DispositivoFactory, MetodoTratamentoFactory
+from ..domain.dispositivos import EstadoProduto
 from ..domain.estados import BuscandoEmpresa, Solicitado
 from ..domain.logistica import Coordenadas
 from ..application.services import (
@@ -29,6 +30,7 @@ from ..application.services import (
     ServicoSaque,
     ServicoUsuario,
 )
+from .pdf import gerar_mtr
 
 ALGORITMO_JWT = 'HS256'
 EXPIRACAO_TOKEN_HORAS = 8
@@ -309,7 +311,11 @@ def criar_blueprint_api_v1(
 
     def _usuario_token_dict():
         payload = request.usuario_token
-        return {'id': payload['sub'], 'tipo': payload['tipo']}
+        return {
+            'id': payload['sub'],
+            'tipo': payload['tipo'],
+            'nome': payload.get('nome', ''),
+        }
 
     def _exigir_cidadao():
         if request.usuario_token['tipo'] != 'cidadao':
@@ -319,6 +325,11 @@ def criar_blueprint_api_v1(
     def _exigir_empresa():
         if request.usuario_token['tipo'] != 'empresa':
             return jsonify({'erro': 'Recurso exclusivo para empresas'}), 403
+        return None
+
+    def _exigir_operador():
+        if request.usuario_token['tipo'] not in ('empresa', 'administrador'):
+            return jsonify({'erro': 'Recurso exclusivo para operadores'}), 403
         return None
 
     def _endereco_operacional(payload):
@@ -373,6 +384,26 @@ def criar_blueprint_api_v1(
     def _detalhes_operacao(solicitacao):
         raw = dados.buscar_solicitacao(solicitacao.id)
         itens = [dict(item) for item in dados.buscar_itens_solicitacao(solicitacao.id)]
+        dispositivos = {
+            item.dispositivo.id: item.dispositivo
+            for item in solicitacao.itens
+        }
+        for item in itens:
+            preco = dados.buscar_preco_subcategoria(
+                item.get('subcategoria') or 'smartphone_medio'
+            )
+            dispositivo = dispositivos.get(item['id_dispositivo'])
+            valor_base = (
+                float(preco['valor_base_funcionando']) if preco
+                else dispositivo.calcular_valor_revenda() if dispositivo else 0.0
+            )
+            valor_sucata = float(preco['valor_minimo_sucata']) if preco else 0.0
+            item['precos'] = {
+                'funcionando': round(valor_base, 2),
+                'defeito_leve': round(valor_base * 0.4, 2),
+                'defeito_grave': round(valor_base * 0.15, 2),
+                'sucata': round(valor_sucata, 2),
+            }
         fotos = [
             {
                 **dict(foto),
@@ -385,6 +416,19 @@ def criar_blueprint_api_v1(
         ]
         agendamento = dados.buscar_agendamento(solicitacao.id)
         avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao.id)
+        base = (
+            dados.buscar_base_operacional(raw['base_operacional_id'])
+            if raw and raw['base_operacional_id'] else None
+        )
+        responsavel_peso = (
+            dados.buscar_usuario(raw['peso_confirmado_por'])
+            if raw and raw['peso_confirmado_por'] else None
+        )
+        estimado = float(raw['peso_estimado_kg'] or 0)
+        confirmado = raw['peso_confirmado_kg']
+        diferenca = None
+        if confirmado is not None and estimado > 0:
+            diferenca = round((float(confirmado) - estimado) / estimado * 100, 1)
         return {
             **_resumo_operacao(solicitacao),
             'endereco_coleta': raw['endereco_coleta'],
@@ -393,12 +437,142 @@ def criar_blueprint_api_v1(
             'metodo_tratamento': raw['metodo_tratamento'],
             'peso_informado_cidadao': bool(raw['peso_informado_cidadao']),
             'peso_confirmado_em': raw['peso_confirmado_em'],
+            'peso_confirmado_por': (
+                responsavel_peso['nome'] if responsavel_peso else None
+            ),
+            'diferenca_peso_percentual': diferenca,
+            'diferenca_peso_relevante': (
+                diferenca is not None and abs(diferenca) >= 20
+            ),
+            'base': _base_json(servico_base.buscar(raw['base_operacional_id']))
+            if base else None,
+            'atribuida_em': raw['atribuida_em'],
             'itens': itens,
             'fotos': fotos,
             'historico': historico,
             'agendamento': dict(agendamento) if agendamento else None,
             'avaliacao': dict(avaliacao) if avaliacao else None,
+            'acoes': {
+                'pode_avancar': solicitacao.estado.pode_avancar(),
+                'exige_peso': (
+                    solicitacao.estado.obter_nome() == 'Solicitado'
+                    and confirmado is None
+                ),
+                'exige_avaliacao': (
+                    solicitacao.estado.obter_nome() == 'Em Processamento'
+                ),
+                'agenda': True,
+                'chat': True,
+            },
         }
+
+    def _buscar_operacao_autorizada(solicitacao_id):
+        solicitacao = servico_descarte.obter_solicitacao(solicitacao_id)
+        if solicitacao is None:
+            return None, (jsonify({'erro': 'Operacao nao encontrada'}), 404)
+        usuario = _usuario_token_dict()
+        if not usuario_pode_operar_solicitacao(usuario, solicitacao, dados):
+            return None, (jsonify({'erro': 'Acesso nao autorizado a operacao'}), 403)
+        return solicitacao, None
+
+    def _registrar_avaliacao(solicitacao, payload):
+        metodo_chave = str(payload.get('metodo', '')).strip().lower()
+        metodos = {
+            'reciclagem': MetodoTratamentoFactory.criar_reciclagem,
+            'reuso': MetodoTratamentoFactory.criar_reuso,
+            'descarte': MetodoTratamentoFactory.criar_descarte_controlado,
+            'descarte_controlado': MetodoTratamentoFactory.criar_descarte_controlado,
+        }
+        if metodo_chave not in metodos:
+            raise ValueError('Informe um metodo de tratamento valido')
+        estado_chave = str(payload.get('estado_produto', '')).strip().lower()
+        try:
+            estado_produto = EstadoProduto(estado_chave)
+        except ValueError as exc:
+            raise ValueError('Informe o estado de conservacao do produto') from exc
+
+        valor_informado = payload.get('valor_proposto')
+        valor_proposto = None
+        if valor_informado not in (None, ''):
+            valor_proposto = float(str(valor_informado).replace(',', '.'))
+            if valor_proposto < 0:
+                raise ValueError('O valor proposto nao pode ser negativo')
+        justificativa = str(payload.get('justificativa', '')).strip()
+
+        valor_total = 0.0
+        status_override = 'nenhum'
+        prioridade_status = {'nenhum': 0, 'aprovado': 1, 'pendente_doc': 2, 'invalido': 3}
+        for item in solicitacao.itens:
+            preco = dados.buscar_preco_subcategoria(
+                item.dispositivo.subcategoria or 'smartphone_medio'
+            )
+            if preco:
+                valor_base = float(preco['valor_base_funcionando'])
+                valor_sucata = float(preco['valor_minimo_sucata'])
+            else:
+                valor_base = item.dispositivo.calcular_valor_revenda()
+                valor_sucata = 0.0
+            if valor_proposto is None:
+                valor_item = item.dispositivo.calcular_valor_avaliado(
+                    estado_produto, valor_base, valor_sucata
+                )
+                status_item = 'nenhum'
+            else:
+                resultado = ServicoDescarte.validar_override(
+                    valor_proposto, valor_base, valor_sucata
+                )
+                valor_item = resultado['valor_aplicado']
+                status_item = resultado['status']
+            valor_total += valor_item * item.quantidade
+            if prioridade_status[status_item] > prioridade_status[status_override]:
+                status_override = status_item
+
+        if status_override in ('pendente_doc', 'invalido') and not justificativa:
+            raise ValueError('Informe a justificativa para o valor proposto')
+        servico_descarte.definir_metodo_tratamento(
+            solicitacao, metodos[metodo_chave]()
+        )
+        dados.atualizar_avaliacao_solicitacao(
+            solicitacao.id, estado_chave, round(valor_total, 2),
+            justificativa, status_override,
+        )
+
+    def _creditar_finalizacao(solicitacao, operador):
+        if 'cidad' not in solicitacao.usuario.obter_tipo().lower():
+            return
+        avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao.id)
+        valor_total = (
+            float(avaliacao['valor_proposto'])
+            if avaliacao and avaliacao['valor_proposto'] is not None
+            else sum(
+                item.dispositivo.calcular_valor_revenda() * item.quantidade
+                for item in solicitacao.itens
+            )
+        )
+        credito = round(valor_total * 0.1, 2)
+        nome_empresa = operador['nome'] if operador['tipo'] == 'empresa' else 'EcoTech'
+        dados.salvar_entrega_para_solicitacao(
+            solicitacao.id, solicitacao.usuario.id, credito, nome_empresa
+        )
+        pontos = int(credito / servico_saque.TAXA_REAIS_POR_PONTO)
+        dados.atualizar_pontos_cidadao(solicitacao.usuario.id, pontos)
+        solicitacao.usuario.adicionar_pontos(pontos)
+        plano = (
+            dados.buscar_plano_empresa(operador['id'])
+            if operador['tipo'] == 'empresa' else 'free'
+        )
+        taxa = ServicoDescarte.TAXAS_ECOTECH.get(plano, 0.08)
+        if operador['tipo'] == 'empresa':
+            dados.atualizar_saldo_empresa(
+                operador['id'], round(valor_total * (1 - 0.10 - taxa), 2)
+            )
+            if plano == 'enterprise':
+                bonus = int(solicitacao.calcular_peso_total() * 10 * 0.5)
+                if bonus:
+                    dados.atualizar_pontos_cidadao(solicitacao.usuario.id, bonus)
+        dados.registrar_receita_ecotech(
+            solicitacao.id, round(valor_total * taxa, 2)
+        )
 
     def _validar_fotos(arquivos):
         fotos = []
@@ -1209,6 +1383,199 @@ def criar_blueprint_api_v1(
             return jsonify({'erro': str(exc)}), 404
         except ValueError as exc:
             return jsonify({'erro': str(exc)}), 409
+
+    @bp.route('/operacoes', methods=['GET'])
+    @requer_autenticacao_api
+    def operacoes_api():
+        bloqueio = _exigir_operador()
+        if bloqueio:
+            return bloqueio
+        solicitacoes = _solicitacoes_do_usuario(
+            request.usuario_token['sub'], request.usuario_token['tipo']
+        )
+        estatisticas = servico_descarte.calcular_stats_estados(solicitacoes)
+        estado = str(request.args.get('estado', '')).strip().lower()
+        busca = str(request.args.get('busca', '')).strip().lower()
+        if estado:
+            solicitacoes = [
+                item for item in solicitacoes
+                if item.estado.obter_nome().lower() == estado
+            ]
+        if busca:
+            solicitacoes = [
+                item for item in solicitacoes
+                if busca in item.id.lower()
+                or busca in item.usuario.nome.lower()
+                or busca in (_nome_empresa_solicitacao(item) or '').lower()
+                or busca in (item.ponto_coleta.nome if item.ponto_coleta else '').lower()
+            ]
+        solicitacoes.sort(key=lambda item: item.data_criacao, reverse=True)
+        try:
+            pagina = max(1, int(request.args.get('pagina', 1)))
+            por_pagina = min(50, max(1, int(request.args.get('por_pagina', 20))))
+        except (TypeError, ValueError):
+            return jsonify({'erro': 'Paginacao invalida'}), 400
+        total = len(solicitacoes)
+        inicio = (pagina - 1) * por_pagina
+        return jsonify({
+            'operacoes': [
+                _resumo_operacao(item)
+                for item in solicitacoes[inicio:inicio + por_pagina]
+            ],
+            'estatisticas': estatisticas,
+            'paginacao': {
+                'pagina': pagina,
+                'por_pagina': por_pagina,
+                'total': total,
+                'total_paginas': max(1, (total + por_pagina - 1) // por_pagina),
+            },
+        })
+
+    @bp.route('/operacoes/<solicitacao_id>', methods=['GET'])
+    @requer_autenticacao_api
+    def operacao_api(solicitacao_id):
+        bloqueio = _exigir_operador()
+        if bloqueio:
+            return bloqueio
+        solicitacao, erro = _buscar_operacao_autorizada(solicitacao_id)
+        if erro:
+            return erro
+        return jsonify(_detalhes_operacao(solicitacao))
+
+    @bp.route('/operacoes/<solicitacao_id>/peso', methods=['POST'])
+    @requer_autenticacao_api
+    def peso_operacao_api(solicitacao_id):
+        bloqueio = _exigir_operador()
+        if bloqueio:
+            return bloqueio
+        solicitacao, erro = _buscar_operacao_autorizada(solicitacao_id)
+        if erro:
+            return erro
+        if solicitacao.estado.obter_nome() != 'Solicitado':
+            return jsonify({
+                'erro': 'O peso deve ser aferido no recebimento da solicitacao'
+            }), 409
+        try:
+            payload = request.get_json(silent=True) or {}
+            peso = dados.confirmar_peso_solicitacao(
+                solicitacao.id,
+                str(payload.get('peso_kg', '')).replace(',', '.'),
+                request.usuario_token['sub'],
+                datetime.now().isoformat(timespec='seconds'),
+            )
+            solicitacao.confirmar_peso(peso)
+            dados.salvar_historico_rastreamento(
+                solicitacao.id, f'Peso aferido no recebimento: {peso:g} kg'
+            )
+            return jsonify({
+                'peso_confirmado_kg': peso,
+                'peso_origem': 'aferido',
+            })
+        except (TypeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/operacoes/<solicitacao_id>/avancar', methods=['POST'])
+    @requer_autenticacao_api
+    def avancar_operacao_api(solicitacao_id):
+        bloqueio = _exigir_operador()
+        if bloqueio:
+            return bloqueio
+        solicitacao, erro = _buscar_operacao_autorizada(solicitacao_id)
+        if erro:
+            return erro
+        if not solicitacao.estado.pode_avancar():
+            return jsonify({'erro': 'A operacao ja esta em estado final'}), 409
+        operador = _usuario_token_dict()
+        if operador['tipo'] == 'empresa' and dados.buscar_plano_empresa(
+            operador['id']
+        ) == 'free':
+            agora = datetime.now()
+            processadas = sum(
+                1 for item in _solicitacoes_do_usuario(
+                    operador['id'], operador['tipo']
+                )
+                if item.estado.obter_nome() not in ('Solicitado', 'Cancelado')
+                and item.data_criacao.year == agora.year
+                and item.data_criacao.month == agora.month
+            )
+            if processadas >= 30:
+                return jsonify({
+                    'erro': 'Limite mensal do plano atingido',
+                    'upgrade': True,
+                }), 403
+        payload = request.get_json(silent=True) or {}
+        estado_anterior = solicitacao.estado.obter_nome()
+        try:
+            if estado_anterior == 'Solicitado' and solicitacao.peso_confirmado_kg is None:
+                peso = dados.confirmar_peso_solicitacao(
+                    solicitacao.id,
+                    str(payload.get('peso_kg', '')).replace(',', '.'),
+                    operador['id'], datetime.now().isoformat(timespec='seconds'),
+                )
+                solicitacao.confirmar_peso(peso)
+                dados.salvar_historico_rastreamento(
+                    solicitacao.id, f'Peso aferido no recebimento: {peso:g} kg'
+                )
+            if estado_anterior == 'Em Processamento':
+                _registrar_avaliacao(solicitacao, payload)
+            servico_descarte.avancar_estado_solicitacao(solicitacao)
+        except (TypeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+        novo_estado = solicitacao.estado.obter_nome()
+        dados.salvar_historico_rastreamento(
+            solicitacao.id,
+            f'Operacao avancou de {estado_anterior} para {novo_estado}',
+        )
+        if novo_estado in estados_finais:
+            _creditar_finalizacao(solicitacao, operador)
+        dados.salvar_notificacao(
+            solicitacao.usuario.id,
+            f'Sua solicitacao foi atualizada para: {novo_estado}.',
+        )
+        return jsonify({
+            'novo_estado': novo_estado,
+            'pode_avancar': solicitacao.estado.pode_avancar(),
+            'operacao': _detalhes_operacao(solicitacao),
+        })
+
+    @bp.route('/operacoes/<solicitacao_id>/mtr', methods=['GET'])
+    @requer_autenticacao_api
+    def mtr_operacao_api(solicitacao_id):
+        bloqueio = _exigir_operador()
+        if bloqueio:
+            return bloqueio
+        operador = _usuario_token_dict()
+        if operador['tipo'] == 'empresa' and dados.buscar_plano_empresa(
+            operador['id']
+        ) == 'free':
+            return jsonify({
+                'erro': 'MTR disponivel nos planos Professional e Enterprise'
+            }), 403
+        solicitacao, erro = _buscar_operacao_autorizada(solicitacao_id)
+        if erro:
+            return erro
+        raw = dados.buscar_solicitacao(solicitacao.id)
+        empresa_id = raw['empresa_responsavel_id']
+        if not empresa_id and raw['id_ponto_coleta']:
+            ponto = dados.buscar_ponto_coleta(raw['id_ponto_coleta'])
+            empresa_id = ponto['id_empresa'] if ponto else None
+        empresa = dados.buscar_empresa(empresa_id) if empresa_id else None
+        base = (
+            dados.buscar_base_operacional(raw['base_operacional_id'])
+            if raw['base_operacional_id'] else None
+        )
+        solicitacao._mtr_registro = dict(raw)
+        solicitacao._mtr_empresa = dict(empresa) if empresa else {}
+        solicitacao._mtr_base = dict(base) if base else {}
+        numero = f'MTR-{solicitacao.id[:8].upper()}'
+        return Response(
+            gerar_mtr(solicitacao),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename={numero}.pdf'
+            },
+        )
 
     return bp
 

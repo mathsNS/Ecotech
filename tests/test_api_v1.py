@@ -566,6 +566,114 @@ def test_oportunidade_preserva_privacidade_e_aceite_e_atomico(client):
 
 
 # ---------------------------------------------------------------------------
+# Operacoes, afericao, avaliacao e MTR
+# ---------------------------------------------------------------------------
+
+def test_operacao_exige_peso_avalia_produto_e_gera_mtr(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    db = _dados_mod.Dados()
+    ponto = db.conn.execute("""
+        SELECT id FROM ponto_coleta
+        WHERE id_empresa = 'user-2' AND ativo = 1 LIMIT 1
+    """).fetchone()
+    assert ponto is not None
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    criada = client.post(
+        '/api/v1/solicitacoes', headers=cidadao,
+        data=_dados_nova_solicitacao(ponto['id']),
+        content_type='multipart/form-data',
+    )
+    assert criada.status_code == 201, criada.get_json()
+    solicitacao_id = criada.get_json()['id']
+    empresa = _cabecalho_empresa(client)
+
+    lista = client.get(
+        '/api/v1/operacoes?estado=Solicitado&busca=' + solicitacao_id[:8],
+        headers=empresa,
+    )
+    assert lista.status_code == 200, lista.get_json()
+    assert lista.get_json()['paginacao']['total'] == 1
+    assert lista.get_json()['operacoes'][0]['peso_origem'] == 'estimado'
+
+    sem_peso = client.post(
+        f'/api/v1/operacoes/{solicitacao_id}/avancar',
+        headers=empresa, json={},
+    )
+    assert sem_peso.status_code == 400
+    aferido = client.post(
+        f'/api/v1/operacoes/{solicitacao_id}/peso',
+        headers=empresa, json={'peso_kg': '2,75'},
+    )
+    assert aferido.status_code == 200, aferido.get_json()
+    assert aferido.get_json()['peso_confirmado_kg'] == 2.75
+
+    for estado_esperado in ('Coletado', 'Em Processamento'):
+        resposta = client.post(
+            f'/api/v1/operacoes/{solicitacao_id}/avancar',
+            headers=empresa, json={},
+        )
+        assert resposta.status_code == 200, resposta.get_json()
+        assert resposta.get_json()['novo_estado'] == estado_esperado
+
+    incompleta = client.post(
+        f'/api/v1/operacoes/{solicitacao_id}/avancar',
+        headers=empresa, json={},
+    )
+    assert incompleta.status_code == 400
+    finalizada = client.post(
+        f'/api/v1/operacoes/{solicitacao_id}/avancar',
+        headers=empresa,
+        json={'metodo': 'reciclagem', 'estado_produto': 'defeito_leve'},
+    )
+    assert finalizada.status_code == 200, finalizada.get_json()
+    assert finalizada.get_json()['novo_estado'] == 'Reciclado'
+    detalhes = finalizada.get_json()['operacao']
+    assert detalhes['peso_confirmado_kg'] == 2.75
+    assert detalhes['peso_confirmado_por'] == 'Recicla Kariri'
+    assert detalhes['avaliacao']['estado_produto'] == 'defeito_leve'
+    assert detalhes['itens'][0]['precos']['funcionando'] >= 0
+
+    admin = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'administrador', _EMAIL_ADMIN, _SENHA_ADMIN
+        )
+    }
+    mtr = client.get(
+        f'/api/v1/operacoes/{solicitacao_id}/mtr', headers=admin
+    )
+    assert mtr.status_code == 200
+    assert mtr.mimetype == 'application/pdf'
+    assert mtr.data.startswith(b'%PDF')
+
+
+def test_operacoes_bloqueiam_cidadao_e_isolam_empresas(client):
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    assert client.get('/api/v1/operacoes', headers=cidadao).status_code == 403
+    recicla = _cabecalho_empresa(client)
+    operacoes = client.get('/api/v1/operacoes', headers=recicla).get_json()
+    assert 'estatisticas' in operacoes
+    assert operacoes['paginacao']['por_pagina'] == 20
+    operacao_recicla = next(
+        item for item in operacoes['operacoes']
+        if item['empresa'] == 'Recicla Kariri'
+    )
+    tech = _cabecalho_empresa(client, '14380200000121', 'techlixo123')
+    negado = client.get(
+        f"/api/v1/operacoes/{operacao_recicla['id']}", headers=tech
+    )
+    assert negado.status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------
 
