@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/profile/perfil_data.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_controller.dart';
+import '../citizen/widgets/citizen_navigation.dart';
 import 'perfil_controller.dart';
 
 class PerfilScreen extends ConsumerStatefulWidget {
@@ -120,22 +121,24 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           );
         },
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 1,
-        onDestinationSelected: (indice) {
-          if (indice == 0) context.go('/home');
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: 'Início',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
-      ),
+      bottomNavigationBar: estado.valueOrNull?.usuario.tipo == 'cidadao'
+          ? const CitizenNavigation(selectedIndex: 3)
+          : NavigationBar(
+              selectedIndex: 1,
+              onDestinationSelected: (indice) {
+                if (indice == 0) context.go('/home');
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  label: 'Início',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  label: 'Perfil',
+                ),
+              ],
+            ),
     );
   }
 

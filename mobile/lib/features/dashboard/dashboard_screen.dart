@@ -8,6 +8,7 @@ import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
+import '../citizen/widgets/citizen_navigation.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -39,22 +40,24 @@ class DashboardScreen extends ConsumerWidget {
           child: _ConteudoDashboard(dados: dados),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (indice) {
-          if (indice == 1) context.go('/perfil');
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: 'Início',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
-      ),
+      bottomNavigationBar: estado.valueOrNull?.tipo == 'cidadao'
+          ? const CitizenNavigation(selectedIndex: 0)
+          : NavigationBar(
+              selectedIndex: 0,
+              onDestinationSelected: (indice) {
+                if (indice == 1) context.go('/perfil');
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  label: 'Início',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  label: 'Perfil',
+                ),
+              ],
+            ),
     );
   }
 }
@@ -126,6 +129,35 @@ class _DashboardCidadao extends StatelessWidget {
     final tier = dados.proximoTier ?? const {};
     return Column(
       children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => context.go('/solicitacoes/nova'),
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Solicitar descarte'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/solicitacoes'),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Solicitações'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/entregas'),
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Entregas'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         _MetricGrid(
           cards: [
             MetricCard(

@@ -21,10 +21,32 @@ class AppFormatters {
   static String dataTexto(String valor) {
     final iso = DateTime.tryParse(valor);
     if (iso != null) return data(iso);
-    if (RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(valor)) return valor;
+    final brasileira = RegExp(
+      r'^(\d{2}/\d{2}/\d{4})(?:[ T](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?)?$',
+    ).firstMatch(valor);
+    if (brasileira != null) return brasileira.group(1)!;
     if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(valor)) {
       final partes = valor.split('-');
       return '${partes[2]}/${partes[1]}/${partes[0]}';
+    }
+    return valor;
+  }
+
+  static String dataHoraTexto(String valor) {
+    final iso = DateTime.tryParse(valor);
+    if (iso != null) {
+      final hora = iso.hour.toString().padLeft(2, '0');
+      final minuto = iso.minute.toString().padLeft(2, '0');
+      return '${data(iso)} $hora:$minuto';
+    }
+    final brasileira = RegExp(
+      r'^(\d{2}/\d{2}/\d{4})(?:[ T](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?)?$',
+    ).firstMatch(valor);
+    if (brasileira != null) {
+      final hora = brasileira.group(2);
+      return hora == null
+          ? brasileira.group(1)!
+          : '${brasileira.group(1)} $hora';
     }
     return valor;
   }
