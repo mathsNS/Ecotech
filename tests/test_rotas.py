@@ -9,6 +9,7 @@ Cobre:
 
 import sqlite3
 import os
+from datetime import datetime, timedelta
 import pytest
 
 from ecotech.infrastructure.web import formatar_data_br
@@ -358,6 +359,7 @@ def test_empresa_nao_edita_base_de_outra_empresa(client):
 
 
 def _dados_nova_coleta(**sobrescrever):
+    data_futura = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     dados = {
         'tipo_dispositivo': 'celular',
         'subcategoria': 'smartphone_medio',
@@ -369,7 +371,7 @@ def _dados_nova_coleta(**sobrescrever):
         'latitude_coleta': '-7.2134',
         'longitude_coleta': '-39.3153',
         'nome_contato': 'João',
-        'data_coleta': '2026-09-10',
+        'data_coleta': data_futura,
         'horario_coleta': '14:30',
     }
     dados.update(sobrescrever)
