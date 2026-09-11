@@ -54,7 +54,7 @@ class PontosEmpresaScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('Novo ponto'),
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 2),
+      bottomNavigationBar: const CompanyNavigation(selectedIndex: 3),
     );
   }
 

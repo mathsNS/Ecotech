@@ -284,9 +284,9 @@ class _DashboardEmpresa extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => context.go('/empresa/pontos'),
-                icon: const Icon(Icons.location_on_outlined),
-                label: const Text('Pontos'),
+                onPressed: () => context.go('/empresa/operacoes'),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Operacoes'),
               ),
             ),
           ],

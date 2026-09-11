@@ -43,6 +43,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
         const paths = [
           '/home',
           '/empresa/oportunidades',
+          '/empresa/operacoes',
           '/empresa/pontos',
           '/empresa/bases',
           '/perfil',
@@ -68,6 +69,11 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
           label: 'Oportunidades',
         ),
         const NavigationDestination(
+          icon: Icon(Icons.inventory_2_outlined),
+          selectedIcon: Icon(Icons.inventory_2),
+          label: 'Operacoes',
+        ),
+        const NavigationDestination(
           icon: Icon(Icons.location_on_outlined),
           label: 'Pontos',
         ),
@@ -80,6 +86,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
           label: 'Perfil',
         ),
       ],
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
     );
   }
 }

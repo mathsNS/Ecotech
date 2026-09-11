@@ -53,7 +53,7 @@ class BasesEmpresaScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('Nova base'),
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 3),
+      bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
     );
   }
 

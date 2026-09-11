@@ -34,11 +34,8 @@ class OperationRepository {
         await _json('GET', '/api/v1/operacoes/$id'),
       );
 
-  Future<void> aferirPeso(String id, double pesoKg) async => _json(
-    'POST',
-    '/api/v1/operacoes/$id/peso',
-    data: {'peso_kg': pesoKg},
-  );
+  Future<void> aferirPeso(String id, double pesoKg) async =>
+      _json('POST', '/api/v1/operacoes/$id/peso', data: {'peso_kg': pesoKg});
 
   Future<OperacaoDetalhesData> avancar(
     String id, {
@@ -52,10 +49,10 @@ class OperationRepository {
       'POST',
       '/api/v1/operacoes/$id/avancar',
       data: {
-        if (pesoKg != null) 'peso_kg': pesoKg,
-        if (metodo != null) 'metodo': metodo,
-        if (estadoProduto != null) 'estado_produto': estadoProduto,
-        if (valorProposto != null) 'valor_proposto': valorProposto,
+        'peso_kg': ?pesoKg,
+        'metodo': ?metodo,
+        'estado_produto': ?estadoProduto,
+        'valor_proposto': ?valorProposto,
         if (justificativa.isNotEmpty) 'justificativa': justificativa,
       },
     );
