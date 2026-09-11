@@ -6,14 +6,22 @@ neste modulo, ela ja existe nos services e no dominio.
 """
 
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import jwt
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..application.authorization import listar_solicitacoes_visiveis_empresa
+from ..application.authorization import (
+    listar_solicitacoes_visiveis_empresa,
+    usuario_pode_visualizar_solicitacao,
+)
+from ..application.elegibilidade import DemandaColeta
+from ..application.factories import DispositivoFactory
+from ..domain.estados import BuscandoEmpresa
+from ..domain.logistica import Coordenadas
 from ..application.services import (
     ServicoAutenticacao,
     ServicoDescarte,
@@ -78,6 +86,10 @@ def criar_blueprint_api_v1(
     servico_descarte: ServicoDescarte,
     servico_saque: ServicoSaque,
     dados,
+    servico_ponto,
+    geolocalizador,
+    servico_agendamento,
+    servico_despacho,
 ) -> Blueprint:
     """Monta o blueprint /api/v1 reaproveitando os services ja existentes."""
     bp = Blueprint('api_v1', __name__, url_prefix='/api/v1')
@@ -293,6 +305,112 @@ def criar_blueprint_api_v1(
             ],
         }
 
+    def _usuario_token_dict():
+        payload = request.usuario_token
+        return {'id': payload['sub'], 'tipo': payload['tipo']}
+
+    def _exigir_cidadao():
+        if request.usuario_token['tipo'] != 'cidadao':
+            return jsonify({'erro': 'Recurso exclusivo para cidadaos'}), 403
+        return None
+
+    def _nome_empresa_solicitacao(solicitacao, raw=None):
+        raw = raw or dados.buscar_solicitacao(solicitacao.id)
+        empresa_id = raw['empresa_responsavel_id'] if raw else None
+        if not empresa_id and solicitacao.ponto_coleta:
+            ponto = dados.buscar_ponto_coleta(solicitacao.ponto_coleta.id)
+            empresa_id = ponto['id_empresa'] if ponto else None
+        empresa = dados.buscar_usuario(empresa_id) if empresa_id else None
+        return empresa['nome'] if empresa else None
+
+    def _resumo_operacao(solicitacao):
+        raw = dados.buscar_solicitacao(solicitacao.id)
+        confirmado = raw['peso_confirmado_kg'] if raw else None
+        estimado = raw['peso_estimado_kg'] if raw else None
+        return {
+            **_resumo_solicitacao(solicitacao),
+            'empresa': _nome_empresa_solicitacao(solicitacao, raw),
+            'tipo_coleta': raw['tipo_coleta'] if raw else None,
+            'peso_estimado_kg': estimado,
+            'peso_confirmado_kg': confirmado,
+            'peso_origem': 'aferido' if confirmado is not None else 'estimado',
+            'quantidade_itens': sum(item.quantidade for item in solicitacao.itens),
+        }
+
+    def _detalhes_operacao(solicitacao):
+        raw = dados.buscar_solicitacao(solicitacao.id)
+        itens = [dict(item) for item in dados.buscar_itens_solicitacao(solicitacao.id)]
+        fotos = [
+            {
+                **dict(foto),
+                'url': f'/api/v1/solicitacoes/{solicitacao.id}/fotos/{foto["id"]}',
+            }
+            for foto in dados.listar_fotos_solicitacao(solicitacao.id)
+        ]
+        historico = [
+            dict(item) for item in dados.buscar_historico_solicitacao(solicitacao.id)
+        ]
+        agendamento = dados.buscar_agendamento(solicitacao.id)
+        avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao.id)
+        return {
+            **_resumo_operacao(solicitacao),
+            'endereco_coleta': raw['endereco_coleta'],
+            'nome_contato': raw['nome_contato'],
+            'data_agendamento': raw['data_agendamento'],
+            'metodo_tratamento': raw['metodo_tratamento'],
+            'peso_informado_cidadao': bool(raw['peso_informado_cidadao']),
+            'peso_confirmado_em': raw['peso_confirmado_em'],
+            'itens': itens,
+            'fotos': fotos,
+            'historico': historico,
+            'agendamento': dict(agendamento) if agendamento else None,
+            'avaliacao': dict(avaliacao) if avaliacao else None,
+        }
+
+    @staticmethod
+    def _validar_fotos(arquivos):
+        fotos = []
+        if len([a for a in arquivos if a and a.filename]) > 5:
+            raise ValueError('Envie no maximo 5 fotos por solicitacao')
+        for arquivo in arquivos:
+            if not arquivo or not arquivo.filename:
+                continue
+            conteudo = arquivo.read()
+            if conteudo.startswith(b'\xff\xd8\xff'):
+                mime_type = 'image/jpeg'
+            elif conteudo.startswith(b'\x89PNG\r\n\x1a\n'):
+                mime_type = 'image/png'
+            elif len(conteudo) > 12 and conteudo[:4] == b'RIFF' and conteudo[8:12] == b'WEBP':
+                mime_type = 'image/webp'
+            else:
+                raise ValueError('Envie somente fotos JPG, PNG ou WebP')
+            if len(conteudo) > 5 * 1024 * 1024:
+                raise ValueError('Cada foto pode ter no maximo 5 MB')
+            fotos.append((arquivo.filename[:180], mime_type, conteudo))
+        return fotos
+
+    @staticmethod
+    def _montar_endereco(formulario):
+        obrigatorios = ('cep', 'logradouro', 'numero', 'bairro', 'cidade', 'uf')
+        ausentes = [campo for campo in obrigatorios if not formulario.get(campo, '').strip()]
+        if ausentes:
+            raise ValueError('Preencha todos os campos obrigatorios do endereco')
+        cep = ''.join(c for c in formulario['cep'] if c.isdigit())
+        if len(cep) != 8:
+            raise ValueError('Informe um CEP valido com 8 digitos')
+        endereco = f'{formulario["logradouro"].strip()}, {formulario["numero"].strip()}'
+        complemento = formulario.get('complemento', '').strip()
+        if complemento:
+            endereco += f', {complemento}'
+        endereco += (
+            f' - {formulario["bairro"].strip()}, {formulario["cidade"].strip()}'
+            f' - {formulario["uf"].strip().upper()}, CEP {cep[:5]}-{cep[5:]}'
+        )
+        referencia = formulario.get('referencia', '').strip()
+        if referencia:
+            endereco += f'. Referencia: {referencia}'
+        return endereco, cep
+
     def _resposta_autenticada(usuario):
         dados_sessao = servico_autenticacao.criar_dados_sessao(usuario)
         token = gerar_token(
@@ -469,6 +587,254 @@ def criar_blueprint_api_v1(
                 ],
             })
         return jsonify({'usuario': perfil, 'resumo': resumo})
+
+    @bp.route('/pontos-coleta', methods=['GET'])
+    @requer_autenticacao_api
+    def pontos_coleta_api():
+        pontos = []
+        for ponto in servico_ponto.listar_pontos():
+            raw = dados.buscar_ponto_coleta(ponto.id)
+            empresa = (
+                dados.buscar_usuario(raw['id_empresa'])
+                if raw and raw['id_empresa'] else None
+            )
+            pontos.append({
+                'id': ponto.id,
+                'nome': ponto.nome,
+                'empresa': empresa['nome'] if empresa else '',
+                'endereco': ponto.endereco,
+                'capacidade_kg': ponto.capacidade_kg,
+                'ocupacao_kg': ponto.ocupacao_atual_kg,
+                'disponibilidade_percentual': ponto.calcular_disponibilidade_percentual(),
+            })
+        return jsonify({'pontos': pontos})
+
+    @bp.route('/cep/<cep>', methods=['GET'])
+    @requer_autenticacao_api
+    def consultar_cep_api(cep):
+        bloqueio = _exigir_cidadao()
+        if bloqueio:
+            return bloqueio
+        try:
+            resultado = geolocalizador.consultar_cep(cep)
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+        return jsonify({
+            'cep': ''.join(c for c in cep if c.isdigit()),
+            'logradouro': resultado.get('street', ''),
+            'bairro': resultado.get('neighborhood', ''),
+            'cidade': resultado.get('city', ''),
+            'uf': resultado.get('state', ''),
+        })
+
+    @bp.route('/solicitacoes', methods=['GET', 'POST'])
+    @requer_autenticacao_api
+    def solicitacoes_api():
+        payload = request.usuario_token
+        if request.method == 'GET':
+            solicitacoes = _solicitacoes_do_usuario(payload['sub'], payload['tipo'])
+            estado = request.args.get('estado', '').strip().lower()
+            if estado:
+                solicitacoes = [
+                    s for s in solicitacoes
+                    if estado in s.estado.obter_nome().lower()
+                ]
+            solicitacoes.sort(key=lambda s: s.data_criacao, reverse=True)
+            pagina = max(request.args.get('pagina', 1, type=int), 1)
+            limite = min(max(request.args.get('limite', 20, type=int), 1), 100)
+            inicio = (pagina - 1) * limite
+            return jsonify({
+                'itens': [
+                    _resumo_operacao(s)
+                    for s in solicitacoes[inicio:inicio + limite]
+                ],
+                'pagina': pagina,
+                'limite': limite,
+                'total': len(solicitacoes),
+                'total_paginas': max((len(solicitacoes) + limite - 1) // limite, 1),
+            })
+
+        bloqueio = _exigir_cidadao()
+        if bloqueio:
+            return bloqueio
+        try:
+            form = request.form
+            fotos = _validar_fotos(request.files.getlist('fotos'))
+            tipo = form.get('tipo_dispositivo', '').strip().lower()
+            if tipo not in {'celular', 'computador', 'eletrodomestico'}:
+                raise ValueError('Selecione um tipo de dispositivo valido')
+            nome = form.get('nome', '').strip()
+            subcategoria = form.get('subcategoria', '').strip()
+            if not nome or not subcategoria:
+                raise ValueError('Informe a categoria e o modelo do produto')
+            quantidade = int(form.get('quantidade', '1'))
+            if quantidade < 1 or quantidade > 100:
+                raise ValueError('A quantidade deve estar entre 1 e 100')
+            ano = int(form.get('ano_fabricacao', str(datetime.now().year)))
+            if ano < 1950 or ano > datetime.now().year:
+                raise ValueError('Informe um ano de fabricacao valido')
+
+            peso_texto = form.get('peso_kg', '').strip().replace(',', '.')
+            peso_informado = bool(peso_texto)
+            pesos_estimados = {
+                'celular': 0.2,
+                'computador': 5.0,
+                'eletrodomestico': 15.0,
+            }
+            peso_unitario = float(peso_texto) if peso_informado else pesos_estimados[tipo]
+            if peso_unitario <= 0:
+                raise ValueError('O peso deve ser maior que zero')
+
+            tipo_coleta = form.get('tipo_coleta', 'domiciliar').strip()
+            if tipo_coleta not in {'domiciliar', 'entrega_ponto'}:
+                raise ValueError('Selecione uma forma de entrega valida')
+            ponto = None
+            endereco = ''
+            coordenadas = None
+            if tipo_coleta == 'entrega_ponto':
+                ponto_id = form.get('ponto_id', '').strip()
+                ponto = servico_ponto.buscar_ponto(ponto_id)
+                if ponto is None:
+                    raise ValueError('Selecione um ponto de coleta valido')
+                if not ponto.pode_receber(peso_unitario * quantidade):
+                    raise ValueError('O ponto selecionado nao possui capacidade disponivel')
+            else:
+                endereco, cep = _montar_endereco(form)
+                dados_cep = geolocalizador.consultar_cep(cep)
+                coordenadas = Coordenadas(
+                    dados_cep['latitude'], dados_cep['longitude']
+                )
+
+            data_coleta = form.get('data_coleta', '').strip()
+            hora_inicio = form.get('horario_inicio', '').strip()
+            hora_fim = form.get('horario_fim', '').strip()
+            if not data_coleta or not hora_inicio or not hora_fim:
+                raise ValueError('Informe a data e a janela de atendimento')
+            inicio = datetime.strptime(
+                f'{data_coleta} {hora_inicio}', '%Y-%m-%d %H:%M'
+            )
+            fim = datetime.strptime(
+                f'{data_coleta} {hora_fim}', '%Y-%m-%d %H:%M'
+            )
+            servico_agendamento.validar(inicio, fim)
+
+            usuario = servico_usuario.buscar_usuario(payload['sub'])
+            if usuario is None:
+                return jsonify({'erro': 'Usuario nao encontrado'}), 404
+            solicitacao = servico_descarte.criar_solicitacao(usuario, ponto)
+            dispositivo = DispositivoFactory.criar_dispositivo(tipo, {
+                'id': str(uuid.uuid4()),
+                'nome': nome,
+                'peso_kg': peso_unitario,
+                'subcategoria': subcategoria,
+            })
+            dispositivo._modelo = nome
+            dispositivo.ano_fabricacao = ano
+            servico_descarte.adicionar_item_solicitacao(
+                solicitacao,
+                dispositivo,
+                quantidade,
+                form.get('observacoes', '').strip(),
+            )
+            dados.atualizar_detalhes_coleta(
+                solicitacao.id,
+                tipo_coleta,
+                endereco,
+                form.get('nome_contato', '').strip() or usuario.nome,
+                inicio.strftime('%Y-%m-%d %H:%M'),
+            )
+            dados.registrar_peso_estimado(
+                solicitacao.id, peso_unitario * quantidade, peso_informado
+            )
+            dados.salvar_historico_rastreamento(
+                solicitacao.id, 'Solicitacao criada pelo cidadao'
+            )
+            for nome_arquivo, mime_type, conteudo in fotos:
+                dados.salvar_foto_solicitacao(
+                    str(uuid.uuid4()), solicitacao.id, nome_arquivo,
+                    mime_type, conteudo, datetime.now().isoformat(),
+                )
+
+            if tipo_coleta == 'domiciliar':
+                dados.atualizar_localizacao_coleta(
+                    solicitacao.id,
+                    coordenadas.latitude,
+                    coordenadas.longitude,
+                    'cep',
+                )
+                servico_agendamento.solicitar(
+                    solicitacao.id, payload['sub'], inicio, fim
+                )
+                servico_despacho.criar_ofertas(
+                    solicitacao.id,
+                    DemandaColeta(
+                        coordenadas=coordenadas,
+                        categorias=frozenset({tipo}),
+                        peso_kg=peso_unitario * quantidade,
+                        agendada_para=inicio,
+                    ),
+                )
+                solicitacao._estado = BuscandoEmpresa()
+                dados.atualizar_solicitacao(
+                    solicitacao.id, 'BUSCANDO_EMPRESA'
+                )
+            else:
+                ponto_raw = dados.buscar_ponto_coleta(ponto.id)
+                if ponto_raw and ponto_raw['id_empresa']:
+                    dados.salvar_notificacao(
+                        ponto_raw['id_empresa'],
+                        f'Nova entrega de {usuario.nome}: {nome}.',
+                    )
+            dados.salvar_notificacao(
+                payload['sub'],
+                f'Sua solicitacao de descarte do {nome} foi recebida.',
+            )
+            return jsonify(_detalhes_operacao(solicitacao)), 201
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/solicitacoes/<solicitacao_id>', methods=['GET'])
+    @requer_autenticacao_api
+    def detalhes_solicitacao_api(solicitacao_id):
+        solicitacao = servico_descarte.obter_solicitacao(solicitacao_id)
+        if solicitacao is None:
+            return jsonify({'erro': 'Solicitacao nao encontrada'}), 404
+        if not usuario_pode_visualizar_solicitacao(
+            _usuario_token_dict(), solicitacao, dados
+        ):
+            return jsonify({'erro': 'Acesso nao autorizado'}), 403
+        return jsonify(_detalhes_operacao(solicitacao))
+
+    @bp.route('/solicitacoes/<solicitacao_id>/fotos/<foto_id>', methods=['GET'])
+    @requer_autenticacao_api
+    def foto_solicitacao_api(solicitacao_id, foto_id):
+        solicitacao = servico_descarte.obter_solicitacao(solicitacao_id)
+        foto = dados.buscar_foto_solicitacao(foto_id)
+        if solicitacao is None or foto is None or foto['solicitacao_id'] != solicitacao_id:
+            return jsonify({'erro': 'Foto nao encontrada'}), 404
+        if not usuario_pode_visualizar_solicitacao(
+            _usuario_token_dict(), solicitacao, dados
+        ):
+            return jsonify({'erro': 'Acesso nao autorizado'}), 403
+        return Response(
+            foto['conteudo'], mimetype=foto['mime_type'],
+            headers={
+                'Content-Disposition': f'inline; filename="{foto["nome_arquivo"]}"'
+            },
+        )
+
+    @bp.route('/entregas', methods=['GET'])
+    @requer_autenticacao_api
+    def entregas_api():
+        bloqueio = _exigir_cidadao()
+        if bloqueio:
+            return bloqueio
+        entregas = [
+            dict(entrega)
+            for entrega in dados.buscar_entregas_usuario(request.usuario_token['sub'])
+        ]
+        entregas.reverse()
+        return jsonify({'entregas': entregas})
 
     return bp
 

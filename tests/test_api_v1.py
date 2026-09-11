@@ -5,8 +5,10 @@ Cobre:
 - GET  /api/v1/auth/me    (com token valido, sem token, token invalido)
 """
 
+import io
 import sqlite3
 import os
+from datetime import datetime, timedelta
 import pytest
 
 
@@ -211,6 +213,116 @@ def test_perfil_pode_atualizar_nome_email_e_senha(client):
         "senha": "senha456",
     })
     assert novo_login.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Jornada do cidadao
+# ---------------------------------------------------------------------------
+
+def _dados_nova_solicitacao(ponto_id):
+    amanha = datetime.now() + timedelta(days=1)
+    return {
+        "tipo_dispositivo": "celular",
+        "subcategoria": "Smartphone",
+        "nome": "Galaxy S20",
+        "ano_fabricacao": "2020",
+        "quantidade": "2",
+        "peso_kg": "",
+        "tipo_coleta": "entrega_ponto",
+        "ponto_id": ponto_id,
+        "nome_contato": "Joao Silva",
+        "observacoes": "Tela trincada",
+        "data_coleta": amanha.strftime("%Y-%m-%d"),
+        "horario_inicio": "10:00",
+        "horario_fim": "12:00",
+    }
+
+
+def test_pontos_coleta_e_criacao_com_peso_estimado_e_foto(client):
+    token = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    headers = {"Authorization": f"Bearer {token}"}
+    pontos_resp = client.get("/api/v1/pontos-coleta", headers=headers)
+    pontos = pontos_resp.get_json()["pontos"]
+    assert pontos_resp.status_code == 200
+    assert pontos
+    assert {"empresa", "capacidade_kg", "ocupacao_kg"} <= pontos[0].keys()
+
+    dados = _dados_nova_solicitacao(pontos[0]["id"])
+    dados["fotos"] = (io.BytesIO(b"\x89PNG\r\n\x1a\nconteudo"), "produto.png")
+    resp = client.post(
+        "/api/v1/solicitacoes",
+        headers=headers,
+        data=dados,
+        content_type="multipart/form-data",
+    )
+    corpo = resp.get_json()
+    assert resp.status_code == 201, corpo
+    assert corpo["peso_origem"] == "estimado"
+    assert corpo["peso_estimado_kg"] == 0.4
+    assert corpo["peso_confirmado_kg"] is None
+    assert corpo["itens"][0]["ano_fabricacao"] == 2020
+    assert len(corpo["fotos"]) == 1
+
+    detalhe = client.get(f"/api/v1/solicitacoes/{corpo['id']}", headers=headers)
+    assert detalhe.status_code == 200
+    foto = client.get(corpo["fotos"][0]["url"], headers=headers)
+    assert foto.status_code == 200
+    assert foto.mimetype == "image/png"
+
+
+def test_upload_invalido_nao_cria_solicitacao_parcial(client):
+    token = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    headers = {"Authorization": f"Bearer {token}"}
+    antes = client.get("/api/v1/solicitacoes", headers=headers).get_json()["total"]
+    ponto_id = client.get("/api/v1/pontos-coleta", headers=headers).get_json()["pontos"][0]["id"]
+    dados = _dados_nova_solicitacao(ponto_id)
+    dados["fotos"] = (io.BytesIO(b"arquivo-invalido"), "produto.txt")
+    resp = client.post(
+        "/api/v1/solicitacoes", headers=headers, data=dados,
+        content_type="multipart/form-data",
+    )
+    depois = client.get("/api/v1/solicitacoes", headers=headers).get_json()["total"]
+    assert resp.status_code == 400
+    assert depois == antes
+
+
+def test_solicitacao_de_outro_cidadao_nao_pode_ser_acessada(client):
+    token_joao = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    headers_joao = {"Authorization": f"Bearer {token_joao}"}
+    solicitacoes = client.get("/api/v1/solicitacoes", headers=headers_joao).get_json()["itens"]
+    assert solicitacoes
+
+    cadastro = client.post("/api/v1/auth/registrar", json={
+        "tipo": "cidadao", "nome": "Outro Cidadao",
+        "email": "outro.cidadao.mobile@example.com", "senha": "senha123",
+        "senha_confirmacao": "senha123", "cpf": "16899535009",
+    })
+    outro_token = cadastro.get_json()["access_token"]
+    resp = client.get(
+        f"/api/v1/solicitacoes/{solicitacoes[0]['id']}",
+        headers={"Authorization": f"Bearer {outro_token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_cep_invalido_retorna_400_sem_consulta_externa(client):
+    token = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    resp = client.get(
+        "/api/v1/cep/123",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+
+
+def test_entregas_e_listagem_sao_exclusivas_do_usuario(client):
+    token = _obter_token(client, "cidadao", _CPF_CIDADAO, _SENHA_CIDADAO)
+    headers = {"Authorization": f"Bearer {token}"}
+    lista = client.get("/api/v1/solicitacoes?pagina=1&limite=5", headers=headers)
+    entregas = client.get("/api/v1/entregas", headers=headers)
+    assert lista.status_code == 200
+    assert len(lista.get_json()["itens"]) <= 5
+    assert entregas.status_code == 200
+    assert isinstance(entregas.get_json()["entregas"], list)
 
 
 # ---------------------------------------------------------------------------

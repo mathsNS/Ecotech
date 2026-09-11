@@ -176,6 +176,10 @@ def criar_app() -> Flask:
         servico_descarte,
         servico_saque,
         dados,
+        servico_ponto,
+        geolocalizador,
+        servico_agendamento,
+        servico_despacho,
     ))
 
     @app.after_request
