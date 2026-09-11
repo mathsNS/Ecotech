@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../citizen/widgets/citizen_navigation.dart';
+import '../company/widgets/company_navigation.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -40,24 +41,26 @@ class DashboardScreen extends ConsumerWidget {
           child: _ConteudoDashboard(dados: dados),
         ),
       ),
-      bottomNavigationBar: estado.valueOrNull?.tipo == 'cidadao'
-          ? const CitizenNavigation(selectedIndex: 0)
-          : NavigationBar(
-              selectedIndex: 0,
-              onDestinationSelected: (indice) {
-                if (indice == 1) context.go('/perfil');
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  label: 'Início',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  label: 'Perfil',
-                ),
-              ],
+      bottomNavigationBar: switch (estado.valueOrNull?.tipo) {
+        'cidadao' => const CitizenNavigation(selectedIndex: 0),
+        'empresa' => const CompanyNavigation(selectedIndex: 0),
+        _ => NavigationBar(
+          selectedIndex: 0,
+          onDestinationSelected: (indice) {
+            if (indice == 1) context.go('/perfil');
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              label: 'Início',
             ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      },
     );
   }
 }
@@ -269,6 +272,26 @@ class _DashboardEmpresa extends StatelessWidget {
     final m = dados.metricas;
     return Column(
       children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.go('/empresa/oportunidades'),
+                icon: const Icon(Icons.campaign_outlined),
+                label: const Text('Oportunidades'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/empresa/pontos'),
+                icon: const Icon(Icons.location_on_outlined),
+                label: const Text('Pontos'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         _MetricGrid(
           cards: [
             MetricCard(

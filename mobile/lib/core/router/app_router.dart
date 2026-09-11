@@ -7,6 +7,9 @@ import '../../features/citizen/nova_solicitacao_screen.dart';
 import '../../features/citizen/pontos_screen.dart';
 import '../../features/citizen/solicitacao_detalhes_screen.dart';
 import '../../features/citizen/solicitacoes_screen.dart';
+import '../../features/company/bases_empresa_screen.dart';
+import '../../features/company/oportunidades_screen.dart';
+import '../../features/company/pontos_empresa_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/profile/perfil_screen.dart';
 import '../../features/splash/splash_screen.dart';
@@ -45,6 +48,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/entregas',
       builder: (context, state) => const EntregasScreen(),
+    ),
+    GoRoute(
+      path: '/empresa/oportunidades',
+      builder: (context, state) => const OportunidadesEmpresaScreen(),
+    ),
+    GoRoute(
+      path: '/empresa/pontos',
+      builder: (context, state) => const PontosEmpresaScreen(),
+    ),
+    GoRoute(
+      path: '/empresa/bases',
+      builder: (context, state) => const BasesEmpresaScreen(),
     ),
   ],
 );
