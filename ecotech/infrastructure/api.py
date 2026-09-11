@@ -5,6 +5,7 @@ As rotas aqui apenas traduzem HTTP <-> services existentes em
 neste modulo, ela ja existe nos services e no dominio.
 """
 
+import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -92,6 +93,7 @@ def criar_blueprint_api_v1(
     servico_ponto,
     geolocalizador,
     servico_agendamento,
+    servico_chat,
     servico_despacho,
     servico_base,
 ) -> Blueprint:
@@ -474,6 +476,156 @@ def criar_blueprint_api_v1(
         if not usuario_pode_operar_solicitacao(usuario, solicitacao, dados):
             return None, (jsonify({'erro': 'Acesso nao autorizado a operacao'}), 403)
         return solicitacao, None
+
+    def _buscar_solicitacao_visivel(solicitacao_id):
+        solicitacao = servico_descarte.obter_solicitacao(solicitacao_id)
+        if solicitacao is None:
+            return None, (jsonify({'erro': 'Solicitacao nao encontrada'}), 404)
+        if not usuario_pode_visualizar_solicitacao(
+            _usuario_token_dict(), solicitacao, dados
+        ):
+            return None, (jsonify({'erro': 'Acesso nao autorizado'}), 403)
+        return solicitacao, None
+
+    def _agenda_json(solicitacao, agenda=None):
+        agenda = agenda or dados.buscar_agendamento(solicitacao.id)
+        historico = [
+            dict(item)
+            for item in dados.buscar_historico_agendamento(solicitacao.id)
+        ]
+        usuario_id = request.usuario_token['sub']
+        usuario_tipo = request.usuario_token['tipo']
+        proposta_por = agenda['proposta_por'] if agenda else None
+        autor = dados.buscar_usuario(proposta_por) if proposta_por else None
+        return {
+            'solicitacao': _resumo_operacao(solicitacao),
+            'agenda': dict(agenda) if agenda else None,
+            'proposta_autor': {
+                'id': autor['id'], 'nome': autor['nome'], 'tipo': autor['tipo'],
+            } if autor else None,
+            'historico': historico,
+            'acoes': {
+                'pode_propor': bool(
+                    agenda and agenda['status'] != 'AGENDADO'
+                    and usuario_tipo != 'administrador'
+                ),
+                'pode_aceitar': bool(
+                    agenda and agenda['status'] != 'AGENDADO'
+                    and (
+                        (
+                            agenda['status'] == 'PROPOSTA_PENDENTE'
+                            and proposta_por != usuario_id
+                        )
+                        or (
+                            agenda['status'] == 'AGUARDANDO_AGENDAMENTO'
+                            and usuario_tipo == 'empresa'
+                        )
+                    )
+                ),
+                'pode_rejeitar': bool(
+                    agenda and agenda['status'] == 'PROPOSTA_PENDENTE'
+                    and proposta_por != usuario_id
+                    and usuario_tipo != 'administrador'
+                ),
+            },
+        }
+
+    def _evento_chat_texto(tipo, payload):
+        textos = {
+            'SISTEMA': 'Atualizacao do sistema',
+            'PROPOSTA_HORARIO': 'Novo horario proposto para a coleta',
+            'HORARIO_ACEITO': 'Horario da coleta confirmado',
+            'HORARIO_RECUSADO': 'Proposta de horario recusada',
+            'COLETA_CONFIRMADA': 'Coleta confirmada',
+        }
+        texto = textos.get(tipo, 'Atualizacao da coleta')
+        inicio = payload.get('inicio') if isinstance(payload, dict) else None
+        return f'{texto}: {inicio}' if inicio else texto
+
+    def _mensagem_json(row, usuario_id):
+        item = dict(row)
+        try:
+            payload = json.loads(item.get('payload') or '{}')
+        except (TypeError, json.JSONDecodeError):
+            payload = {}
+        tipo = item.get('tipo') or 'MENSAGEM'
+        return {
+            'id': item['id'],
+            'tipo': tipo,
+            'texto': item.get('texto') or _evento_chat_texto(tipo, payload),
+            'payload': payload,
+            'criado_em': item['criado_em'],
+            'lida_em': item.get('lida_em'),
+            'propria': item.get('remetente_id') == usuario_id,
+            'remetente': {
+                'id': item.get('remetente_id'),
+                'nome': item.get('remetente_nome') or 'EcoTech',
+                'tipo': item.get('remetente_tipo') or 'sistema',
+            },
+        }
+
+    def _destino_notificacao(notificacao, tipo):
+        chave = notificacao['chave_idempotencia'] or ''
+        usuario_tipo = request.usuario_token['tipo']
+        if chave.startswith('oferta:'):
+            return '/empresa/oportunidades'
+        if chave.startswith('agenda:'):
+            solicitacao_id = chave.split(':', 2)[1]
+            return f'/solicitacoes/{solicitacao_id}/agenda'
+        if chave.startswith('estado:') or chave.startswith('mtr:'):
+            solicitacao_id = chave.split(':', 2)[1]
+            prefixo = '/empresa/operacoes' if usuario_tipo == 'empresa' else '/solicitacoes'
+            return f'{prefixo}/{solicitacao_id}'
+        if chave.startswith('chat:'):
+            mensagem_id = chave.split(':', 1)[1]
+            row = dados.buscar_solicitacao_mensagem(mensagem_id)
+            if row:
+                return f'/conversas/{row["solicitacao_id"]}'
+        destinos = {
+            'mensagem': '/conversas',
+            'oportunidade': '/empresa/oportunidades',
+            'pagamento': '/carteira',
+            'agenda': '/conversas',
+            'mtr': '/empresa/operacoes',
+        }
+        return destinos.get(tipo, '/notificacoes')
+
+    def _notificacao_json(row):
+        item = dict(row)
+        mensagem = item['mensagem']
+        normalizada = mensagem.lower()
+        chave = item.get('chave_idempotencia') or ''
+        if chave.startswith('oferta:') or 'oportunidade' in normalizada:
+            tipo = 'oportunidade'
+        elif chave.startswith('chat:') or 'mensagem' in normalizada:
+            tipo = 'mensagem'
+        elif chave.startswith('agenda:') or any(
+            termo in normalizada for termo in ('horario', 'horário', 'proposta')
+        ):
+            tipo = 'agenda'
+        elif chave.startswith('mtr:') or 'mtr' in normalizada:
+            tipo = 'mtr'
+        elif any(
+            termo in normalizada
+            for termo in ('credito', 'crédito', 'pagamento', 'saque', 'r$')
+        ):
+            tipo = 'pagamento'
+        elif any(
+            termo in normalizada for termo in ('estado', 'atualizada', 'processamento')
+        ):
+            tipo = 'estado'
+        else:
+            tipo = 'coleta'
+        return {
+            'id': item['id'],
+            'titulo': mensagem[:70] + ('...' if len(mensagem) > 70 else ''),
+            'mensagem': mensagem,
+            'tipo': tipo,
+            'criada_em': item['timestamp'],
+            'lida': bool(item.get('lida_em')),
+            'lida_em': item.get('lida_em'),
+            'destino': _destino_notificacao(item, tipo),
+        }
 
     def _registrar_avaliacao(solicitacao, payload):
         metodo_chave = str(payload.get('metodo', '')).strip().lower()
@@ -959,15 +1111,16 @@ def criar_blueprint_api_v1(
                     mime_type, conteudo, datetime.now().isoformat(),
                 )
 
+            servico_agendamento.solicitar(
+                solicitacao.id, payload['sub'], inicio, fim
+            )
+
             if tipo_coleta == 'domiciliar':
                 dados.atualizar_localizacao_coleta(
                     solicitacao.id,
                     coordenadas.latitude,
                     coordenadas.longitude,
                     'cep',
-                )
-                servico_agendamento.solicitar(
-                    solicitacao.id, payload['sub'], inicio, fim
                 )
                 servico_despacho.criar_ofertas(
                     solicitacao.id,
@@ -1384,6 +1537,263 @@ def criar_blueprint_api_v1(
         except ValueError as exc:
             return jsonify({'erro': str(exc)}), 409
 
+    @bp.route('/solicitacoes/<solicitacao_id>/agendamento', methods=['GET'])
+    @requer_autenticacao_api
+    def agendamento_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        return jsonify(_agenda_json(solicitacao))
+
+    def _instantes_agendamento():
+        payload = request.get_json(silent=True) or {}
+        try:
+            inicio = datetime.fromisoformat(str(payload.get('inicio', '')))
+            fim = datetime.fromisoformat(str(payload.get('fim', '')))
+        except ValueError as exc:
+            raise ValueError('Informe inicio e fim validos') from exc
+        return inicio, fim
+
+    @bp.route(
+        '/solicitacoes/<solicitacao_id>/agendamento/propor', methods=['POST']
+    )
+    @requer_autenticacao_api
+    def propor_agendamento_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        if request.usuario_token['tipo'] == 'administrador':
+            return jsonify({'erro': 'Administrador nao participa da negociacao'}), 403
+        try:
+            inicio, fim = _instantes_agendamento()
+            row = servico_agendamento.propor(
+                solicitacao_id, request.usuario_token['sub'], inicio, fim
+            )
+            servico_chat.criar_para_atribuicao(solicitacao_id)
+            servico_chat.evento(solicitacao_id, 'PROPOSTA_HORARIO', {
+                'inicio': row['proposta_inicio'],
+                'fim': row['proposta_fim'],
+                'autor_id': request.usuario_token['sub'],
+            })
+            return jsonify(_agenda_json(solicitacao, row))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except (TypeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route(
+        '/solicitacoes/<solicitacao_id>/agendamento/aceitar', methods=['POST']
+    )
+    @requer_autenticacao_api
+    def aceitar_agendamento_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        if request.usuario_token['tipo'] == 'administrador':
+            return jsonify({'erro': 'Administrador nao participa da negociacao'}), 403
+        try:
+            row = servico_agendamento.aceitar(
+                solicitacao_id, request.usuario_token['sub']
+            )
+            servico_chat.criar_para_atribuicao(solicitacao_id)
+            servico_chat.evento(solicitacao_id, 'HORARIO_ACEITO', {
+                'inicio': row['inicio_confirmado'],
+                'fim': row['fim_confirmado'],
+            })
+            return jsonify(_agenda_json(solicitacao, row))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route(
+        '/solicitacoes/<solicitacao_id>/agendamento/rejeitar', methods=['POST']
+    )
+    @requer_autenticacao_api
+    def rejeitar_agendamento_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        if request.usuario_token['tipo'] == 'administrador':
+            return jsonify({'erro': 'Administrador nao participa da negociacao'}), 403
+        try:
+            row = servico_agendamento.rejeitar(
+                solicitacao_id, request.usuario_token['sub']
+            )
+            servico_chat.criar_para_atribuicao(solicitacao_id)
+            servico_chat.evento(solicitacao_id, 'HORARIO_RECUSADO', {
+                'autor_id': request.usuario_token['sub'],
+            })
+            return jsonify(_agenda_json(solicitacao, row))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/conversas', methods=['GET'])
+    @requer_autenticacao_api
+    def conversas_api():
+        usuario = _usuario_token_dict()
+        if usuario['tipo'] == 'administrador':
+            return jsonify({'conversas': [], 'total_nao_lidas': 0})
+        for solicitacao in _solicitacoes_do_usuario(usuario['id'], usuario['tipo']):
+            try:
+                servico_chat.criar_para_atribuicao(solicitacao.id)
+            except ValueError:
+                pass
+        conversas = []
+        for row in dados.listar_conversas_usuario(usuario['id']):
+            item = dict(row)
+            ultima = item.get('ultima_mensagem')
+            if not ultima and item.get('ultima_mensagem_tipo'):
+                ultima = _evento_chat_texto(item['ultima_mensagem_tipo'], {})
+            conversas.append({
+                'id': item['id'],
+                'solicitacao_id': item['solicitacao_id'],
+                'contato_nome': item['contato_nome'],
+                'contato_tipo': (
+                    'cidadao' if item['empresa_id'] == usuario['id'] else 'empresa'
+                ),
+                'estado': item['estado'].replace('_', ' ').title(),
+                'criada_em': item['criada_em'],
+                'encerrada_em': item['encerrada_em'],
+                'ultima_mensagem': ultima or 'Conversa iniciada',
+                'ultima_mensagem_em': (
+                    item['ultima_mensagem_em'] or item['criada_em']
+                ),
+                'nao_lidas': int(item['nao_lidas']),
+            })
+        return jsonify({
+            'conversas': conversas,
+            'total_nao_lidas': sum(item['nao_lidas'] for item in conversas),
+        })
+
+    @bp.route('/conversas/<solicitacao_id>/mensagens', methods=['GET', 'POST'])
+    @requer_autenticacao_api
+    def mensagens_conversa_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        usuario = _usuario_token_dict()
+        try:
+            servico_chat.criar_para_atribuicao(solicitacao_id)
+            if request.method == 'POST':
+                payload = request.get_json(silent=True) or {}
+                row = servico_chat.enviar(
+                    solicitacao_id,
+                    usuario['id'],
+                    payload.get('texto'),
+                    chave_idempotencia=payload.get('id_cliente'),
+                )
+                row_completo = next(
+                    item for item in servico_chat.listar_recentes(
+                        solicitacao_id, usuario['id'], 1, 100
+                    ) if item['id'] == row['id']
+                )
+                return jsonify(_mensagem_json(row_completo, usuario['id'])), 201
+            try:
+                pagina = max(1, int(request.args.get('pagina', 1)))
+                limite = min(100, max(1, int(request.args.get('limite', 50))))
+            except (TypeError, ValueError):
+                return jsonify({'erro': 'Paginacao invalida'}), 400
+            mensagens = servico_chat.listar_recentes(
+                solicitacao_id, usuario['id'], pagina, limite
+            )
+            return jsonify({
+                'solicitacao': _resumo_operacao(solicitacao),
+                'mensagens': [
+                    _mensagem_json(item, usuario['id']) for item in mensagens
+                ],
+                'pagina': pagina,
+                'limite': limite,
+                'tem_mais': len(mensagens) == limite,
+            })
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/conversas/<solicitacao_id>/leitura', methods=['POST'])
+    @requer_autenticacao_api
+    def leitura_conversa_api(solicitacao_id):
+        solicitacao, erro = _buscar_solicitacao_visivel(solicitacao_id)
+        if erro:
+            return erro
+        try:
+            total = servico_chat.marcar_lidas(
+                solicitacao.id, request.usuario_token['sub']
+            )
+            return jsonify({'ok': True, 'marcadas': total})
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+
+    @bp.route('/notificacoes', methods=['GET'])
+    @requer_autenticacao_api
+    def notificacoes_api():
+        try:
+            pagina = max(1, int(request.args.get('pagina', 1)))
+            limite = min(50, max(1, int(request.args.get('limite', 20))))
+        except (TypeError, ValueError):
+            return jsonify({'erro': 'Paginacao invalida'}), 400
+        todas = dados.buscar_notificacoes_usuario(request.usuario_token['sub'])
+        inicio = (pagina - 1) * limite
+        itens = todas[inicio:inicio + limite]
+        return jsonify({
+            'notificacoes': [_notificacao_json(item) for item in itens],
+            'pagina': pagina,
+            'total': len(todas),
+            'tem_mais': inicio + limite < len(todas),
+            'nao_lidas': dados.contar_notificacoes_nao_lidas(
+                request.usuario_token['sub']
+            ),
+        })
+
+    @bp.route('/notificacoes/leitura', methods=['POST'])
+    @requer_autenticacao_api
+    def leitura_notificacoes_api():
+        payload = request.get_json(silent=True) or {}
+        usuario_id = request.usuario_token['sub']
+        notificacao_id = payload.get('id')
+        if notificacao_id is None:
+            total = dados.marcar_notificacoes_lidas(usuario_id)
+        else:
+            try:
+                total = dados.marcar_notificacao_lida(
+                    usuario_id, int(notificacao_id)
+                )
+            except (TypeError, ValueError):
+                return jsonify({'erro': 'Notificacao invalida'}), 400
+            if total == 0:
+                return jsonify({'erro': 'Notificacao nao encontrada'}), 404
+        return jsonify({'ok': True, 'marcadas': total})
+
+    @bp.route('/badges', methods=['GET'])
+    @requer_autenticacao_api
+    def badges_api():
+        usuario_id = request.usuario_token['sub']
+        oportunidades = (
+            dados.contar_ofertas_ativas_empresa(usuario_id)
+            if request.usuario_token['tipo'] == 'empresa' else 0
+        )
+        mensagens = dados.contar_mensagens_nao_lidas(usuario_id)
+        notificacoes = dados.contar_notificacoes_nao_lidas(usuario_id)
+        return jsonify({
+            'notificacoes': notificacoes,
+            'mensagens': mensagens,
+            'oportunidades': oportunidades,
+            'total': notificacoes + mensagens + oportunidades,
+        })
+
     @bp.route('/operacoes', methods=['GET'])
     @requer_autenticacao_api
     def operacoes_api():
@@ -1532,7 +1942,16 @@ def criar_blueprint_api_v1(
         dados.salvar_notificacao(
             solicitacao.usuario.id,
             f'Sua solicitacao foi atualizada para: {novo_estado}.',
+            chave_idempotencia=f'estado:{solicitacao.id}:{novo_estado}',
         )
+        if novo_estado in estados_finais and operador['tipo'] == 'empresa':
+            plano = dados.buscar_plano_empresa(operador['id'])
+            if plano in ('professional', 'enterprise'):
+                dados.salvar_notificacao(
+                    operador['id'],
+                    f'MTR disponivel para a operacao {solicitacao.id[:8]}.',
+                    chave_idempotencia=f'mtr:{solicitacao.id}:disponivel',
+                )
         return jsonify({
             'novo_estado': novo_estado,
             'pode_avancar': solicitacao.estado.pode_avancar(),

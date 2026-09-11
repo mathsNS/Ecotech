@@ -674,6 +674,117 @@ def test_operacoes_bloqueiam_cidadao_e_isolam_empresas(client):
 
 
 # ---------------------------------------------------------------------------
+# Agenda, conversas, notificacoes e badges
+# ---------------------------------------------------------------------------
+
+def test_agenda_chat_notificacoes_e_badges_mobile(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    db = _dados_mod.Dados()
+    ponto = db.conn.execute("""SELECT id FROM ponto_coleta
+        WHERE id_empresa='user-2' AND ativo=1 LIMIT 1""").fetchone()
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    empresa = _cabecalho_empresa(client)
+    criada = client.post(
+        '/api/v1/solicitacoes', headers=cidadao,
+        data=_dados_nova_solicitacao(ponto['id']),
+        content_type='multipart/form-data',
+    )
+    assert criada.status_code == 201, criada.get_json()
+    solicitacao_id = criada.get_json()['id']
+
+    agenda = client.get(
+        f'/api/v1/solicitacoes/{solicitacao_id}/agendamento', headers=empresa
+    )
+    assert agenda.status_code == 200, agenda.get_json()
+    assert agenda.get_json()['acoes']['pode_aceitar'] is True, agenda.get_json()
+    inicio = datetime.now() + timedelta(days=3)
+    proposta = client.post(
+        f'/api/v1/solicitacoes/{solicitacao_id}/agendamento/propor',
+        headers=empresa,
+        json={
+            'inicio': inicio.isoformat(timespec='seconds'),
+            'fim': (inicio + timedelta(hours=2)).isoformat(timespec='seconds'),
+        },
+    )
+    assert proposta.status_code == 200, proposta.get_json()
+    assert proposta.get_json()['proposta_autor']['nome'] == 'Recicla Kariri'
+    assert proposta.get_json()['acoes']['pode_aceitar'] is False
+    auto_aceite = client.post(
+        f'/api/v1/solicitacoes/{solicitacao_id}/agendamento/aceitar',
+        headers=empresa,
+    )
+    assert auto_aceite.status_code == 403
+    aceite = client.post(
+        f'/api/v1/solicitacoes/{solicitacao_id}/agendamento/aceitar',
+        headers=cidadao,
+    )
+    assert aceite.status_code == 200, aceite.get_json()
+    assert aceite.get_json()['agenda']['status'] == 'AGENDADO'
+    assert aceite.get_json()['historico'][-1]['autor_nome'] == 'João Silva'
+
+    conversa_empresa = client.get('/api/v1/conversas', headers=empresa)
+    assert conversa_empresa.status_code == 200
+    conversa = next(
+        item for item in conversa_empresa.get_json()['conversas']
+        if item['solicitacao_id'] == solicitacao_id
+    )
+    assert conversa['contato_nome'] == 'João Silva'
+    assert conversa['ultima_mensagem'] == 'Horario da coleta confirmado'
+
+    texto = '<script>alert(1)</script>'
+    primeira = client.post(
+        f'/api/v1/conversas/{solicitacao_id}/mensagens',
+        headers=cidadao, json={'texto': texto, 'id_cliente': 'msg-mobile-1'},
+    )
+    repetida = client.post(
+        f'/api/v1/conversas/{solicitacao_id}/mensagens',
+        headers=cidadao, json={'texto': texto, 'id_cliente': 'msg-mobile-1'},
+    )
+    assert primeira.status_code == 201, primeira.get_json()
+    assert repetida.get_json()['id'] == primeira.get_json()['id']
+    mensagens = client.get(
+        f'/api/v1/conversas/{solicitacao_id}/mensagens', headers=empresa
+    ).get_json()['mensagens']
+    mensagem = next(
+        item for item in mensagens if item['id'] == primeira.get_json()['id']
+    )
+    assert mensagem['texto'] == texto
+    assert mensagem['remetente']['nome'] == 'João Silva'
+    assert mensagem['remetente']['tipo'] == 'cidadao'
+    assert mensagem['propria'] is False
+
+    tech = _cabecalho_empresa(client, '14380200000121', 'techlixo123')
+    terceiro = client.get(
+        f'/api/v1/conversas/{solicitacao_id}/mensagens', headers=tech
+    )
+    assert terceiro.status_code == 403
+    badges = client.get('/api/v1/badges', headers=empresa).get_json()
+    assert badges['mensagens'] >= 1
+    leitura = client.post(
+        f'/api/v1/conversas/{solicitacao_id}/leitura', headers=empresa
+    )
+    assert leitura.status_code == 200
+
+    notificacoes = client.get('/api/v1/notificacoes', headers=empresa)
+    assert notificacoes.status_code == 200
+    aviso_chat = next(
+        item for item in notificacoes.get_json()['notificacoes']
+        if item['tipo'] == 'mensagem' and solicitacao_id in item['destino']
+    )
+    assert aviso_chat['lida'] is False
+    marcada = client.post(
+        '/api/v1/notificacoes/leitura', headers=empresa,
+        json={'id': aviso_chat['id']},
+    )
+    assert marcada.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------
 

@@ -179,6 +179,7 @@ def criar_app() -> Flask:
         servico_ponto,
         geolocalizador,
         servico_agendamento,
+        servico_chat,
         servico_despacho,
         servico_base,
     ))
