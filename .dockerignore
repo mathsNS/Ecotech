@@ -2,6 +2,7 @@
 .gitignore
 .pytest_cache
 .pytest-tmp-*
+.pytest_tmp*
 .tmp
 mobile/.dart_tool
 mobile/android/.gradle
