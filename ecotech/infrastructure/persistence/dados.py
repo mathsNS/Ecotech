@@ -916,7 +916,10 @@ class Dados(RepositorioBase):
         return self.buscar_agendamento(solicitacao_id)
 
     def _participante_agendamento(self, solicitacao_id, usuario_id):
-        sol=self.conn.execute("SELECT id_usuario,empresa_responsavel_id FROM solicitacao_descarte WHERE id=?",(solicitacao_id,)).fetchone()
+        sol=self.conn.execute("""SELECT sd.id_usuario,
+            COALESCE(sd.empresa_responsavel_id,pc.id_empresa) empresa_responsavel_id
+            FROM solicitacao_descarte sd LEFT JOIN ponto_coleta pc
+              ON pc.id=sd.id_ponto_coleta WHERE sd.id=?""",(solicitacao_id,)).fetchone()
         if not sol or usuario_id not in (sol['id_usuario'],sol['empresa_responsavel_id']): raise PermissionError('usuário não participa da coleta')
         return sol
 
@@ -971,6 +974,13 @@ class Dados(RepositorioBase):
     def buscar_agendamento(self, solicitacao_id):
         return self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
 
+    def buscar_historico_agendamento(self, solicitacao_id):
+        return self.conn.execute("""SELECT h.*, u.nome AS autor_nome,
+            u.tipo AS autor_tipo FROM historico_agendamento h
+            LEFT JOIN usuario u ON u.id=h.autor_id
+            WHERE h.solicitacao_id=? ORDER BY h.criado_em,h.id""",
+            (solicitacao_id,)).fetchall()
+
     def criar_conversa_solicitacao(self, solicitacao_id, agora):
         with self.conn:
             sol=self.conn.execute("""SELECT sd.id_usuario,
@@ -992,8 +1002,8 @@ class Dados(RepositorioBase):
         conversa=self._conversa_autorizada(solicitacao_id,remetente_id,sistema)
         if conversa['encerrada_em']: raise ValueError('conversa encerrada')
         with self.conn:
-            self.conn.execute("INSERT INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",(id_mensagem,conversa['id'],remetente_id,tipo,texto,payload,agora))
-            if tipo == 'MENSAGEM' and remetente_id:
+            cursor = self.conn.execute("INSERT OR IGNORE INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",(id_mensagem,conversa['id'],remetente_id,tipo,texto,payload,agora))
+            if cursor.rowcount and tipo == 'MENSAGEM' and remetente_id:
                 destinatario = (
                     conversa['empresa_id'] if remetente_id == conversa['cidadao_id']
                     else conversa['cidadao_id']
@@ -1018,10 +1028,19 @@ class Dados(RepositorioBase):
             WHERE m.conversa_id=? ORDER BY m.criado_em,m.id LIMIT ? OFFSET ?""",
             (conversa['id'],limite,(pagina-1)*limite)).fetchall()
 
+    def buscar_mensagens_chat_recentes(self,solicitacao_id,usuario_id,pagina,limite):
+        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
+        rows=self.conn.execute("""SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
+            FROM mensagem_chat m LEFT JOIN usuario u ON u.id=m.remetente_id
+            WHERE m.conversa_id=? ORDER BY m.criado_em DESC,m.id DESC LIMIT ? OFFSET ?""",
+            (conversa['id'],limite,(pagina-1)*limite)).fetchall()
+        return list(reversed(rows))
+
     def listar_conversas_usuario(self, usuario_id):
         return self.conn.execute("""SELECT c.*, sd.estado, sd.data_criacao,
             CASE WHEN c.empresa_id=? THEN cid.nome ELSE emp.nome END contato_nome,
             (SELECT texto FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem,
+            (SELECT tipo FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem_tipo,
             (SELECT criado_em FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem_em,
             (SELECT COUNT(*) FROM mensagem_chat m WHERE m.conversa_id=c.id AND m.lida_em IS NULL AND (m.remetente_id IS NULL OR m.remetente_id<>?)) nao_lidas
             FROM conversa_solicitacao c
@@ -1030,6 +1049,18 @@ class Dados(RepositorioBase):
             WHERE c.cidadao_id=? OR c.empresa_id=?
             ORDER BY COALESCE(ultima_mensagem_em,c.criada_em) DESC""",
             (usuario_id,usuario_id,usuario_id,usuario_id)).fetchall()
+
+    def contar_mensagens_nao_lidas(self, usuario_id):
+        return self.conn.execute("""SELECT COUNT(*) total
+            FROM mensagem_chat m JOIN conversa_solicitacao c ON c.id=m.conversa_id
+            WHERE (c.cidadao_id=? OR c.empresa_id=?) AND m.lida_em IS NULL
+              AND (m.remetente_id IS NULL OR m.remetente_id<>?)""",
+            (usuario_id,usuario_id,usuario_id)).fetchone()['total']
+
+    def buscar_solicitacao_mensagem(self, id_mensagem):
+        return self.conn.execute("""SELECT c.solicitacao_id
+            FROM mensagem_chat m JOIN conversa_solicitacao c ON c.id=m.conversa_id
+            WHERE m.id=?""", (id_mensagem,)).fetchone()
 
     def salvar_foto_solicitacao(self, foto_id, solicitacao_id, nome, mime_type, conteudo, agora):
         with self.conn:
@@ -1255,6 +1286,15 @@ class Dados(RepositorioBase):
             cursor = self.conn.execute("""UPDATE notificacao SET lida_em=?
                 WHERE id_usuario=? AND lida_em IS NULL""", (
                 agora or datetime.now().isoformat(timespec='seconds'), id_usuario,
+            ))
+        return cursor.rowcount
+
+    def marcar_notificacao_lida(self, id_usuario, notificacao_id, agora=None):
+        with self.conn:
+            cursor = self.conn.execute("""UPDATE notificacao SET lida_em=?
+                WHERE id_usuario=? AND id=?""", (
+                agora or datetime.now().isoformat(timespec='seconds'),
+                id_usuario, notificacao_id,
             ))
         return cursor.rowcount
 

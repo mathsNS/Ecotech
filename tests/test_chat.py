@@ -50,3 +50,15 @@ def test_central_lista_contato_ultima_mensagem_e_nao_lidas(tmp_path,monkeypatch)
     assert len(conversas)==1
     assert conversas[0]['ultima_mensagem']=='Tenho uma dÃºvida'
     assert conversas[0]['nao_lidas']==1
+
+def test_envio_idempotente_e_paginacao_pelas_mais_recentes(tmp_path,monkeypatch):
+    dados,chat=preparar(tmp_path,monkeypatch)
+    primeira=chat.enviar('sol-1','cid-1','Mensagem unica',AGORA,
+                         chave_idempotencia='mobile-1')
+    repetida=chat.enviar('sol-1','cid-1','Mensagem unica',AGORA,
+                         chave_idempotencia='mobile-1')
+    assert primeira['id']==repetida['id']
+    chat.enviar('sol-1','emp-1','Resposta',AGORA+timedelta(seconds=1))
+    recentes=chat.listar_recentes('sol-1','cid-1',pagina=1,limite=1)
+    assert [item['texto'] for item in recentes]==['Resposta']
+    assert dados.contar_mensagens_nao_lidas('emp-1')==1

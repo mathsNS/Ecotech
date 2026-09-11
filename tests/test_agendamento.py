@@ -38,3 +38,11 @@ def test_cidadao_rejeita_e_outra_empresa_nao_acessa(tmp_path,monkeypatch):
     agenda.propor('sol-1','emp-1',inicio+timedelta(hours=3),inicio+timedelta(hours=4),AGORA)
     assert agenda.rejeitar('sol-1','cid-1',AGORA)['status']=='AGUARDANDO_AGENDAMENTO'
     with pytest.raises(PermissionError): agenda.propor('sol-1','emp-2',inicio,inicio+timedelta(hours=1),AGORA)
+
+def test_historico_identifica_autor_e_decisao(tmp_path,monkeypatch):
+    dados,agenda,inicio,_=preparar(tmp_path,monkeypatch)
+    agenda.propor('sol-1','emp-1',inicio+timedelta(hours=3),inicio+timedelta(hours=4),AGORA)
+    agenda.aceitar('sol-1','cid-1',AGORA)
+    historico=dados.buscar_historico_agendamento('sol-1')
+    assert [item['acao'] for item in historico]==['JANELA_SOLICITADA','PROPOSTA','ACEITA']
+    assert historico[1]['autor_nome']=='Empresa 1'
