@@ -16,11 +16,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..application.authorization import (
     listar_solicitacoes_visiveis_empresa,
+    usuario_pode_operar_solicitacao,
     usuario_pode_visualizar_solicitacao,
 )
 from ..application.elegibilidade import DemandaColeta
 from ..application.factories import DispositivoFactory
-from ..domain.estados import BuscandoEmpresa
+from ..domain.estados import BuscandoEmpresa, Solicitado
 from ..domain.logistica import Coordenadas
 from ..application.services import (
     ServicoAutenticacao,
@@ -90,6 +91,7 @@ def criar_blueprint_api_v1(
     geolocalizador,
     servico_agendamento,
     servico_despacho,
+    servico_base,
 ) -> Blueprint:
     """Monta o blueprint /api/v1 reaproveitando os services ja existentes."""
     bp = Blueprint('api_v1', __name__, url_prefix='/api/v1')
@@ -314,6 +316,37 @@ def criar_blueprint_api_v1(
             return jsonify({'erro': 'Recurso exclusivo para cidadaos'}), 403
         return None
 
+    def _exigir_empresa():
+        if request.usuario_token['tipo'] != 'empresa':
+            return jsonify({'erro': 'Recurso exclusivo para empresas'}), 403
+        return None
+
+    def _endereco_operacional(payload):
+        campos = {
+            chave: str(payload.get(chave, '') or '')
+            for chave in (
+                'cep', 'logradouro', 'numero', 'complemento', 'bairro',
+                'cidade', 'uf', 'referencia',
+            )
+        }
+        endereco, cep = _montar_endereco(campos)
+        localizado = geolocalizador.consultar_cep(cep)
+        return endereco, localizado['latitude'], localizado['longitude']
+
+    def _base_json(base):
+        return {
+            'id': base.id,
+            'nome': base.nome,
+            'endereco': base.endereco,
+            'raio_atendimento_km': base.raio_atendimento_km,
+            'capacidade_kg': base.capacidade_kg,
+            'ocupacao_kg': base.ocupacao_atual_kg,
+            'capacidade_disponivel_kg': base.capacidade_disponivel_kg,
+            'realiza_coleta_domiciliar': base.realiza_coleta_domiciliar,
+            'ativa': base.ativa,
+            'ponto_coleta_id': base.ponto_coleta_id,
+        }
+
     def _nome_empresa_solicitacao(solicitacao, raw=None):
         raw = raw or dados.buscar_solicitacao(solicitacao.id)
         empresa_id = raw['empresa_responsavel_id'] if raw else None
@@ -367,7 +400,6 @@ def criar_blueprint_api_v1(
             'avaliacao': dict(avaliacao) if avaliacao else None,
         }
 
-    @staticmethod
     def _validar_fotos(arquivos):
         fotos = []
         if len([a for a in arquivos if a and a.filename]) > 5:
@@ -389,7 +421,6 @@ def criar_blueprint_api_v1(
             fotos.append((arquivo.filename[:180], mime_type, conteudo))
         return fotos
 
-    @staticmethod
     def _montar_endereco(formulario):
         obrigatorios = ('cep', 'logradouro', 'numero', 'bairro', 'cidade', 'uf')
         ausentes = [campo for campo in obrigatorios if not formulario.get(campo, '').strip()]
@@ -593,6 +624,8 @@ def criar_blueprint_api_v1(
     def pontos_coleta_api():
         pontos = []
         for ponto in servico_ponto.listar_pontos():
+            if not ponto.ativo:
+                continue
             raw = dados.buscar_ponto_coleta(ponto.id)
             empresa = (
                 dados.buscar_usuario(raw['id_empresa'])
@@ -612,9 +645,6 @@ def criar_blueprint_api_v1(
     @bp.route('/cep/<cep>', methods=['GET'])
     @requer_autenticacao_api
     def consultar_cep_api(cep):
-        bloqueio = _exigir_cidadao()
-        if bloqueio:
-            return bloqueio
         try:
             resultado = geolocalizador.consultar_cep(cep)
         except ValueError as exc:
@@ -835,6 +865,350 @@ def criar_blueprint_api_v1(
         ]
         entregas.reverse()
         return jsonify({'entregas': entregas})
+
+    def _ponto_empresa_json(row):
+        solicitacoes = []
+        for registro in dados.buscar_solicitacoes_ponto(row['id']):
+            solicitacao = servico_descarte.obter_solicitacao(registro['id'])
+            if solicitacao is None:
+                continue
+            confirmacoes = dados.buscar_confirmacoes_solicitacao(registro['id'])
+            peso = (
+                registro['peso_confirmado_kg']
+                if registro['peso_confirmado_kg'] is not None
+                else registro['peso_estimado_kg']
+            )
+            if peso is None:
+                peso = solicitacao.calcular_peso_total()
+            solicitacoes.append({
+                'id': registro['id'],
+                'cidadao': registro['nome_usuario'],
+                'estado': solicitacao.estado.obter_nome(),
+                'data_agendamento': registro['data_agendamento'],
+                'peso_kg': round(float(peso), 3),
+                'peso_informado_cidadao': bool(
+                    registro['peso_informado_cidadao']
+                ),
+                'peso_confirmado_kg': registro['peso_confirmado_kg'],
+                'confirmado_empresa': bool(
+                    confirmacoes['confirmado_empresa']
+                ),
+                'pode_confirmar': (
+                    registro['estado'] == 'SOLICITADO'
+                    and not confirmacoes['confirmado_empresa']
+                ),
+            })
+        return {
+            'id': row['id'],
+            'nome': row['nome'],
+            'endereco': row['endereco'],
+            'capacidade_kg': row['capacidade_kg'],
+            'ocupacao_kg': row['ocupacao_atual_kg'],
+            'ativa': bool(row['ativo']),
+            'solicitacoes': solicitacoes,
+        }
+
+    @bp.route('/empresa/pontos', methods=['GET', 'POST'])
+    @requer_autenticacao_api
+    def pontos_empresa_api():
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        if request.method == 'GET':
+            return jsonify({
+                'pontos': [
+                    _ponto_empresa_json(row)
+                    for row in dados.buscar_todos_pontos_empresa(empresa_id)
+                ]
+            })
+        try:
+            payload = request.get_json(silent=True) or {}
+            endereco, latitude, longitude = _endereco_operacional(payload)
+            ponto = servico_ponto.criar_para_empresa(
+                empresa_id,
+                str(payload.get('nome', '')),
+                endereco,
+                latitude,
+                longitude,
+                float(payload.get('capacidade_kg', 0)),
+            )
+            return jsonify(_ponto_empresa_json(
+                dados.buscar_ponto_coleta(ponto.id)
+            )), 201
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/empresa/pontos/<id_ponto>', methods=['PATCH', 'DELETE'])
+    @requer_autenticacao_api
+    def ponto_empresa_api(id_ponto):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        try:
+            if request.method == 'DELETE':
+                servico_ponto.definir_atividade_da_empresa(
+                    empresa_id, id_ponto, False
+                )
+            else:
+                payload = request.get_json(silent=True) or {}
+                if set(payload) == {'ativo'}:
+                    servico_ponto.definir_atividade_da_empresa(
+                        empresa_id, id_ponto, bool(payload['ativo'])
+                    )
+                else:
+                    atual = dados.buscar_ponto_coleta(id_ponto)
+                    if atual is None or atual['id_empresa'] != empresa_id:
+                        raise PermissionError(
+                            'ponto de coleta nao pertence a empresa'
+                        )
+                    if str(payload.get('cep', '')).strip():
+                        endereco, latitude, longitude = _endereco_operacional(
+                            payload
+                        )
+                    else:
+                        endereco = atual['endereco']
+                        latitude = atual['latitude']
+                        longitude = atual['longitude']
+                    servico_ponto.atualizar_da_empresa(
+                        empresa_id, id_ponto,
+                        str(payload.get('nome', '')),
+                        endereco, latitude, longitude,
+                        float(payload.get('capacidade_kg', 0)),
+                    )
+            return jsonify(_ponto_empresa_json(
+                dados.buscar_ponto_coleta(id_ponto)
+            ))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route(
+        '/empresa/pontos/<id_ponto>/solicitacoes/<solicitacao_id>/confirmar',
+        methods=['POST'],
+    )
+    @requer_autenticacao_api
+    def confirmar_entrega_ponto_api(id_ponto, solicitacao_id):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        ponto_row = dados.buscar_ponto_coleta(id_ponto)
+        solicitacao = servico_descarte.obter_solicitacao(solicitacao_id)
+        if ponto_row is None or solicitacao is None:
+            return jsonify({'erro': 'Entrega nao encontrada'}), 404
+        if ponto_row['id_empresa'] != empresa_id:
+            return jsonify({'erro': 'Ponto nao pertence a empresa'}), 403
+        raw = dados.buscar_solicitacao(solicitacao_id)
+        if raw['id_ponto_coleta'] != id_ponto or not usuario_pode_operar_solicitacao(
+            _usuario_token_dict(), solicitacao, dados
+        ):
+            return jsonify({'erro': 'Acesso nao autorizado a entrega'}), 403
+        if solicitacao.estado.obter_nome() != 'Solicitado':
+            return jsonify({'erro': 'Entrega nao aguarda recebimento'}), 409
+        try:
+            payload = request.get_json(silent=True) or {}
+            peso = float(str(payload.get('peso_kg', '')).replace(',', '.'))
+            if peso <= 0:
+                raise ValueError('Informe o peso aferido no recebimento')
+            ponto = servico_ponto.buscar_ponto(id_ponto)
+            if ponto is None or not ponto.pode_receber(peso):
+                raise ValueError('O ponto nao possui capacidade para este peso')
+            agora = datetime.now().isoformat(timespec='seconds')
+            dados.confirmar_peso_solicitacao(
+                solicitacao_id, peso, empresa_id, agora
+            )
+            solicitacao.confirmar_peso(peso)
+            dados.confirmar_solicitacao(solicitacao_id, 'empresa')
+            servico_descarte.avancar_estado_solicitacao(solicitacao)
+            ponto.adicionar_ocupacao(peso)
+            dados.atualizar_ocupacao_ponto(id_ponto, ponto.ocupacao_atual_kg)
+            dados.salvar_historico_rastreamento(
+                solicitacao_id, 'Recebimento e peso confirmados pela empresa'
+            )
+            dados.salvar_notificacao(
+                solicitacao.usuario.id,
+                f'O ponto de coleta confirmou o recebimento de {peso:g} kg.',
+            )
+            return jsonify({
+                'ok': True,
+                'novo_estado': solicitacao.estado.obter_nome(),
+                'peso_confirmado_kg': peso,
+            })
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/empresa/bases', methods=['GET', 'POST'])
+    @requer_autenticacao_api
+    def bases_empresa_api():
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        if request.method == 'GET':
+            return jsonify({
+                'bases': [
+                    _base_json(base)
+                    for base in servico_base.listar_empresa(empresa_id)
+                ]
+            })
+        try:
+            payload = request.get_json(silent=True) or {}
+            endereco, latitude, longitude = _endereco_operacional(payload)
+            base = servico_base.criar(empresa_id, {
+                'nome': str(payload.get('nome', '')),
+                'endereco': endereco,
+                'latitude': latitude,
+                'longitude': longitude,
+                'raio_atendimento_km': payload.get('raio_atendimento_km', 0),
+                'capacidade_kg': payload.get('capacidade_kg', 0),
+                'realiza_coleta_domiciliar': bool(
+                    payload.get('realiza_coleta_domiciliar', True)
+                ),
+            })
+            return jsonify(_base_json(base)), 201
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/empresa/bases/<id_base>', methods=['PATCH', 'DELETE'])
+    @requer_autenticacao_api
+    def base_empresa_api(id_base):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        try:
+            if request.method == 'DELETE':
+                servico_base.definir_atividade(empresa_id, id_base, False)
+                base = servico_base.buscar(id_base)
+            else:
+                payload = request.get_json(silent=True) or {}
+                atual = servico_base.buscar(id_base)
+                if atual is None or not atual.pertence_a(empresa_id):
+                    raise PermissionError(
+                        'base operacional nao pertence a empresa'
+                    )
+                if str(payload.get('cep', '')).strip():
+                    endereco, latitude, longitude = _endereco_operacional(
+                        payload
+                    )
+                else:
+                    endereco = atual.endereco
+                    latitude = atual.latitude
+                    longitude = atual.longitude
+                base = servico_base.atualizar(empresa_id, id_base, {
+                    'nome': str(payload.get('nome', '')),
+                    'endereco': endereco,
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    'raio_atendimento_km': payload.get(
+                        'raio_atendimento_km', 0
+                    ),
+                    'capacidade_kg': payload.get('capacidade_kg', 0),
+                    'realiza_coleta_domiciliar': bool(
+                        payload.get('realiza_coleta_domiciliar', False)
+                    ),
+                })
+            return jsonify(_base_json(base))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except (ValueError, TypeError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/empresa/bases/<id_base>/atividade', methods=['POST'])
+    @requer_autenticacao_api
+    def atividade_base_empresa_api(id_base):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        try:
+            payload = request.get_json(silent=True) or {}
+            servico_base.definir_atividade(
+                request.usuario_token['sub'], id_base, bool(payload.get('ativa'))
+            )
+            return jsonify(_base_json(servico_base.buscar(id_base)))
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/empresa/oportunidades', methods=['GET'])
+    @requer_autenticacao_api
+    def oportunidades_empresa_api():
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        empresa_id = request.usuario_token['sub']
+        servico_despacho.processar_ofertas_expiradas()
+        ofertas = servico_despacho.listar_ofertas_ativas(empresa_id)
+        itens = []
+        for oferta in ofertas:
+            base = servico_base.buscar(oferta['base_operacional_id'])
+            itens.append({
+                **oferta,
+                'base_nome': base.nome if base else '',
+            })
+        return jsonify({'oportunidades': itens, 'total': len(itens)})
+
+    @bp.route(
+        '/empresa/oportunidades/<oferta_id>/aceitar', methods=['POST']
+    )
+    @requer_autenticacao_api
+    def aceitar_oportunidade_empresa_api(oferta_id):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        try:
+            aceita = servico_despacho.aceitar(
+                oferta_id, request.usuario_token['sub']
+            )
+            solicitacao = servico_descarte.obter_solicitacao(
+                aceita['solicitacao_id']
+            )
+            if solicitacao:
+                solicitacao._empresa_responsavel_id = request.usuario_token['sub']
+                solicitacao._base_operacional_id = aceita['base_operacional_id']
+                solicitacao._atribuida_em = datetime.fromisoformat(
+                    aceita['respondida_em']
+                )
+                solicitacao._estado = Solicitado()
+                solicitacao._endereco_coleta = aceita['endereco_coleta']
+                solicitacao._nome_contato = aceita['nome_contato']
+            return jsonify({
+                'ok': True,
+                'solicitacao_id': aceita['solicitacao_id'],
+                'endereco_coleta': aceita['endereco_coleta'],
+                'nome_contato': aceita['nome_contato'],
+                'data_agendamento': aceita['data_agendamento'],
+            })
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except TimeoutError as exc:
+            return jsonify({'erro': str(exc)}), 410
+        except (RuntimeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 409
+
+    @bp.route(
+        '/empresa/oportunidades/<oferta_id>/recusar', methods=['POST']
+    )
+    @requer_autenticacao_api
+    def recusar_oportunidade_empresa_api(oferta_id):
+        bloqueio = _exigir_empresa()
+        if bloqueio:
+            return bloqueio
+        try:
+            payload = request.get_json(silent=True) or {}
+            servico_despacho.recusar(
+                oferta_id, request.usuario_token['sub'],
+                str(payload.get('motivo', '')),
+            )
+            return jsonify({'ok': True})
+        except LookupError as exc:
+            return jsonify({'erro': str(exc)}), 404
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 409
 
     return bp
 

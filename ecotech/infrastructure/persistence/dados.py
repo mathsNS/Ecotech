@@ -675,6 +675,37 @@ class Dados(RepositorioBase):
                 solicitacao_id, ativada_em, expira_em
             )
 
+    def atualizar_ponto_empresa(
+        self, id_ponto: str, id_empresa: str, nome: str, endereco: str,
+        latitude: float, longitude: float, capacidade_kg: float,
+    ) -> None:
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE ponto_coleta
+                SET nome = ?, endereco = ?, latitude = ?, longitude = ?,
+                    capacidade_kg = ?
+                WHERE id = ? AND id_empresa = ?
+                  AND ocupacao_atual_kg <= ?
+            """, (
+                nome, endereco, latitude, longitude, capacidade_kg,
+                id_ponto, id_empresa, capacidade_kg,
+            ))
+        if cursor.rowcount != 1:
+            raise ValueError(
+                "ponto nao encontrado ou capacidade menor que a ocupacao atual"
+            )
+
+    def definir_atividade_ponto_empresa(
+        self, id_ponto: str, id_empresa: str, ativo: bool,
+    ) -> None:
+        with self.conn:
+            cursor = self.conn.execute("""
+                UPDATE ponto_coleta SET ativo = ?
+                WHERE id = ? AND id_empresa = ?
+            """, (int(ativo), id_ponto, id_empresa))
+        if cursor.rowcount != 1:
+            raise ValueError("ponto de coleta nao pertence a empresa")
+
     def expirar_ofertas_vencidas(self, agora: str, proxima_expiracao: str):
         with self.conn:
             solicitacoes = [row['solicitacao_id'] for row in self.conn.execute("""
@@ -1335,6 +1366,12 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute("SELECT * FROM ponto_coleta WHERE id_empresa = ? AND ativo = 1", (id_empresa,))
         return [dict(row) for row in c.fetchall()]
+
+    def buscar_todos_pontos_empresa(self, id_empresa: str):
+        return [dict(row) for row in self.conn.execute("""
+            SELECT * FROM ponto_coleta
+            WHERE id_empresa = ? ORDER BY ativo DESC, nome
+        """, (id_empresa,)).fetchall()]
 
     def buscar_solicitacoes_ponto(self, id_ponto: str):
         """Retorna todas as solicitações de um ponto, com nome do usuário."""

@@ -6,6 +6,7 @@ Cobre:
 """
 
 import io
+import json
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -323,6 +324,245 @@ def test_entregas_e_listagem_sao_exclusivas_do_usuario(client):
     assert len(lista.get_json()["itens"]) <= 5
     assert entregas.status_code == 200
     assert isinstance(entregas.get_json()["entregas"], list)
+
+
+# ---------------------------------------------------------------------------
+# Estrutura e oportunidades da empresa
+# ---------------------------------------------------------------------------
+
+def _cabecalho_empresa(client, cnpj=_CNPJ_EMPRESA, senha=_SENHA_EMPRESA):
+    token = _obter_token(client, "empresa", cnpj, senha)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _endereco_empresa(**extras):
+    payload = {
+        "nome": "Unidade Mobile",
+        "cep": "63010010",
+        "logradouro": "Rua Sao Pedro",
+        "numero": "100",
+        "complemento": "Galpao B",
+        "bairro": "Centro",
+        "cidade": "Juazeiro do Norte",
+        "uf": "CE",
+        "capacidade_kg": 800,
+    }
+    payload.update(extras)
+    return payload
+
+
+@pytest.fixture
+def cep_empresa(monkeypatch):
+    from ecotech.application.geolocalizacao import GeolocalizadorPorCep
+
+    monkeypatch.setattr(GeolocalizadorPorCep, "consultar_cep", lambda self, cep: {
+        "street": "Rua Sao Pedro", "neighborhood": "Centro",
+        "city": "Juazeiro do Norte", "state": "CE",
+        "latitude": -7.213, "longitude": -39.315,
+    })
+
+
+def test_empresa_cria_edita_e_desativa_base_sem_coordenadas_na_api(
+    client, cep_empresa,
+):
+    headers = _cabecalho_empresa(client)
+    payload = _endereco_empresa(
+        raio_atendimento_km=30,
+        realiza_coleta_domiciliar=True,
+    )
+    criada = client.post('/api/v1/empresa/bases', headers=headers, json=payload)
+    assert criada.status_code == 201, criada.get_json()
+    base = criada.get_json()
+    assert base['endereco'].startswith('Rua Sao Pedro, 100')
+    assert 'latitude' not in base and 'longitude' not in base
+
+    payload['nome'] = 'Unidade Mobile Atualizada'
+    payload['raio_atendimento_km'] = 35
+    editada = client.patch(
+        f"/api/v1/empresa/bases/{base['id']}", headers=headers, json=payload
+    )
+    assert editada.status_code == 200
+    assert editada.get_json()['raio_atendimento_km'] == 35
+
+    desativada = client.post(
+        f"/api/v1/empresa/bases/{base['id']}/atividade",
+        headers=headers, json={'ativa': False},
+    )
+    assert desativada.status_code == 200
+    assert desativada.get_json()['ativa'] is False
+
+    outra = _cabecalho_empresa(client, '14380200000121', 'techlixo123')
+    invasao = client.patch(
+        f"/api/v1/empresa/bases/{base['id']}", headers=outra, json=payload
+    )
+    assert invasao.status_code == 403
+
+
+def test_empresa_gerencia_ponto_e_confirma_entrega_com_peso_aferido(
+    client, cep_empresa,
+):
+    headers_empresa = _cabecalho_empresa(client)
+    criada = client.post(
+        '/api/v1/empresa/pontos', headers=headers_empresa,
+        json=_endereco_empresa(nome='Ponto Mobile', capacidade_kg=500),
+    )
+    assert criada.status_code == 201, criada.get_json()
+    ponto = criada.get_json()
+    assert ponto['ativa'] is True
+
+    headers_cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    solicitacao = client.post(
+        '/api/v1/solicitacoes', headers=headers_cidadao,
+        data=_dados_nova_solicitacao(ponto['id']),
+        content_type='multipart/form-data',
+    )
+    assert solicitacao.status_code == 201, solicitacao.get_json()
+    solicitacao_id = solicitacao.get_json()['id']
+
+    pontos = client.get('/api/v1/empresa/pontos', headers=headers_empresa)
+    ponto_atual = next(
+        item for item in pontos.get_json()['pontos'] if item['id'] == ponto['id']
+    )
+    entrega = next(
+        item for item in ponto_atual['solicitacoes']
+        if item['id'] == solicitacao_id
+    )
+    assert entrega['pode_confirmar'] is True
+    assert entrega['peso_confirmado_kg'] is None
+
+    confirmada = client.post(
+        f"/api/v1/empresa/pontos/{ponto['id']}/solicitacoes/"
+        f"{solicitacao_id}/confirmar",
+        headers=headers_empresa, json={'peso_kg': '0,55'},
+    )
+    assert confirmada.status_code == 200, confirmada.get_json()
+    assert confirmada.get_json()['peso_confirmado_kg'] == 0.55
+
+    desativado = client.delete(
+        f"/api/v1/empresa/pontos/{ponto['id']}", headers=headers_empresa
+    )
+    assert desativado.status_code == 200
+    assert desativado.get_json()['ativa'] is False
+    publicos = client.get('/api/v1/pontos-coleta', headers=headers_cidadao)
+    assert ponto['id'] not in {item['id'] for item in publicos.get_json()['pontos']}
+
+
+def test_endpoints_empresariais_bloqueiam_outros_perfis(client):
+    token = _obter_token(client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO)
+    headers = {'Authorization': f'Bearer {token}'}
+    assert client.get('/api/v1/empresa/bases', headers=headers).status_code == 403
+    assert client.get('/api/v1/empresa/pontos', headers=headers).status_code == 403
+    assert client.get(
+        '/api/v1/empresa/oportunidades', headers=headers
+    ).status_code == 403
+
+
+def test_oportunidade_preserva_privacidade_e_aceite_e_atomico(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    db = _dados_mod.Dados()
+    base_recicla = db.conn.execute(
+        "SELECT id FROM base_operacional WHERE empresa_id='user-2' LIMIT 1"
+    ).fetchone()['id']
+    base_tech = db.conn.execute(
+        "SELECT id FROM base_operacional WHERE empresa_id='user-7' LIMIT 1"
+    ).fetchone()['id']
+    agora = datetime.now()
+    solicitacao_id = 'sol-api-oportunidade'
+    snapshot = json.dumps({'dados_visiveis': {
+        'categorias': ['celular'], 'peso_estimado_kg': 1.2,
+        'agendada_para': (agora + timedelta(days=1)).isoformat(timespec='seconds'),
+    }})
+    with db.conn:
+        db.conn.execute("""
+            INSERT INTO solicitacao_descarte(
+                id,id_usuario,estado,data_criacao,tipo_coleta,endereco_coleta,
+                nome_contato,data_agendamento,latitude_coleta,longitude_coleta
+            ) VALUES(?,?,'BUSCANDO_EMPRESA',?,'domiciliar',?,?,?,?,?)
+        """, (
+            solicitacao_id, 'user-1', agora.isoformat(timespec='seconds'),
+            'Rua Protegida, 99', 'Contato Privado',
+            (agora + timedelta(days=1)).strftime('%Y-%m-%d %H:%M'),
+            -7.21, -39.31,
+        ))
+        for oferta_id, empresa_id, base_id, prioridade in (
+            ('oferta-api-recicla', 'user-2', base_recicla, 1),
+            ('oferta-api-tech', 'user-7', base_tech, 2),
+        ):
+            db.conn.execute("""
+                INSERT INTO oferta_coleta(
+                    id,solicitacao_id,empresa_id,base_operacional_id,
+                    distancia_km,score_prioridade,prioridade,rodada,status,
+                    snapshot_fatores,criada_em,enviada_em,ativada_em,expira_em
+                ) VALUES(?,?,?,?,?,100,?,1,'ATIVA',?,?,?,?,?)
+            """, (
+                oferta_id, solicitacao_id, empresa_id, base_id, 2.5,
+                prioridade, snapshot, agora.isoformat(timespec='seconds'),
+                agora.isoformat(timespec='seconds'),
+                agora.isoformat(timespec='seconds'),
+                (agora + timedelta(minutes=10)).isoformat(timespec='seconds'),
+            ))
+
+    recicla = _cabecalho_empresa(client)
+    lista = client.get('/api/v1/empresa/oportunidades', headers=recicla)
+    assert lista.status_code == 200
+    oferta = next(
+        item for item in lista.get_json()['oportunidades']
+        if item['id'] == 'oferta-api-recicla'
+    )
+    assert oferta['dados']['categorias'] == ['celular']
+    assert 'Rua Protegida' not in str(oferta)
+    assert 'Contato Privado' not in str(oferta)
+
+    aceita = client.post(
+        '/api/v1/empresa/oportunidades/oferta-api-recicla/aceitar',
+        headers=recicla,
+    )
+    assert aceita.status_code == 200
+    assert aceita.get_json()['endereco_coleta'] == 'Rua Protegida, 99'
+
+    tech = _cabecalho_empresa(client, '14380200000121', 'techlixo123')
+    conflito = client.post(
+        '/api/v1/empresa/oportunidades/oferta-api-tech/aceitar', headers=tech
+    )
+    assert conflito.status_code == 409
+
+    with db.conn:
+        db.conn.execute("""
+            INSERT INTO solicitacao_descarte(
+                id,id_usuario,estado,data_criacao,tipo_coleta,endereco_coleta,
+                nome_contato,data_agendamento,latitude_coleta,longitude_coleta
+            ) VALUES('sol-api-recusa','user-1','BUSCANDO_EMPRESA',?,
+                'domiciliar','Rua Recusada, 10','Contato',?,-7.21,-39.31)
+        """, (
+            agora.isoformat(timespec='seconds'),
+            (agora + timedelta(days=1)).strftime('%Y-%m-%d %H:%M'),
+        ))
+        db.conn.execute("""
+            INSERT INTO oferta_coleta(
+                id,solicitacao_id,empresa_id,base_operacional_id,
+                distancia_km,score_prioridade,prioridade,rodada,status,
+                snapshot_fatores,criada_em,enviada_em,ativada_em,expira_em
+            ) VALUES('oferta-api-recusa','sol-api-recusa','user-2',?,
+                2.5,100,1,1,'ATIVA',?,?,?,?,?)
+        """, (
+            base_recicla, snapshot, agora.isoformat(timespec='seconds'),
+            agora.isoformat(timespec='seconds'),
+            agora.isoformat(timespec='seconds'),
+            (agora + timedelta(minutes=10)).isoformat(timespec='seconds'),
+        ))
+    recusada = client.post(
+        '/api/v1/empresa/oportunidades/oferta-api-recusa/recusar',
+        headers=recicla, json={'motivo': 'Sem veiculo disponivel'},
+    )
+    assert recusada.status_code == 200
+    assert db.conn.execute(
+        "SELECT status FROM oferta_coleta WHERE id='oferta-api-recusa'"
+    ).fetchone()['status'] == 'RECUSADA'
 
 
 # ---------------------------------------------------------------------------

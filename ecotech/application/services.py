@@ -564,6 +564,64 @@ class ServicoPontoColeta:
         """Busca um ponto de coleta pelo ID."""
         return self._pontos.get(id)
 
+    def criar_para_empresa(
+        self, empresa_id: str, nome: str, endereco: str,
+        latitude: float, longitude: float, capacidade_kg: float,
+    ) -> PontoColeta:
+        if not empresa_id:
+            raise ValueError("empresa e obrigatoria")
+        if not nome or not nome.strip():
+            raise ValueError("nome do ponto e obrigatorio")
+        if not endereco or not endereco.strip():
+            raise ValueError("endereco do ponto e obrigatorio")
+        capacidade = float(capacidade_kg)
+        if capacidade <= 0:
+            raise ValueError("capacidade deve ser positiva")
+        ponto = self.criar_ponto_coleta(
+            nome.strip(), endereco.strip(), float(latitude), float(longitude),
+            capacidade,
+        )
+        self._dados.vincular_empresa_a_ponto(ponto.id, empresa_id)
+        return ponto
+
+    def atualizar_da_empresa(
+        self, empresa_id: str, id_ponto: str, nome: str, endereco: str,
+        latitude: float, longitude: float, capacidade_kg: float,
+    ) -> PontoColeta:
+        row = self._dados.buscar_ponto_coleta(id_ponto)
+        if not row or row['id_empresa'] != empresa_id:
+            raise PermissionError("ponto de coleta nao pertence a empresa")
+        if not nome or not nome.strip():
+            raise ValueError("nome do ponto e obrigatorio")
+        if not endereco or not endereco.strip():
+            raise ValueError("endereco do ponto e obrigatorio")
+        capacidade = float(capacidade_kg)
+        ponto = PontoColeta(
+            id_ponto, nome.strip(), endereco.strip(), float(latitude),
+            float(longitude), capacidade,
+        )
+        ponto.ocupacao_atual_kg = float(row['ocupacao_atual_kg'])
+        self._dados.atualizar_ponto_empresa(
+            id_ponto, empresa_id, ponto.nome, ponto.endereco,
+            ponto.latitude, ponto.longitude, ponto.capacidade_kg,
+        )
+        ponto._ativo = bool(row['ativo'])
+        self._pontos[id_ponto] = ponto
+        return ponto
+
+    def definir_atividade_da_empresa(
+        self, empresa_id: str, id_ponto: str, ativo: bool,
+    ) -> None:
+        row = self._dados.buscar_ponto_coleta(id_ponto)
+        if not row or row['id_empresa'] != empresa_id:
+            raise PermissionError("ponto de coleta nao pertence a empresa")
+        self._dados.definir_atividade_ponto_empresa(
+            id_ponto, empresa_id, ativo
+        )
+        ponto = self._pontos.get(id_ponto)
+        if ponto:
+            ponto._ativo = bool(ativo)
+
 
 class ServicoBaseOperacional:
     """Gerencia bases operacionais pertencentes às empresas."""

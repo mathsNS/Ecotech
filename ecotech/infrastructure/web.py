@@ -180,6 +180,7 @@ def criar_app() -> Flask:
         geolocalizador,
         servico_agendamento,
         servico_despacho,
+        servico_base,
     ))
 
     @app.after_request
