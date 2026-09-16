@@ -785,6 +785,115 @@ def test_agenda_chat_notificacoes_e_badges_mobile(client):
 
 
 # ---------------------------------------------------------------------------
+# Carteira, saques e relatorios
+# ---------------------------------------------------------------------------
+
+def test_carteira_e_saque_idempotente_mobile(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    db = _dados_mod.Dados()
+    db.conn.execute("UPDATE cidadao SET pontos = 5000 WHERE id_usuario = 'user-1'")
+    db.conn.commit()
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    carteira = client.get('/api/v1/carteira', headers=cidadao)
+    assert carteira.status_code == 200
+    saldo_inicial = carteira.get_json()['saldo']
+    assert saldo_inicial >= 10
+    assert carteira.get_json()['conversao']['pontos_por_real'] == 100
+
+    payload = {
+        'valor': 10,
+        'metodo': 'Pix',
+        'titular': 'Joao Silva',
+        'id_cliente': 'saque-mobile-fase-8',
+    }
+    primeiro = client.post('/api/v1/saques', headers=cidadao, json=payload)
+    repetido = client.post('/api/v1/saques', headers=cidadao, json=payload)
+    assert primeiro.status_code == 201, primeiro.get_json()
+    assert repetido.status_code == 200, repetido.get_json()
+    assert repetido.get_json()['repetido'] is True
+    assert repetido.get_json()['saque']['id'] == primeiro.get_json()['saque']['id']
+    assert primeiro.get_json()['carteira']['saldo'] == pytest.approx(
+        saldo_inicial - 10
+    )
+    assert 'T' in primeiro.get_json()['saque']['data_hora']
+
+    conflito = client.post(
+        '/api/v1/saques', headers=cidadao,
+        json={**payload, 'valor': 11},
+    )
+    assert conflito.status_code == 400
+    assert 'outros dados' in conflito.get_json()['erro']
+
+
+def test_carteira_e_saque_bloqueiam_empresa(client):
+    empresa = _cabecalho_empresa(client)
+    assert client.get('/api/v1/carteira', headers=empresa).status_code == 403
+    assert client.post(
+        '/api/v1/saques', headers=empresa,
+        json={'valor': 1, 'metodo': 'Pix', 'titular': 'Empresa'},
+    ).status_code == 403
+
+
+def test_relatorios_respeitam_escopo_periodo_plano_e_csv(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    recicla = _cabecalho_empresa(client)
+    db = _dados_mod.Dados()
+    db.atualizar_plano_empresa('user-2', 'free')
+    relatorio = client.get('/api/v1/relatorios', headers=recicla)
+    assert relatorio.status_code == 200, relatorio.get_json()
+    corpo = relatorio.get_json()
+    assert corpo['plano'] == 'free'
+    assert corpo['pode_exportar'] is False
+    assert corpo['metricas']['peso_descartado_kg'] >= 0
+    assert all(item['estado'] in ('Reciclado', 'Reutilizado', 'Descartado')
+               for item in corpo['finalizadas'])
+    assert client.get(
+        '/api/v1/relatorios/exportar.csv', headers=recicla
+    ).status_code == 403
+
+    db.atualizar_plano_empresa('user-2', 'professional')
+    csv_response = client.get(
+        '/api/v1/relatorios/exportar.csv', headers=recicla
+    )
+    assert csv_response.status_code == 200
+    assert csv_response.data.startswith('\ufeffID,Cidadao'.encode('utf-8'))
+    assert 'attachment' in csv_response.headers['Content-Disposition']
+
+    vazio = client.get(
+        '/api/v1/relatorios?data_inicio=2099-01-01&data_fim=2099-12-31',
+        headers=recicla,
+    )
+    assert vazio.status_code == 200
+    assert vazio.get_json()['metricas']['peso_total_kg'] == 0
+    invalido = client.get(
+        '/api/v1/relatorios?data_inicio=2026-12-31&data_fim=2026-01-01',
+        headers=recicla,
+    )
+    assert invalido.status_code == 400
+
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    assert client.get('/api/v1/relatorios', headers=cidadao).status_code == 403
+    admin = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'administrador', _EMAIL_ADMIN, _SENHA_ADMIN
+        )
+    }
+    geral = client.get('/api/v1/relatorios', headers=admin)
+    assert geral.status_code == 200
+    assert geral.get_json()['pode_exportar'] is True
+
+
+# ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------
 

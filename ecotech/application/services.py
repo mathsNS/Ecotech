@@ -430,7 +430,8 @@ class ServicoSaque:
         id_usuario: str,
         valor: float,
         metodo: str,
-        saldo_disponivel: float
+        saldo_disponivel: float,
+        chave_idempotencia: Optional[str] = None,
     ) -> Dict:
         """
         Registra uma solicitação de saque.
@@ -438,6 +439,33 @@ class ServicoSaque:
         Raises:
             ValueError: Se o valor for inválido ou exceder o saldo disponível.
         """
+        chave = str(chave_idempotencia or '').strip()
+        if len(chave) > 100:
+            raise ValueError("A chave de idempotencia deve ter no maximo 100 caracteres.")
+
+        id_saque = (
+            str(uuid.uuid5(uuid.NAMESPACE_URL, f'ecotech:saque:{id_usuario}:{chave}'))[:12]
+            if chave else str(uuid.uuid4())[:12]
+        )
+        if chave and self._dados:
+            existente = next(
+                (
+                    dict(item) for item in self._dados.buscar_saques_usuario(id_usuario)
+                    if item['id'] == id_saque
+                ),
+                None,
+            )
+            if existente:
+                if (
+                    round(float(existente['valor']), 2) != round(float(valor), 2)
+                    or existente['metodo'] != metodo
+                ):
+                    raise ValueError(
+                        "A chave de idempotencia ja foi usada com outros dados."
+                    )
+                existente['repetido'] = True
+                return existente
+
         if valor <= 0:
             raise ValueError("O valor do saque deve ser positivo.")
         if valor > saldo_disponivel:
@@ -445,7 +473,6 @@ class ServicoSaque:
                 f"Saldo insuficiente. Disponível: R$ {saldo_disponivel:.2f}"
             )
 
-        id_saque = str(uuid.uuid4())[:12]
         agora = datetime.now()
         data = agora.strftime('%d %b %Y')
         hora = agora.strftime('%H:%M')

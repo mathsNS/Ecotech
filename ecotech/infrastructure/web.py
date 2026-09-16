@@ -175,6 +175,7 @@ def criar_app() -> Flask:
         servico_usuario,
         servico_descarte,
         servico_saque,
+        servico_relatorio,
         dados,
         servico_ponto,
         geolocalizador,

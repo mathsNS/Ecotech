@@ -5,6 +5,8 @@ As rotas aqui apenas traduzem HTTP <-> services existentes em
 neste modulo, ela ja existe nos services e no dominio.
 """
 
+import csv
+import io
 import json
 import os
 import uuid
@@ -28,6 +30,7 @@ from ..domain.logistica import Coordenadas
 from ..application.services import (
     ServicoAutenticacao,
     ServicoDescarte,
+    ServicoRelatorio,
     ServicoSaque,
     ServicoUsuario,
 )
@@ -89,6 +92,7 @@ def criar_blueprint_api_v1(
     servico_usuario: ServicoUsuario,
     servico_descarte: ServicoDescarte,
     servico_saque: ServicoSaque,
+    servico_relatorio: ServicoRelatorio,
     dados,
     servico_ponto,
     geolocalizador,
@@ -625,6 +629,124 @@ def criar_blueprint_api_v1(
             'lida': bool(item.get('lida_em')),
             'lida_em': item.get('lida_em'),
             'destino': _destino_notificacao(item, tipo),
+        }
+
+    def _carteira_json(usuario_id):
+        cidadao = dados.buscar_cidadao(usuario_id)
+        usuario = dados.buscar_usuario(usuario_id)
+        pontos = int(cidadao['pontos'] or 0) if cidadao else 0
+        saques = [dict(item) for item in servico_saque.listar_saques(usuario_id)]
+        total_reservado = sum(
+            float(item['valor']) for item in saques
+            if item.get('status') != 'cancelado'
+        )
+        saldo = max(
+            round(pontos * servico_saque.TAXA_REAIS_POR_PONTO - total_reservado, 2),
+            0.0,
+        )
+        def data_hora_iso(item):
+            try:
+                return datetime.strptime(
+                    f'{item["data"]} {item["hora"]}', '%d %b %Y %H:%M'
+                ).isoformat()
+            except (TypeError, ValueError):
+                return f'{item["data"]} {item["hora"]}'.strip()
+
+        return {
+            'saldo': saldo,
+            'pontos': pontos,
+            'conversao': {
+                'pontos_por_real': int(
+                    round(1 / servico_saque.TAXA_REAIS_POR_PONTO)
+                ),
+                'reais_por_ponto': servico_saque.TAXA_REAIS_POR_PONTO,
+            },
+            'metodos': [
+                {'id': 'Pix', 'nome': 'Pix'},
+                {'id': 'Transferencia', 'nome': 'Transferencia bancaria'},
+            ],
+            'titular': {
+                'nome': usuario['nome'] if usuario else '',
+                'cpf': cidadao['cpf'] if cidadao else '',
+                'email': usuario['email'] if usuario else '',
+            },
+            'saques': [
+                {
+                    'id': item['id'],
+                    'valor': float(item['valor']),
+                    'metodo': item['metodo'],
+                    'data': item['data'],
+                    'hora': item['hora'],
+                    'data_hora': data_hora_iso(item),
+                    'status': item['status'],
+                }
+                for item in saques
+            ],
+        }
+
+    def _periodo_relatorio():
+        inicio_texto = str(request.args.get('data_inicio', '')).strip()
+        fim_texto = str(request.args.get('data_fim', '')).strip()
+        try:
+            inicio = (
+                datetime.strptime(inicio_texto, '%Y-%m-%d')
+                if inicio_texto else None
+            )
+            fim = (
+                datetime.strptime(fim_texto, '%Y-%m-%d').replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+                if fim_texto else None
+            )
+        except ValueError as exc:
+            raise ValueError('Use datas validas no formato AAAA-MM-DD') from exc
+        if inicio and fim and inicio > fim:
+            raise ValueError('A data inicial deve ser anterior a data final')
+        return inicio_texto, fim_texto, inicio, fim
+
+    def _dados_relatorio():
+        usuario = _usuario_token_dict()
+        if usuario['tipo'] not in ('empresa', 'administrador'):
+            raise PermissionError(
+                'Relatorios estao disponiveis para empresas e administradores'
+            )
+        inicio_texto, fim_texto, inicio, fim = _periodo_relatorio()
+        solicitacoes = _solicitacoes_do_usuario(usuario['id'], usuario['tipo'])
+        titulo = (
+            'Relatorio Geral do Sistema'
+            if usuario['tipo'] == 'administrador'
+            else f'Relatorio de {usuario["nome"]}'
+        )
+        relatorio = servico_relatorio.gerar_relatorio_periodo(
+            titulo, solicitacoes, data_inicio=inicio, data_fim=fim
+        )
+        metricas = relatorio.gerar_relatorio()
+        filtradas = [
+            item for item in solicitacoes
+            if (inicio is None or item.data_criacao >= inicio)
+            and (fim is None or item.data_criacao <= fim)
+        ]
+        finalizadas = [
+            item for item in filtradas
+            if item.estado.obter_nome() in estados_finais
+        ]
+        plano = (
+            dados.buscar_plano_empresa(usuario['id'])
+            if usuario['tipo'] == 'empresa' else None
+        )
+        pode_exportar = usuario['tipo'] == 'administrador' or plano in (
+            'professional', 'enterprise'
+        )
+        return {
+            'usuario': usuario,
+            'periodo': {
+                'data_inicio': inicio_texto or None,
+                'data_fim': fim_texto or None,
+            },
+            'metricas': metricas,
+            'finalizadas': finalizadas,
+            'plano': plano,
+            'pode_exportar': pode_exportar,
         }
 
     def _registrar_avaliacao(solicitacao, payload):
@@ -1793,6 +1915,178 @@ def criar_blueprint_api_v1(
             'oportunidades': oportunidades,
             'total': notificacoes + mensagens + oportunidades,
         })
+
+    @bp.route('/carteira', methods=['GET'])
+    @requer_autenticacao_api
+    def carteira_api():
+        if request.usuario_token['tipo'] != 'cidadao':
+            return jsonify({
+                'erro': 'A carteira esta disponivel apenas para cidadaos'
+            }), 403
+        return jsonify(_carteira_json(request.usuario_token['sub']))
+
+    @bp.route('/saques', methods=['POST'])
+    @requer_autenticacao_api
+    def solicitar_saque_api():
+        if request.usuario_token['tipo'] != 'cidadao':
+            return jsonify({
+                'erro': 'Saques estao disponiveis apenas para cidadaos'
+            }), 403
+        payload = request.get_json(silent=True) or {}
+        metodo = str(payload.get('metodo', '')).strip()
+        metodos = {'Pix', 'Transferencia'}
+        if metodo not in metodos:
+            return jsonify({'erro': 'Selecione um metodo de saque valido'}), 400
+        titular = str(payload.get('titular', '')).strip()
+        if len(titular) < 3:
+            return jsonify({'erro': 'Informe o nome completo do titular'}), 400
+        try:
+            valor = float(str(payload.get('valor', '')).replace(',', '.'))
+            carteira = _carteira_json(request.usuario_token['sub'])
+            resultado = servico_saque.solicitar_saque(
+                request.usuario_token['sub'],
+                valor,
+                metodo,
+                carteira['saldo'],
+                chave_idempotencia=payload.get('id_cliente'),
+            )
+            if not resultado.get('repetido'):
+                dados.salvar_notificacao(
+                    request.usuario_token['sub'],
+                    f'Saque de R$ {valor:.2f} solicitado com sucesso.',
+                    chave_idempotencia=f'saque:{resultado["id"]}',
+                )
+            return jsonify({
+                'saque': {
+                    'id': resultado['id'],
+                    'valor': float(resultado['valor']),
+                    'metodo': resultado['metodo'],
+                    'data': resultado['data'],
+                    'hora': resultado['hora'],
+                    'data_hora': next(
+                        item['data_hora']
+                        for item in _carteira_json(
+                            request.usuario_token['sub']
+                        )['saques']
+                        if item['id'] == resultado['id']
+                    ),
+                    'status': resultado['status'],
+                    'titular': titular,
+                },
+                'repetido': bool(resultado.get('repetido')),
+                'carteira': _carteira_json(request.usuario_token['sub']),
+            }), 200 if resultado.get('repetido') else 201
+        except (TypeError, ValueError) as exc:
+            return jsonify({'erro': str(exc)}), 400
+
+    @bp.route('/relatorios', methods=['GET'])
+    @requer_autenticacao_api
+    def relatorios_api():
+        try:
+            resultado = _dados_relatorio()
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+        metricas = resultado['metricas']
+        total = round(
+            metricas['peso_reciclado_kg']
+            + metricas['peso_reutilizado_kg']
+            + metricas['peso_descartado_kg'],
+            2,
+        )
+        taxa_reciclagem = round(
+            metricas['peso_reciclado_kg'] / total * 100
+            if total else 0.0,
+            2,
+        )
+        destinacao_adequada = round(
+            (
+                metricas['peso_reciclado_kg']
+                + metricas['peso_reutilizado_kg']
+            ) / total * 100 if total else 0.0,
+            2,
+        )
+        return jsonify({
+            'titulo': metricas['titulo'],
+            'gerado_em': metricas['data_geracao'],
+            'periodo': resultado['periodo'],
+            'metricas': {
+                **metricas,
+                'peso_total_kg': total,
+                'taxa_reciclagem_pct': taxa_reciclagem,
+            },
+            'finalizadas': [
+                {
+                    'id': item.id,
+                    'cidadao': item.usuario.nome,
+                    'peso_kg': round(item.calcular_peso_total(), 2),
+                    'impacto_kg': round(item.calcular_impacto_total(), 2),
+                    'metodo': (
+                        item.metodo_tratamento.obter_nome()
+                        if item.metodo_tratamento else None
+                    ),
+                    'estado': item.estado.obter_nome(),
+                    'data': item.data_criacao.isoformat(),
+                }
+                for item in sorted(
+                    resultado['finalizadas'],
+                    key=lambda item: item.data_criacao,
+                    reverse=True,
+                )
+            ],
+            'pnrs': {
+                'disponivel': resultado['pode_exportar'],
+                'destinacao_adequada_pct': destinacao_adequada,
+                'peso_total_gerenciado_kg': total,
+                'solicitacoes_atendidas': len(resultado['finalizadas']),
+            },
+            'plano': resultado['plano'],
+            'pode_exportar': resultado['pode_exportar'],
+        })
+
+    @bp.route('/relatorios/exportar.csv', methods=['GET'])
+    @requer_autenticacao_api
+    def exportar_relatorio_api():
+        try:
+            resultado = _dados_relatorio()
+        except PermissionError as exc:
+            return jsonify({'erro': str(exc)}), 403
+        except ValueError as exc:
+            return jsonify({'erro': str(exc)}), 400
+        if not resultado['pode_exportar']:
+            return jsonify({
+                'erro': 'Exportacao disponivel nos planos Professional e Enterprise',
+                'upgrade': True,
+            }), 403
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            'ID', 'Cidadao', 'Peso (kg)', 'Impacto CO2 (kg)',
+            'Metodo', 'Estado', 'Data',
+        ])
+        for item in sorted(
+            resultado['finalizadas'], key=lambda sol: sol.data_criacao,
+            reverse=True,
+        ):
+            writer.writerow([
+                item.id,
+                item.usuario.nome,
+                f'{item.calcular_peso_total():.2f}',
+                f'{item.calcular_impacto_total():.2f}',
+                item.metodo_tratamento.obter_nome()
+                if item.metodo_tratamento else '',
+                item.estado.obter_nome(),
+                item.data_criacao.strftime('%d/%m/%Y'),
+            ])
+        conteudo = '\ufeff' + output.getvalue()
+        return Response(
+            conteudo,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': 'attachment; filename=relatorio_ecotech.csv'
+            },
+        )
 
     @bp.route('/operacoes', methods=['GET'])
     @requer_autenticacao_api
