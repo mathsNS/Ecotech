@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/api_exception.dart';
@@ -10,6 +11,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_data.dart';
 import '../../data/company/operation_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
+import '../communication/widgets/communication_actions.dart';
 import 'company_controller.dart';
 import 'widgets/company_states.dart';
 
@@ -21,7 +23,10 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(operacaoDetalhesProvider(id));
     return Scaffold(
-      appBar: AppBar(title: Text('Operacao #${id.substring(0, 8)}')),
+      appBar: AppBar(
+        title: Text('Operacao #${id.substring(0, 8)}'),
+        actions: const [CommunicationActions()],
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -55,6 +60,26 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 12),
               _Historico(dados.historico),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push('/solicitacoes/$id/agenda'),
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: const Text('Agenda'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/conversas/$id'),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Conversa'),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 18),
               _Acoes(dados: dados),
             ],

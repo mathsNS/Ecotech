@@ -2,11 +2,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
+import '../communication/widgets/communication_actions.dart';
 import 'citizen_controller.dart';
 import 'widgets/citizen_states.dart';
 
@@ -18,7 +20,10 @@ class SolicitacaoDetalhesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(solicitacaoDetalhesProvider(id));
     return Scaffold(
-      appBar: AppBar(title: Text('Solicitação #${id.substring(0, 8)}')),
+      appBar: AppBar(
+        title: Text('Solicitação #${id.substring(0, 8)}'),
+        actions: const [CommunicationActions()],
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CitizenError(
@@ -97,6 +102,28 @@ class SolicitacaoDetalhesScreen extends ConsumerWidget {
                             .map(_HistoricoTile.new)
                             .toList(),
                       ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push('/solicitacoes/$id/agenda'),
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: const Text('Agenda'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: dados.empresa == null
+                          ? null
+                          : () => context.push('/conversas/$id'),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Conversa'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

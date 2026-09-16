@@ -10,6 +10,7 @@ import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_navigation.dart';
+import '../communication/widgets/communication_actions.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -22,6 +23,7 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Image.asset('assets/images/ecotech navbar.png', height: 34),
         actions: [
+          const CommunicationActions(),
           IconButton(
             tooltip: 'Perfil',
             onPressed: () => context.go('/perfil'),

@@ -12,6 +12,10 @@ import '../../features/company/oportunidades_screen.dart';
 import '../../features/company/operacao_detalhes_screen.dart';
 import '../../features/company/operacoes_empresa_screen.dart';
 import '../../features/company/pontos_empresa_screen.dart';
+import '../../features/communication/agenda_screen.dart';
+import '../../features/communication/chat_screen.dart';
+import '../../features/communication/conversas_screen.dart';
+import '../../features/communication/notificacoes_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/profile/perfil_screen.dart';
 import '../../features/splash/splash_screen.dart';
@@ -46,6 +50,24 @@ final appRouter = GoRouter(
       path: '/solicitacoes/:id',
       builder: (context, state) =>
           SolicitacaoDetalhesScreen(id: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/solicitacoes/:id/agenda',
+      builder: (context, state) =>
+          AgendaScreen(solicitacaoId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/conversas',
+      builder: (context, state) => const ConversasScreen(),
+    ),
+    GoRoute(
+      path: '/conversas/:id',
+      builder: (context, state) =>
+          ChatScreen(solicitacaoId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/notificacoes',
+      builder: (context, state) => const NotificacoesScreen(),
     ),
     GoRoute(
       path: '/entregas',

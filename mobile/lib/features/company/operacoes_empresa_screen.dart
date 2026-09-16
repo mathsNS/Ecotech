@@ -251,14 +251,28 @@ class _OperacaoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () =>
-                    context.push('/empresa/operacoes/${operacao.id}'),
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Ver detalhes'),
-              ),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: () => context.push('/conversas/${operacao.id}'),
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Conversa'),
+                ),
+                TextButton.icon(
+                  onPressed: () =>
+                      context.push('/solicitacoes/${operacao.id}/agenda'),
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  label: const Text('Agenda'),
+                ),
+                TextButton.icon(
+                  onPressed: () =>
+                      context.push('/empresa/operacoes/${operacao.id}'),
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Detalhes'),
+                ),
+              ],
             ),
           ],
         ),
