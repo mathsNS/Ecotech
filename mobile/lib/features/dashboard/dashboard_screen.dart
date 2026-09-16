@@ -162,6 +162,15 @@ class _DashboardCidadao extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.go('/carteira'),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: const Text('Carteira e saques'),
+          ),
+        ),
         const SizedBox(height: 16),
         _MetricGrid(
           cards: [
@@ -293,6 +302,15 @@ class _DashboardEmpresa extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.go('/relatorios'),
+            icon: const Icon(Icons.bar_chart_outlined),
+            label: const Text('Relatórios ambientais'),
+          ),
+        ),
         const SizedBox(height: 16),
         _MetricGrid(
           cards: [
@@ -368,6 +386,15 @@ class _DashboardAdmin extends StatelessWidget {
     final m = dados.metricas;
     return Column(
       children: [
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.go('/relatorios'),
+            icon: const Icon(Icons.bar_chart_outlined),
+            label: const Text('Relatórios do sistema'),
+          ),
+        ),
+        const SizedBox(height: 16),
         _MetricGrid(
           cards: [
             MetricCard(

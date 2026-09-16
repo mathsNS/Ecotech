@@ -103,9 +103,7 @@ class _NotificacoesScreenState extends ConsumerState<NotificacoesScreen> {
         ref.invalidate(badgesProvider);
       }
       if (!mounted) return;
-      final destino = notificacao.destino == '/carteira'
-          ? '/home'
-          : notificacao.destino;
+      final destino = notificacao.destino;
       if (destino != '/notificacoes') context.push(destino);
     } catch (error) {
       _mostrarErro(error);

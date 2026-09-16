@@ -17,6 +17,8 @@ import '../../features/communication/chat_screen.dart';
 import '../../features/communication/conversas_screen.dart';
 import '../../features/communication/notificacoes_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
+import '../../features/finance/carteira_screen.dart';
+import '../../features/finance/relatorios_screen.dart';
 import '../../features/profile/perfil_screen.dart';
 import '../../features/splash/splash_screen.dart';
 
@@ -34,6 +36,14 @@ final appRouter = GoRouter(
       builder: (context, state) => const DashboardScreen(),
     ),
     GoRoute(path: '/perfil', builder: (context, state) => const PerfilScreen()),
+    GoRoute(
+      path: '/carteira',
+      builder: (context, state) => const CarteiraScreen(),
+    ),
+    GoRoute(
+      path: '/relatorios',
+      builder: (context, state) => const RelatoriosScreen(),
+    ),
     GoRoute(path: '/pontos', builder: (context, state) => const PontosScreen()),
     GoRoute(
       path: '/solicitacoes',
