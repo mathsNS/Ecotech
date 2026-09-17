@@ -78,6 +78,32 @@ def formatar_data_br(valor, variante='data_hora'):
     return instante.strftime(formatos.get(variante, formatos['data_hora']))
 
 
+def configurar_seguranca(app):
+    """Aplica configuracoes seguras sem inicializar persistencia ou servicos."""
+    ambiente = os.environ.get('ECOTECH_ENV', 'development').strip().lower()
+    producao = ambiente in ('production', 'producao', 'prod')
+    segredo_sessao = os.environ.get('ECOTECH_SECRET_KEY', '')
+    segredo_jwt = os.environ.get('ECOTECH_JWT_SECRET', '')
+    if producao and (len(segredo_sessao) < 32 or len(segredo_jwt) < 32):
+        raise RuntimeError(
+            'ECOTECH_SECRET_KEY e ECOTECH_JWT_SECRET devem ter ao menos '
+            '32 caracteres em producao'
+        )
+    app.secret_key = segredo_sessao or secrets.token_hex(32)
+    try:
+        expiracao_jwt = int(os.environ.get('ECOTECH_JWT_EXPIRACAO_HORAS', '8'))
+    except ValueError:
+        expiracao_jwt = 8
+    app.config.update(
+        ECOTECH_ENV=ambiente,
+        JWT_EXPIRACAO_HORAS=min(168, max(1, expiracao_jwt)),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_SECURE=producao,
+        PREFERRED_URL_SCHEME='https' if producao else 'http',
+    )
+
+
 def criar_app() -> Flask:
     """
     Cria e configura a aplicação Flask.
@@ -87,7 +113,7 @@ def criar_app() -> Flask:
     """
     from datetime import timedelta
     app = Flask(__name__)
-    app.secret_key = os.environ.get('ECOTECH_SECRET_KEY') or secrets.token_hex(32)
+    configurar_seguranca(app)
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
     app.config.setdefault('CSRF_ENABLED', True)
     app.add_template_filter(formatar_data_br, 'data_br')
@@ -190,9 +216,22 @@ def criar_app() -> Flask:
     def liberar_cors_api_mobile(response):
         """Libera CORS so para a API mobile, que autentica por token e nao por cookie."""
         if request.path.startswith('/api/v1/'):
-            response.headers['Access-Control-Allow-Origin'] = '*'
+            origens = [
+                item.strip()
+                for item in os.environ.get('ECOTECH_CORS_ORIGINS', '*').split(',')
+                if item.strip()
+            ]
+            origem = request.headers.get('Origin')
+            if '*' in origens:
+                response.headers['Access-Control-Allow-Origin'] = '*'
+            elif origem in origens:
+                response.headers['Access-Control-Allow-Origin'] = origem
+                response.headers.add('Vary', 'Origin')
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         return response
 
     @app.before_request

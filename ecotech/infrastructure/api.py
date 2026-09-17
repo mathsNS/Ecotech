@@ -41,6 +41,16 @@ ALGORITMO_JWT = 'HS256'
 EXPIRACAO_TOKEN_HORAS = 8
 
 
+def _expiracao_token_horas() -> int:
+    try:
+        configurada = int(
+            current_app.config.get('JWT_EXPIRACAO_HORAS', EXPIRACAO_TOKEN_HORAS)
+        )
+    except (TypeError, ValueError):
+        configurada = EXPIRACAO_TOKEN_HORAS
+    return min(168, max(1, configurada))
+
+
 def _chave_jwt() -> str:
     """Chave usada para assinar o token, propria para nao acoplar ao cookie de sessao."""
     return os.environ.get('ECOTECH_JWT_SECRET') or current_app.secret_key
@@ -54,7 +64,7 @@ def gerar_token(usuario_id: str, nome: str, tipo: str) -> str:
         'nome': nome,
         'tipo': tipo,
         'iat': agora,
-        'exp': agora + timedelta(hours=EXPIRACAO_TOKEN_HORAS),
+        'exp': agora + timedelta(hours=_expiracao_token_horas()),
     }
     return jwt.encode(payload, _chave_jwt(), algorithm=ALGORITMO_JWT)
 
@@ -982,7 +992,7 @@ def criar_blueprint_api_v1(
         return jsonify({
             'access_token': token,
             'token_type': 'Bearer',
-            'expires_in': EXPIRACAO_TOKEN_HORAS * 3600,
+            'expires_in': _expiracao_token_horas() * 3600,
             'usuario': {
                 'id': dados_sessao['user_id'],
                 'nome': dados_sessao['user_nome'],

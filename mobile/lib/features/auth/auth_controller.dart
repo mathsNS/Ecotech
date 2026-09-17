@@ -10,13 +10,13 @@ final authRepositoryProvider = Provider<AuthRepository>(
 /// Estado de autenticacao do app: null = deslogado, Usuario = logado.
 class AuthController extends AsyncNotifier<Usuario?> {
   @override
-  Future<Usuario?> build() async {
-    try {
-      return await ref.read(authRepositoryProvider).usuarioAtual();
-    } catch (_) {
-      // sem sessao valida (sem token, servidor indisponivel, etc), trata como deslogado
-      return null;
-    }
+  Future<Usuario?> build() => ref.read(authRepositoryProvider).usuarioAtual();
+
+  Future<void> reload() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(authRepositoryProvider).usuarioAtual(),
+    );
   }
 
   Future<void> login({

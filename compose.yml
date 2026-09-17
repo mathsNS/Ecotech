@@ -5,5 +5,11 @@ services:
     container_name: ecotech-01
     ports:
       - "5000:5000"
+    environment:
+      ECOTECH_ENV: ${ECOTECH_ENV:-development}
+      ECOTECH_SECRET_KEY: ${ECOTECH_SECRET_KEY:-}
+      ECOTECH_JWT_SECRET: ${ECOTECH_JWT_SECRET:-}
+      ECOTECH_JWT_EXPIRACAO_HORAS: ${ECOTECH_JWT_EXPIRACAO_HORAS:-8}
+      ECOTECH_CORS_ORIGINS: ${ECOTECH_CORS_ORIGINS:-*}
     volumes:
       - .:/usr/src/ecotech
