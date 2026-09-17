@@ -1,4 +1,4 @@
-package com.ecotech.ecotech_mobile
+package br.com.ecotech.app
 
 import io.flutter.embedding.android.FlutterActivity
 
