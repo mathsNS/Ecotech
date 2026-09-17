@@ -1090,13 +1090,14 @@ class Dados(RepositorioBase):
     # DESATIVAR (soft-delete)
     # -------------------
 
-    def desativar_usuario(self, id_usuario: str) -> None:
+    def desativar_usuario(self, id_usuario: str) -> bool:
         """Marca o usuário como inativo sem remover o registro."""
         with self.conn:
-            self.conn.execute(
-                "UPDATE usuario SET ativo = 0 WHERE id = ?",
+            cursor = self.conn.execute(
+                "UPDATE usuario SET ativo = 0 WHERE id = ? AND ativo = 1",
                 (id_usuario,)
             )
+        return cursor.rowcount == 1
 
     def atualizar_pontos_cidadao(self, id_usuario: str, pontos_a_adicionar: int) -> None:
         """Incrementa os pontos do cidadão no banco."""
@@ -1383,7 +1384,8 @@ class Dados(RepositorioBase):
     def buscar_todos_cidadaos_admin(self):
         c = self.conn.cursor()
         c.execute("""
-            SELECT u.id, u.nome, u.email, u.data_cadastro, ci.cpf, ci.pontos
+            SELECT u.id, u.nome, u.email, u.data_cadastro, u.ativo,
+                   ci.cpf, ci.pontos
             FROM usuario u
             JOIN cidadao ci ON u.id = ci.id_usuario
             WHERE u.tipo = 'cidadao'
@@ -1394,7 +1396,8 @@ class Dados(RepositorioBase):
         """Retorna lista com id, nome, email, data_cadastro, cnpj e descartado_mes de todas as empresas."""
         c = self.conn.cursor()
         c.execute("""
-            SELECT u.id, u.nome, u.email, u.data_cadastro, e.cnpj, e.descartado_mes
+            SELECT u.id, u.nome, u.email, u.data_cadastro, u.ativo,
+                   e.cnpj, e.razao_social, e.descartado_mes, e.plano
             FROM usuario u
             JOIN empresa e ON u.id = e.id_usuario
             WHERE u.tipo = 'empresa'
@@ -1535,23 +1538,27 @@ class Dados(RepositorioBase):
         """)
         return c.fetchall()
 
-    def aprovar_override(self, id_sol: str):
+    def aprovar_override(self, id_sol: str) -> bool:
         """Aprova o override de valor proposto pelo operador."""
         c = self.conn.cursor()
         c.execute(
-            "UPDATE solicitacao_descarte SET status_override = 'aprovado' WHERE id = ?",
+            "UPDATE solicitacao_descarte SET status_override = 'aprovado' "
+            "WHERE id = ? AND status_override = 'pendente_doc'",
             (id_sol,)
         )
         self.conn.commit()
+        return c.rowcount == 1
 
-    def rejeitar_override(self, id_sol: str, valor_recalculado: float):
+    def rejeitar_override(self, id_sol: str, valor_recalculado: float) -> bool:
         """Rejeita o override, revertendo ao valor calculado automaticamente."""
         c = self.conn.cursor()
         c.execute(
-            "UPDATE solicitacao_descarte SET status_override = 'rejeitado', valor_proposto = ? WHERE id = ?",
+            "UPDATE solicitacao_descarte SET status_override = 'rejeitado', "
+            "valor_proposto = ? WHERE id = ? AND status_override = 'pendente_doc'",
             (valor_recalculado, id_sol)
         )
         self.conn.commit()
+        return c.rowcount == 1
 
     # -------------------
     # RECEITA / SALDO
@@ -1597,7 +1604,7 @@ class Dados(RepositorioBase):
         c.execute("SELECT * FROM receita_ecotech ORDER BY data DESC")
         return c.fetchall()
 
-    def atualizar_preco_subcategoria(self, subcategoria: str, valor_base: float, valor_minimo: float):
+    def atualizar_preco_subcategoria(self, subcategoria: str, valor_base: float, valor_minimo: float) -> bool:
         """Atualiza os valores de uma subcategoria na tabela de preços."""
         c = self.conn.cursor()
         c.execute(
@@ -1605,6 +1612,7 @@ class Dados(RepositorioBase):
             (valor_base, valor_minimo, subcategoria)
         )
         self.conn.commit()
+        return c.rowcount == 1
 
     def buscar_versao_schema(self) -> int:
         """Retorna a versão mais recente aplicada ao schema."""

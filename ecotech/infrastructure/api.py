@@ -338,6 +338,11 @@ def criar_blueprint_api_v1(
             return jsonify({'erro': 'Recurso exclusivo para operadores'}), 403
         return None
 
+    def _exigir_admin():
+        if request.usuario_token['tipo'] != 'administrador':
+            return jsonify({'erro': 'Recurso exclusivo para administradores'}), 403
+        return None
+
     def _endereco_operacional(payload):
         campos = {
             chave: str(payload.get(chave, '') or '')
@@ -580,6 +585,9 @@ def criar_blueprint_api_v1(
             solicitacao_id = chave.split(':', 2)[1]
             prefixo = '/empresa/operacoes' if usuario_tipo == 'empresa' else '/solicitacoes'
             return f'{prefixo}/{solicitacao_id}'
+        if chave.startswith('override:'):
+            solicitacao_id = chave.split(':', 2)[1]
+            return f'/empresa/operacoes/{solicitacao_id}'
         if chave.startswith('chat:'):
             mensagem_id = chave.split(':', 1)[1]
             row = dados.buscar_solicitacao_mensagem(mensagem_id)
@@ -609,6 +617,8 @@ def criar_blueprint_api_v1(
             tipo = 'agenda'
         elif chave.startswith('mtr:') or 'mtr' in normalizada:
             tipo = 'mtr'
+        elif chave.startswith('override:'):
+            tipo = 'estado'
         elif any(
             termo in normalizada
             for termo in ('credito', 'crédito', 'pagamento', 'saque', 'r$')
@@ -747,6 +757,79 @@ def criar_blueprint_api_v1(
             'finalizadas': finalizadas,
             'plano': plano,
             'pode_exportar': pode_exportar,
+        }
+
+    def _mascarar_email(email):
+        usuario, separador, dominio = str(email or '').partition('@')
+        if not separador:
+            return '-'
+        visivel = usuario[:2] if len(usuario) > 1 else usuario[:1]
+        return f'{visivel}***@{dominio}'
+
+    def _mascarar_documento(documento, tipo):
+        digitos = ''.join(c for c in str(documento or '') if c.isdigit())
+        if tipo == 'cidadao' and len(digitos) == 11:
+            return f'***.***.***-{digitos[-2:]}'
+        if tipo == 'empresa' and len(digitos) == 14:
+            return f'**.***.***/****-{digitos[-2:]}'
+        return '-'
+
+    def _usuario_admin_json(item, tipo):
+        documento = item.get('cpf') if tipo == 'cidadao' else item.get('cnpj')
+        return {
+            'id': item['id'],
+            'nome': item['nome'],
+            'email': _mascarar_email(item.get('email')),
+            'documento': _mascarar_documento(documento, tipo),
+            'tipo': tipo,
+            'ativo': bool(item.get('ativo')),
+            'data_cadastro': item.get('data_cadastro'),
+            'pontos': int(item.get('pontos') or 0) if tipo == 'cidadao' else None,
+            'descartado_mes_kg': (
+                float(item.get('descartado_mes') or 0)
+                if tipo == 'empresa' else None
+            ),
+            'plano': item.get('plano') if tipo == 'empresa' else None,
+        }
+
+    def _empresa_id_solicitacao(solicitacao_id):
+        raw = dados.buscar_solicitacao(solicitacao_id)
+        if not raw:
+            return None
+        empresa_id = raw['empresa_responsavel_id']
+        if not empresa_id and raw['id_ponto_coleta']:
+            ponto = dados.buscar_ponto_coleta(raw['id_ponto_coleta'])
+            empresa_id = ponto['id_empresa'] if ponto else None
+        return empresa_id
+
+    def _valores_override(solicitacao_id, estado_produto=None):
+        avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao_id)
+        if not avaliacao:
+            raise LookupError('Avaliacao nao encontrada')
+        estado = estado_produto or avaliacao['estado_produto'] or 'funcionando'
+        valor_base = 0.0
+        valor_minimo = 0.0
+        valor_recalculado = 0.0
+        for item in dados.buscar_itens_solicitacao(solicitacao_id):
+            preco = dados.buscar_preco_subcategoria(
+                item['subcategoria'] or 'smartphone_medio'
+            )
+            if not preco:
+                continue
+            quantidade = int(item['quantidade'] or 1)
+            base = float(preco['valor_base_funcionando'])
+            minimo = float(preco['valor_minimo_sucata'])
+            valor_base += base * quantidade
+            valor_minimo += minimo * quantidade
+            valor_recalculado += (
+                ServicoDescarte.calcular_valor_avaliado(estado, base, minimo)
+                * quantidade
+            )
+        return {
+            'valor_base': round(valor_base, 2),
+            'valor_minimo': round(valor_minimo, 2),
+            'limite_override': round(valor_base * 1.5, 2),
+            'valor_recalculado': round(valor_recalculado, 2),
         }
 
     def _registrar_avaliacao(solicitacao, payload):
@@ -2087,6 +2170,278 @@ def criar_blueprint_api_v1(
                 'Content-Disposition': 'attachment; filename=relatorio_ecotech.csv'
             },
         )
+
+    @bp.route('/admin/usuarios', methods=['GET', 'POST'])
+    @requer_autenticacao_api
+    def usuarios_admin_api():
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        if request.method == 'POST':
+            payload = request.get_json(silent=True) or {}
+            tipo = str(payload.get('tipo', '')).strip()
+            nome = str(payload.get('nome', '')).strip()
+            email = str(payload.get('email', '')).strip().lower()
+            senha = str(payload.get('senha', ''))
+            if tipo not in ('cidadao', 'empresa'):
+                return jsonify({'erro': 'Selecione cidadao ou empresa'}), 400
+            if len(nome) < 3 or '@' not in email:
+                return jsonify({'erro': 'Informe nome e e-mail validos'}), 400
+            if len(senha) < 6:
+                return jsonify({
+                    'erro': 'A senha deve ter pelo menos 6 caracteres'
+                }), 400
+            if any(
+                str(item['email']).lower() == email
+                for item in dados.buscar_todos_usuarios()
+            ):
+                return jsonify({'erro': 'Este e-mail ja esta em uso'}), 409
+            novo = {'nome': nome, 'email': email}
+            if tipo == 'cidadao':
+                documento = str(payload.get('cpf', '')).strip()
+                if any(
+                    ''.join(c for c in str(item.get('cpf') or '') if c.isdigit())
+                    == ''.join(c for c in documento if c.isdigit())
+                    for item in dados.buscar_todos_cidadaos_admin()
+                ):
+                    return jsonify({'erro': 'Este CPF ja esta cadastrado'}), 409
+                novo['cpf'] = documento
+            else:
+                documento = str(payload.get('cnpj', '')).strip()
+                if any(
+                    ''.join(c for c in str(item.get('cnpj') or '') if c.isdigit())
+                    == ''.join(c for c in documento if c.isdigit())
+                    for item in dados.buscar_todos_empresas_admin()
+                ):
+                    return jsonify({'erro': 'Este CNPJ ja esta cadastrado'}), 409
+                novo['cnpj'] = documento
+                novo['razao_social'] = str(
+                    payload.get('razao_social', '')
+                ).strip()
+            try:
+                usuario = servico_usuario.criar_usuario(tipo, novo, senha)
+            except ValueError as exc:
+                return jsonify({'erro': str(exc)}), 400
+            except Exception:
+                return jsonify({'erro': 'Nao foi possivel cadastrar o usuario'}), 400
+            row = (
+                dados.buscar_cidadao(usuario.id)
+                if tipo == 'cidadao' else dados.buscar_empresa(usuario.id)
+            )
+            return jsonify(_usuario_admin_json(dict(row), tipo)), 201
+
+        tipo = str(request.args.get('tipo', 'todos')).strip().lower()
+        busca = str(request.args.get('busca', '')).strip().lower()
+        if tipo not in ('todos', 'cidadao', 'empresa'):
+            return jsonify({'erro': 'Tipo de usuario invalido'}), 400
+        try:
+            pagina = max(1, int(request.args.get('pagina', 1)))
+            por_pagina = min(50, max(1, int(request.args.get('por_pagina', 20))))
+        except (TypeError, ValueError):
+            return jsonify({'erro': 'Paginacao invalida'}), 400
+        cidadaos = [dict(item) for item in dados.buscar_todos_cidadaos_admin()]
+        empresas = [dict(item) for item in dados.buscar_todos_empresas_admin()]
+        itens = []
+        if tipo in ('todos', 'cidadao'):
+            itens.extend(_usuario_admin_json(item, 'cidadao') for item in cidadaos)
+        if tipo in ('todos', 'empresa'):
+            itens.extend(_usuario_admin_json(item, 'empresa') for item in empresas)
+        if busca:
+            itens = [
+                item for item in itens
+                if busca in item['nome'].lower()
+                or busca in item['email'].lower()
+                or busca in item['documento'].lower()
+            ]
+        itens.sort(key=lambda item: (not item['ativo'], item['nome'].lower()))
+        total = len(itens)
+        inicio = (pagina - 1) * por_pagina
+        return jsonify({
+            'usuarios': itens[inicio:inicio + por_pagina],
+            'metricas': {
+                'total': len(cidadaos) + len(empresas),
+                'cidadaos': len(cidadaos),
+                'empresas': len(empresas),
+                'ativos': sum(
+                    bool(item.get('ativo')) for item in cidadaos + empresas
+                ),
+                'inativos': sum(
+                    not bool(item.get('ativo')) for item in cidadaos + empresas
+                ),
+            },
+            'paginacao': {
+                'pagina': pagina,
+                'por_pagina': por_pagina,
+                'total': total,
+                'total_paginas': max(1, (total + por_pagina - 1) // por_pagina),
+            },
+        })
+
+    @bp.route('/admin/usuarios/<usuario_id>/desativar', methods=['POST'])
+    @requer_autenticacao_api
+    def desativar_usuario_admin_api(usuario_id):
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        if usuario_id == request.usuario_token['sub']:
+            return jsonify({'erro': 'Voce nao pode desativar a propria conta'}), 409
+        usuario = dados.buscar_usuario(usuario_id)
+        if not usuario:
+            return jsonify({'erro': 'Usuario nao encontrado'}), 404
+        if usuario['tipo'] == 'administrador':
+            return jsonify({'erro': 'Administradores nao podem ser desativados aqui'}), 403
+        alterado = dados.desativar_usuario(usuario_id)
+        return jsonify({
+            'ok': True,
+            'ativo': False,
+            'repetido': not alterado,
+        })
+
+    @bp.route('/admin/despacho', methods=['GET'])
+    @requer_autenticacao_api
+    def despacho_admin_api():
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        diagnostico = dados.buscar_diagnostico_despacho()
+        metricas = dict(diagnostico['metricas'] or {})
+        eventos = dict(diagnostico['eventos'] or {})
+        tempo = dict(diagnostico['tempo_agendamento'] or {})
+        atribuicoes = []
+        for row in diagnostico['atribuicoes']:
+            item = dict(row)
+            empresa = dados.buscar_usuario(item['empresa_responsavel_id'])
+            item['empresa_nome'] = empresa['nome'] if empresa else 'Nao identificada'
+            atribuicoes.append(item)
+        return jsonify({
+            'somente_leitura': True,
+            'metricas': {
+                **{chave: valor or 0 for chave, valor in metricas.items()},
+                'conflitos': eventos.get('conflitos') or 0,
+                'sem_empresa': eventos.get('sem_empresa') or 0,
+                'falhas_geocodificacao': eventos.get('falhas_geocodificacao') or 0,
+                'minutos_atribuicao_ate_agendamento': (
+                    tempo.get('minutos_atribuicao_ate_agendamento') or 0
+                ),
+            },
+            'resumo': [dict(item) for item in diagnostico['resumo']],
+            'pendentes': [dict(item) for item in diagnostico['pendentes']],
+            'destinatarios': [
+                dict(item) for item in diagnostico['destinatarios']
+            ],
+            'atribuicoes': atribuicoes,
+        })
+
+    @bp.route('/admin/overrides', methods=['GET'])
+    @requer_autenticacao_api
+    def overrides_admin_api():
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        pendentes = []
+        for row in dados.buscar_overrides_pendentes():
+            item = dict(row)
+            valores = _valores_override(item['id'], item['estado_produto'])
+            empresa_id = _empresa_id_solicitacao(item['id'])
+            empresa = dados.buscar_usuario(empresa_id) if empresa_id else None
+            pendentes.append({
+                'solicitacao_id': item['id'],
+                'data_criacao': item['data_criacao'],
+                'cidadao': item['nome_usuario'],
+                'empresa': empresa['nome'] if empresa else 'Nao atribuida',
+                'estado_produto': item['estado_produto'],
+                'valor_proposto': float(item['valor_proposto'] or 0),
+                'justificativa': item['justificativa_valor'] or '',
+                **valores,
+            })
+        return jsonify({'overrides': pendentes, 'total': len(pendentes)})
+
+    @bp.route('/admin/overrides/<solicitacao_id>/decisao', methods=['POST'])
+    @requer_autenticacao_api
+    def decidir_override_admin_api(solicitacao_id):
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        payload = request.get_json(silent=True) or {}
+        decisao = str(payload.get('decisao', '')).strip().lower()
+        if decisao not in ('aprovar', 'rejeitar'):
+            return jsonify({'erro': 'Decisao deve ser aprovar ou rejeitar'}), 400
+        avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao_id)
+        if not avaliacao:
+            return jsonify({'erro': 'Avaliacao nao encontrada'}), 404
+        status_destino = 'aprovado' if decisao == 'aprovar' else 'rejeitado'
+        if avaliacao['status_override'] == status_destino:
+            return jsonify({
+                'ok': True, 'status': status_destino, 'repetido': True,
+                'valor': float(avaliacao['valor_proposto'] or 0),
+            })
+        if avaliacao['status_override'] != 'pendente_doc':
+            return jsonify({'erro': 'Override ja possui outra decisao'}), 409
+        valores = _valores_override(solicitacao_id, avaliacao['estado_produto'])
+        if decisao == 'aprovar':
+            alterado = dados.aprovar_override(solicitacao_id)
+            valor = float(avaliacao['valor_proposto'] or 0)
+        else:
+            valor = valores['valor_recalculado']
+            alterado = dados.rejeitar_override(solicitacao_id, valor)
+        if not alterado:
+            return jsonify({'erro': 'Override foi decidido por outro administrador'}), 409
+        empresa_id = _empresa_id_solicitacao(solicitacao_id)
+        if empresa_id:
+            dados.salvar_notificacao(
+                empresa_id,
+                f'Override da operacao {solicitacao_id[:8]} foi {status_destino}.',
+                chave_idempotencia=f'override:{solicitacao_id}:{status_destino}',
+            )
+        return jsonify({
+            'ok': True,
+            'status': status_destino,
+            'repetido': False,
+            'valor': valor,
+        })
+
+    @bp.route('/admin/precos', methods=['GET', 'PATCH'])
+    @requer_autenticacao_api
+    def precos_admin_api():
+        bloqueio = _exigir_admin()
+        if bloqueio:
+            return bloqueio
+        if request.method == 'PATCH':
+            payload = request.get_json(silent=True) or {}
+            subcategoria = str(payload.get('subcategoria', '')).strip()
+            atual = dados.buscar_preco_subcategoria(subcategoria)
+            if not atual:
+                return jsonify({'erro': 'Subcategoria nao encontrada'}), 404
+            try:
+                valor_base = float(str(payload.get('valor_base', '')).replace(',', '.'))
+                valor_minimo = float(
+                    str(payload.get('valor_minimo', '')).replace(',', '.')
+                )
+            except (TypeError, ValueError):
+                return jsonify({'erro': 'Informe valores numericos validos'}), 400
+            if valor_base <= 0 or valor_minimo < 0:
+                return jsonify({
+                    'erro': 'Valor base deve ser positivo e minimo nao pode ser negativo'
+                }), 400
+            if valor_minimo >= valor_base:
+                return jsonify({
+                    'erro': 'Valor minimo deve ser menor que o valor base'
+                }), 400
+            dados.atualizar_preco_subcategoria(
+                subcategoria, valor_base, valor_minimo
+            )
+        precos = []
+        for row in dados.buscar_tabela_precos():
+            item = dict(row)
+            base = float(item['valor_base_funcionando'])
+            precos.append({
+                'subcategoria': item['subcategoria'],
+                'categoria': item['categoria'],
+                'valor_base': base,
+                'valor_minimo': float(item['valor_minimo_sucata']),
+                'limite_override': round(base * 1.5, 2),
+            })
+        return jsonify({'precos': precos})
 
     @bp.route('/operacoes', methods=['GET'])
     @requer_autenticacao_api

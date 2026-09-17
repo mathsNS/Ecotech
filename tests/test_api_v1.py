@@ -894,6 +894,176 @@ def test_relatorios_respeitam_escopo_periodo_plano_e_csv(client):
 
 
 # ---------------------------------------------------------------------------
+# Administracao mobile
+# ---------------------------------------------------------------------------
+
+def _cabecalho_admin(client):
+    return {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'administrador', _EMAIL_ADMIN, _SENHA_ADMIN
+        )
+    }
+
+
+def test_admin_usuarios_cadastro_busca_paginacao_e_soft_delete(client):
+    admin = _cabecalho_admin(client)
+    lista = client.get(
+        '/api/v1/admin/usuarios?tipo=cidadao&pagina=1&por_pagina=2',
+        headers=admin,
+    )
+    assert lista.status_code == 200, lista.get_json()
+    assert lista.get_json()['paginacao']['por_pagina'] == 2
+    assert lista.get_json()['metricas']['cidadaos'] >= 1
+    assert all('*' in item['documento'] for item in lista.get_json()['usuarios'])
+    assert all('*' in item['email'] for item in lista.get_json()['usuarios'])
+
+    criado = client.post(
+        '/api/v1/admin/usuarios', headers=admin,
+        json={
+            'tipo': 'cidadao',
+            'nome': 'Usuario Administrado',
+            'email': 'administrado@ecotech.test',
+            'senha': 'senha123',
+            'cpf': '93541134780',
+        },
+    )
+    assert criado.status_code == 201, criado.get_json()
+    usuario_id = criado.get_json()['id']
+    filtrado = client.get(
+        '/api/v1/admin/usuarios?busca=administrado', headers=admin
+    ).get_json()
+    assert filtrado['paginacao']['total'] == 1
+    assert filtrado['usuarios'][0]['ativo'] is True
+
+    desativado = client.post(
+        f'/api/v1/admin/usuarios/{usuario_id}/desativar', headers=admin
+    )
+    repetido = client.post(
+        f'/api/v1/admin/usuarios/{usuario_id}/desativar', headers=admin
+    )
+    assert desativado.status_code == 200
+    assert repetido.get_json()['repetido'] is True
+    preservado = client.get(
+        '/api/v1/admin/usuarios?busca=administrado', headers=admin
+    ).get_json()['usuarios'][0]
+    assert preservado['ativo'] is False
+
+
+def test_admin_despacho_expoe_destinatarios_reais(client):
+    admin = _cabecalho_admin(client)
+    resposta = client.get('/api/v1/admin/despacho', headers=admin)
+    assert resposta.status_code == 200, resposta.get_json()
+    corpo = resposta.get_json()
+    assert corpo['somente_leitura'] is True
+    assert 'solicitacoes_ofertadas' in corpo['metricas']
+    assert all(item['empresa_nome'] and item['base_nome']
+               for item in corpo['destinatarios'])
+    assert all(item['empresa_nome'] for item in corpo['atribuicoes'])
+
+
+def test_admin_override_decisao_idempotente_e_notifica_empresa(client):
+    import ecotech.infrastructure.persistence.dados as _dados_mod
+
+    db = _dados_mod.Dados()
+    solicitacao = db.conn.execute("""
+        SELECT DISTINCT sd.id,
+               COALESCE(sd.empresa_responsavel_id, pc.id_empresa) empresa_id
+        FROM solicitacao_descarte sd
+        JOIN item_descarte i ON i.id_solicitacao=sd.id
+        JOIN dispositivo d ON d.id=i.id_dispositivo
+        JOIN tabela_precos tp ON tp.subcategoria=d.subcategoria
+        LEFT JOIN ponto_coleta pc ON pc.id=sd.id_ponto_coleta
+        WHERE COALESCE(sd.empresa_responsavel_id, pc.id_empresa) IS NOT NULL
+        LIMIT 1
+    """).fetchone()
+    assert solicitacao is not None
+    db.conn.execute("""
+        UPDATE solicitacao_descarte
+        SET estado_produto='funcionando', valor_proposto=99999,
+            justificativa_valor='Laudo tecnico anexado',
+            status_override='pendente_doc'
+        WHERE id=?
+    """, (solicitacao['id'],))
+    db.conn.commit()
+    admin = _cabecalho_admin(client)
+    fila = client.get('/api/v1/admin/overrides', headers=admin)
+    assert fila.status_code == 200
+    item = next(
+        item for item in fila.get_json()['overrides']
+        if item['solicitacao_id'] == solicitacao['id']
+    )
+    assert item['valor_base'] > 0
+    assert item['limite_override'] == pytest.approx(item['valor_base'] * 1.5)
+    assert item['empresa'] != 'Nao atribuida'
+
+    url = f"/api/v1/admin/overrides/{solicitacao['id']}/decisao"
+    primeira = client.post(url, headers=admin, json={'decisao': 'rejeitar'})
+    repetida = client.post(url, headers=admin, json={'decisao': 'rejeitar'})
+    assert primeira.status_code == 200, primeira.get_json()
+    assert primeira.get_json()['status'] == 'rejeitado'
+    assert repetida.get_json()['repetido'] is True
+    notificacao = db.conn.execute("""
+        SELECT * FROM notificacao WHERE id_usuario=?
+        AND chave_idempotencia=?
+    """, (
+        solicitacao['empresa_id'],
+        f"override:{solicitacao['id']}:rejeitado",
+    )).fetchone()
+    assert notificacao is not None
+
+
+def test_admin_precos_valida_edicao_e_bloqueia_nao_admin(client):
+    admin = _cabecalho_admin(client)
+    tabela = client.get('/api/v1/admin/precos', headers=admin)
+    assert tabela.status_code == 200
+    atual = next(
+        item for item in tabela.get_json()['precos']
+        if item['subcategoria'] == 'smartphone_basico'
+    )
+    invalido = client.patch(
+        '/api/v1/admin/precos', headers=admin,
+        json={
+            'subcategoria': atual['subcategoria'],
+            'valor_base': 10,
+            'valor_minimo': 10,
+        },
+    )
+    assert invalido.status_code == 400
+    alterado = client.patch(
+        '/api/v1/admin/precos', headers=admin,
+        json={
+            'subcategoria': atual['subcategoria'],
+            'valor_base': atual['valor_base'] + 1,
+            'valor_minimo': atual['valor_minimo'],
+        },
+    )
+    assert alterado.status_code == 200
+    atualizado = next(
+        item for item in alterado.get_json()['precos']
+        if item['subcategoria'] == atual['subcategoria']
+    )
+    assert atualizado['valor_base'] == atual['valor_base'] + 1
+
+    restaurado = client.patch(
+        '/api/v1/admin/precos', headers=admin,
+        json={
+            'subcategoria': atual['subcategoria'],
+            'valor_base': atual['valor_base'],
+            'valor_minimo': atual['valor_minimo'],
+        },
+    )
+    assert restaurado.status_code == 200
+    empresa = _cabecalho_empresa(client)
+    for rota in (
+        '/api/v1/admin/usuarios',
+        '/api/v1/admin/despacho',
+        '/api/v1/admin/overrides',
+        '/api/v1/admin/precos',
+    ):
+        assert client.get(rota, headers=empresa).status_code == 403
+
+
+# ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------
 
