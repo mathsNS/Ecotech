@@ -62,6 +62,16 @@ def client(app):
     return app.test_client()
 
 
+def test_fonte_inter_e_servida_localmente(client):
+    css = client.get("/static/css/style.css")
+    fonte = client.get("/static/fonts/InterVariable.woff2")
+
+    assert css.status_code == 200
+    assert b"font-family: 'Inter'" in css.data
+    assert fonte.status_code == 200
+    assert fonte.headers["Content-Type"] == "font/woff2"
+
+
 def _set_session(client, user_id, nome, tipo):
     """Helper: injeta sessão simulando login."""
     with client.session_transaction() as sess:

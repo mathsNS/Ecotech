@@ -2,6 +2,7 @@
 // sessao ativa.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ecotech_mobile/data/auth/auth_repository.dart';
@@ -19,8 +20,7 @@ class _AuthRepositorySemSessao implements AuthRepository {
     required String tipo,
     required String credencial,
     required String senha,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Usuario> registrar({
@@ -32,15 +32,16 @@ class _AuthRepositorySemSessao implements AuthRepository {
     String? cpf,
     String? cnpj,
     String? razaoSocial,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> logout() async {}
 }
 
 void main() {
-  testWidgets('App abre na tela de login sem sessao ativa', (WidgetTester tester) async {
+  testWidgets('App abre na tela de login sem sessao ativa', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -52,5 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Entrar no sistema'), findsOneWidget);
+    final context = tester.element(find.text('Entrar no sistema'));
+    expect(Theme.of(context).textTheme.bodyMedium?.fontFamily, 'Inter');
   });
 }

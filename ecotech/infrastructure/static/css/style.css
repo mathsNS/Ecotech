@@ -1,3 +1,11 @@
+@font-face {
+    font-family: 'Inter';
+    src: url('../fonts/InterVariable.woff2') format('woff2');
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
 /* reset e variaveis */
 * {
     margin: 0;
@@ -29,8 +37,16 @@
     --radius-lg: 20px;
 }
 
+html,
+body,
+button,
+input,
+select,
+textarea {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: var(--text-dark);
     background-color: var(--background);
     line-height: 1.6;
@@ -3477,7 +3493,7 @@ input[type="time"].form-control-new::-webkit-calendar-picker-indicator {
     .esg-grid { grid-template-columns: 1fr; }
 }
 
-/* Paginação */
+/* PaginaÃ§Ã£o */
 .pagination {
     display: flex;
     align-items: center;

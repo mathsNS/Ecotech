@@ -8,6 +8,7 @@ baseada no design mobile fornecido.
 import csv
 import io
 import hmac
+import mimetypes
 import os
 import secrets
 import click
@@ -112,6 +113,7 @@ def criar_app() -> Flask:
         Aplicação Flask configurada
     """
     from datetime import timedelta
+    mimetypes.add_type('font/woff2', '.woff2')
     app = Flask(__name__)
     configurar_seguranca(app)
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
