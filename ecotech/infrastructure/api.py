@@ -127,6 +127,11 @@ def criar_blueprint_api_v1(
         return [s for s in solicitacoes if s.usuario.id == usuario_id]
 
     def _resumo_solicitacao(solicitacao):
+        registro = dados.buscar_solicitacao(solicitacao.id)
+        base = (
+            dados.buscar_base_operacional(registro['base_operacional_id'])
+            if registro and registro['base_operacional_id'] else None
+        )
         return {
             'id': solicitacao.id,
             'cidadao': solicitacao.usuario.nome,
@@ -137,6 +142,7 @@ def criar_blueprint_api_v1(
                 solicitacao.ponto_coleta.nome
                 if solicitacao.ponto_coleta else None
             ),
+            'base_operacional': base['nome'] if base else None,
         }
 
     def _perfil_completo(usuario_id: str, tipo: str):

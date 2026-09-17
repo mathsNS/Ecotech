@@ -11,6 +11,7 @@ class SolicitacaoResumo {
     required this.pesoKg,
     required this.dataCriacao,
     this.pontoColeta,
+    this.baseOperacional,
   });
 
   factory SolicitacaoResumo.fromJson(Map<String, dynamic> json) =>
@@ -21,6 +22,7 @@ class SolicitacaoResumo {
         pesoKg: _double(json['peso_kg']),
         dataCriacao: DateTime.tryParse(json['data_criacao'] as String? ?? ''),
         pontoColeta: json['ponto_coleta'] as String?,
+        baseOperacional: json['base_operacional'] as String?,
       );
 
   final String id;
@@ -29,6 +31,7 @@ class SolicitacaoResumo {
   final double pesoKg;
   final DateTime? dataCriacao;
   final String? pontoColeta;
+  final String? baseOperacional;
 }
 
 class EntregaResumo {
