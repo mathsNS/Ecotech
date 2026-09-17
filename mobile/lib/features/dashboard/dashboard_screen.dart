@@ -8,6 +8,7 @@ import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
+import '../admin/widgets/admin_navigation.dart';
 import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_navigation.dart';
 import '../communication/widgets/communication_actions.dart';
@@ -46,6 +47,7 @@ class DashboardScreen extends ConsumerWidget {
       bottomNavigationBar: switch (estado.valueOrNull?.tipo) {
         'cidadao' => const CitizenNavigation(selectedIndex: 0),
         'empresa' => const CompanyNavigation(selectedIndex: 0),
+        'administrador' => const AdminNavigation(selectedIndex: 0),
         _ => NavigationBar(
           selectedIndex: 0,
           onDestinationSelected: (indice) {
@@ -134,6 +136,37 @@ class _DashboardCidadao extends StatelessWidget {
     final tier = dados.proximoTier ?? const {};
     return Column(
       children: [
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.25,
+          children: [
+            _AtalhoAdmin(
+              icone: Icons.manage_accounts_outlined,
+              rotulo: 'Usuários',
+              rota: '/admin/usuarios',
+            ),
+            _AtalhoAdmin(
+              icone: Icons.route_outlined,
+              rotulo: 'Despacho',
+              rota: '/admin/despacho',
+            ),
+            _AtalhoAdmin(
+              icone: Icons.fact_check_outlined,
+              rotulo: 'Overrides',
+              rota: '/admin/overrides',
+            ),
+            _AtalhoAdmin(
+              icone: Icons.price_change_outlined,
+              rotulo: 'Preços',
+              rota: '/admin/precos',
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -271,6 +304,25 @@ class _DashboardCidadao extends StatelessWidget {
     final m = (meta as num?)?.toDouble() ?? 1;
     return (a / m).clamp(0, 1).toDouble();
   }
+}
+
+class _AtalhoAdmin extends StatelessWidget {
+  const _AtalhoAdmin({
+    required this.icone,
+    required this.rotulo,
+    required this.rota,
+  });
+
+  final IconData icone;
+  final String rotulo;
+  final String rota;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: () => context.go(rota),
+    icon: Icon(icone),
+    label: Text(rotulo),
+  );
 }
 
 class _DashboardEmpresa extends StatelessWidget {

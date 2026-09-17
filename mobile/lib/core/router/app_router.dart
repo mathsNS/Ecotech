@@ -1,5 +1,9 @@
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/despacho_admin_screen.dart';
+import '../../features/admin/overrides_admin_screen.dart';
+import '../../features/admin/precos_admin_screen.dart';
+import '../../features/admin/usuarios_admin_screen.dart';
 import '../../features/auth/cadastro_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/citizen/entregas_screen.dart';
@@ -103,6 +107,22 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/empresa/bases',
       builder: (context, state) => const BasesEmpresaScreen(),
+    ),
+    GoRoute(
+      path: '/admin/usuarios',
+      builder: (context, state) => const UsuariosAdminScreen(),
+    ),
+    GoRoute(
+      path: '/admin/despacho',
+      builder: (context, state) => const DespachoAdminScreen(),
+    ),
+    GoRoute(
+      path: '/admin/overrides',
+      builder: (context, state) => const OverridesAdminScreen(),
+    ),
+    GoRoute(
+      path: '/admin/precos',
+      builder: (context, state) => const PrecosAdminScreen(),
     ),
   ],
 );
