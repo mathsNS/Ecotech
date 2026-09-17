@@ -24,6 +24,7 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/finance/carteira_screen.dart';
 import '../../features/finance/relatorios_screen.dart';
 import '../../features/profile/perfil_screen.dart';
+import '../../features/plans/plans_screen.dart';
 import '../../features/splash/splash_screen.dart';
 
 final appRouter = GoRouter(
@@ -40,6 +41,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const DashboardScreen(),
     ),
     GoRoute(path: '/perfil', builder: (context, state) => const PerfilScreen()),
+    GoRoute(path: '/planos', builder: (context, state) => const PlansScreen()),
     GoRoute(
       path: '/carteira',
       builder: (context, state) => const CarteiraScreen(),

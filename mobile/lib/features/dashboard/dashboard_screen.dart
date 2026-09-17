@@ -363,6 +363,15 @@ class _DashboardEmpresa extends StatelessWidget {
             label: const Text('Relatórios ambientais'),
           ),
         ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.go('/planos'),
+            icon: const Icon(Icons.workspace_premium_outlined),
+            label: const Text('Planos e recursos'),
+          ),
+        ),
         const SizedBox(height: 16),
         _MetricGrid(
           cards: [

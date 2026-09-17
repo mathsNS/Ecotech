@@ -47,6 +47,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
           '/empresa/pontos',
           '/empresa/bases',
           '/perfil',
+          '/planos',
         ];
         context.go(paths[index]);
       },
@@ -84,6 +85,11 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
         const NavigationDestination(
           icon: Icon(Icons.person_outline),
           label: 'Perfil',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.workspace_premium_outlined),
+          selectedIcon: Icon(Icons.workspace_premium),
+          label: 'Planos',
         ),
       ],
       labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
