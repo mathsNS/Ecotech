@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ecotech_mobile/data/dashboard/dashboard_data.dart';
 import 'package:ecotech_mobile/data/dashboard/dashboard_repository.dart';
+import 'package:ecotech_mobile/data/communication/communication_data.dart';
 import 'package:ecotech_mobile/data/models/usuario.dart';
+import 'package:ecotech_mobile/features/communication/communication_controller.dart';
 import 'package:ecotech_mobile/features/dashboard/dashboard_controller.dart';
 import 'package:ecotech_mobile/features/dashboard/dashboard_screen.dart';
 
@@ -63,7 +65,48 @@ DashboardData _dashboard(String tipo) {
         ? {'nome': 'Ouro', 'meta': 600, 'progresso_percentual': 75}
         : null,
     meses: tipo == 'empresa'
-        ? const [MesDashboard('08/26', 100), MesDashboard('09/26', 140.5)]
+        ? const [
+            MesDashboard('04/26', 0),
+            MesDashboard('05/26', 0),
+            MesDashboard('06/26', 0),
+            MesDashboard('07/26', 0),
+            MesDashboard('08/26', 140.5),
+            MesDashboard('09/26', 0),
+          ]
+        : const [],
+    categorias: tipo == 'empresa'
+        ? const [
+            CategoriaDashboard('Computadores', 90),
+            CategoriaDashboard('Eletrodomésticos', 50.5),
+          ]
+        : const [],
+    totalEmProcessamento: tipo == 'empresa' ? 3 : 0,
+    emProcessamento: tipo == 'empresa'
+        ? [
+            SolicitacaoResumo(
+              id: '471da929-abcd',
+              cidadao: 'João Silva',
+              estado: 'EM_PROCESSAMENTO',
+              pesoKg: 1.44,
+              dataCriacao: DateTime(2026, 8, 31),
+              baseOperacional: 'Recicla Kariri - Centro de Triagem',
+            ),
+            SolicitacaoResumo(
+              id: '8ed47b81-abcd',
+              cidadao: 'Maria Silva',
+              estado: 'EM_PROCESSAMENTO',
+              pesoKg: 42.5,
+              dataCriacao: DateTime(2026, 8, 31),
+              baseOperacional: 'Recicla Kariri - Centro de Triagem',
+            ),
+            SolicitacaoResumo(
+              id: 'terceira-solicitacao',
+              cidadao: 'José Lima',
+              estado: 'EM_PROCESSAMENTO',
+              pesoKg: 5,
+              dataCriacao: DateTime(2026, 8, 30),
+            ),
+          ]
         : const [],
   );
 }
@@ -74,6 +117,10 @@ Future<void> _abrir(WidgetTester tester, String tipo) async {
       overrides: [
         dashboardRepositoryProvider.overrideWithValue(
           _DashboardRepositoryFake(_dashboard(tipo)),
+        ),
+        badgesProvider.overrideWith(
+          (ref) async =>
+              const BadgesData(notificacoes: 4, mensagens: 0, oportunidades: 0),
         ),
       ],
       child: const MaterialApp(home: DashboardScreen()),
@@ -94,9 +141,22 @@ void main() {
   testWidgets('empresa visualiza desempenho e impacto', (tester) async {
     await _abrir(tester, 'empresa');
 
-    expect(find.text('Peso processado'), findsAtLeastNWidgets(1));
+    expect(find.text('Resumo do mês'), findsOneWidget);
+    expect(find.text('Agosto está movimentado'), findsOneWidget);
     expect(find.text('Desempenho e impacto'), findsOneWidget);
-    expect(find.text('Impacto acumulado'), findsOneWidget);
+    expect(find.text('Peso processado por mês'), findsOneWidget);
+    expect(find.text('EM PROCESSAMENTO'), findsNWidgets(2));
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Operações'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Ações rápidas'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Ações rápidas'), findsOneWidget);
+    expect(find.text('Pontos de Coleta'), findsOneWidget);
+    expect(find.text('Seu plano'), findsOneWidget);
   });
 
   testWidgets('administrador visualiza panorama do sistema', (tester) async {

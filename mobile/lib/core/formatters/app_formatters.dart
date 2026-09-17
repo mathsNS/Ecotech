@@ -3,7 +3,15 @@ class AppFormatters {
 
   static String moeda(dynamic valor) {
     final numero = (valor as num?)?.toDouble() ?? 0;
-    return 'R\$ ${numero.toStringAsFixed(2).replaceAll('.', ',')}';
+    final partes = numero.abs().toStringAsFixed(2).split('.');
+    final inteiro = partes.first;
+    final grupos = <String>[];
+    for (var fim = inteiro.length; fim > 0; fim -= 3) {
+      final inicio = fim > 3 ? fim - 3 : 0;
+      grupos.insert(0, inteiro.substring(inicio, fim));
+    }
+    final sinal = numero < 0 ? '-' : '';
+    return 'R\$ $sinal${grupos.join('.')},${partes.last}';
   }
 
   static String numero(dynamic valor, {int casas = 1}) {

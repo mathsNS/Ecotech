@@ -10,8 +10,8 @@ import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../admin/widgets/admin_navigation.dart';
 import '../citizen/widgets/citizen_navigation.dart';
-import '../company/widgets/company_navigation.dart';
 import '../communication/widgets/communication_actions.dart';
+import 'company_dashboard_view.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -20,33 +20,47 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final estado = ref.watch(dashboardControllerProvider);
+    final dadosAtuais = estado.valueOrNull;
+    final empresa = dadosAtuais?.tipo == 'empresa';
     return Scaffold(
-      appBar: AppBar(
-        title: Image.asset('assets/images/ecotech navbar.png', height: 34),
-        actions: [
-          const CommunicationActions(),
-          IconButton(
-            tooltip: 'Perfil',
-            onPressed: () => context.go('/perfil'),
-            icon: const Icon(Icons.account_circle_outlined),
-          ),
-        ],
-      ),
+      backgroundColor: empresa ? const Color(0xFFF6F7F8) : null,
+      appBar: empresa
+          ? CompanyDashboardHeader(name: dadosAtuais!.usuario.nome)
+          : AppBar(
+              title: Image.asset(
+                'assets/images/ecotech navbar.png',
+                height: 34,
+              ),
+              actions: [
+                const CommunicationActions(),
+                IconButton(
+                  tooltip: 'Perfil',
+                  onPressed: () => context.go('/perfil'),
+                  icon: const Icon(Icons.account_circle_outlined),
+                ),
+              ],
+            ),
       body: estado.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (erro, _) => _ErroDashboard(
           onRetry: () =>
               ref.read(dashboardControllerProvider.notifier).recarregar(),
         ),
-        data: (dados) => RefreshIndicator(
-          onRefresh: () =>
-              ref.read(dashboardControllerProvider.notifier).recarregar(),
-          child: _ConteudoDashboard(dados: dados),
-        ),
+        data: (dados) => dados.tipo == 'empresa'
+            ? CompanyDashboardView(
+                data: dados,
+                onRefresh: () =>
+                    ref.read(dashboardControllerProvider.notifier).recarregar(),
+              )
+            : RefreshIndicator(
+                onRefresh: () =>
+                    ref.read(dashboardControllerProvider.notifier).recarregar(),
+                child: _ConteudoDashboard(dados: dados),
+              ),
       ),
       bottomNavigationBar: switch (estado.valueOrNull?.tipo) {
         'cidadao' => const CitizenNavigation(selectedIndex: 0),
-        'empresa' => const CompanyNavigation(selectedIndex: 0),
+        'empresa' => const CompanyDashboardNavigation(),
         'administrador' => const AdminNavigation(selectedIndex: 0),
         _ => NavigationBar(
           selectedIndex: 0,
