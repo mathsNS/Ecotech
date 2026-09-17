@@ -1063,6 +1063,67 @@ def test_admin_precos_valida_edicao_e_bloqueia_nao_admin(client):
         assert client.get(rota, headers=empresa).status_code == 403
 
 
+def test_planos_expoe_catalogo_limites_e_feature_flags(client):
+    empresa = _cabecalho_empresa(client)
+    resposta = client.get('/api/v1/planos', headers=empresa)
+    assert resposta.status_code == 200
+    corpo = resposta.get_json()
+    assert corpo['plano_atual'] in {'free', 'professional', 'enterprise'}
+    assert [item['id'] for item in corpo['planos']] == [
+        'free', 'professional', 'enterprise'
+    ]
+    free, professional, enterprise = corpo['planos']
+    assert free['limite_solicitacoes_mes'] == 30
+    assert professional['limite_solicitacoes_mes'] is None
+    assert professional['feature_flags']['mtr'] is True
+    assert enterprise['feature_flags']['api_integracao'] is True
+    assert corpo['feature_flags'] == next(
+        item['feature_flags'] for item in corpo['planos']
+        if item['id'] == corpo['plano_atual']
+    )
+
+
+def test_alteracao_de_plano_valida_perfil_e_e_idempotente(client):
+    empresa = _cabecalho_empresa(client)
+    plano_original = client.get(
+        '/api/v1/planos', headers=empresa
+    ).get_json()['plano_atual']
+    destino = 'enterprise' if plano_original != 'enterprise' else 'professional'
+    try:
+        alterado = client.post(
+            '/api/v1/planos/alterar', headers=empresa, json={'plano': destino}
+        )
+        repetido = client.post(
+            '/api/v1/planos/alterar', headers=empresa, json={'plano': destino}
+        )
+        invalido = client.post(
+            '/api/v1/planos/alterar', headers=empresa, json={'plano': 'gold'}
+        )
+        assert alterado.status_code == 200
+        assert alterado.get_json()['plano_anterior'] == plano_original
+        assert alterado.get_json()['plano_atual'] == destino
+        assert alterado.get_json()['repetido'] is False
+        assert repetido.status_code == 200
+        assert repetido.get_json()['repetido'] is True
+        assert invalido.status_code == 400
+    finally:
+        client.post(
+            '/api/v1/planos/alterar', headers=empresa,
+            json={'plano': plano_original},
+        )
+
+    cidadao = {
+        'Authorization': 'Bearer ' + _obter_token(
+            client, 'cidadao', _CPF_CIDADAO, _SENHA_CIDADAO
+        )
+    }
+    assert client.get('/api/v1/planos', headers=cidadao).status_code == 403
+    assert client.post(
+        '/api/v1/planos/alterar', headers=cidadao,
+        json={'plano': 'professional'},
+    ).status_code == 403
+
+
 # ---------------------------------------------------------------------------
 # POST /api/v1/auth/registrar
 # ---------------------------------------------------------------------------

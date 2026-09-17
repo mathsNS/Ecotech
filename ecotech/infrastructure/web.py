@@ -35,6 +35,7 @@ from ..application.factories import (
     DispositivoFactory,
     MetodoTratamentoFactory
 )
+from ..application.planos import buscar_plano
 from ..application.authorization import (
     listar_solicitacoes_visiveis_empresa,
     usuario_pode_operar_solicitacao,
@@ -1134,6 +1135,9 @@ def criar_app() -> Flask:
 
         if request.method == 'POST':
             novo_plano = request.form.get('plano', 'free')
+            if buscar_plano(novo_plano) is None:
+                flash('Plano inválido.', 'error')
+                return redirect(url_for('planos'))
             dados.atualizar_plano_empresa(usuario['id'], novo_plano)
             flash('Plano atualizado com sucesso!', 'success')
             return redirect(url_for('planos'))

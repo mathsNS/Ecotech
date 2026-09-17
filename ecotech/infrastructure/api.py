@@ -24,6 +24,7 @@ from ..application.authorization import (
 )
 from ..application.elegibilidade import DemandaColeta
 from ..application.factories import DispositivoFactory, MetodoTratamentoFactory
+from ..application.planos import buscar_plano, listar_planos, recursos_do_plano
 from ..domain.dispositivos import EstadoProduto
 from ..domain.estados import BuscandoEmpresa, Solicitado
 from ..domain.logistica import Coordenadas
@@ -2442,6 +2443,44 @@ def criar_blueprint_api_v1(
                 'limite_override': round(base * 1.5, 2),
             })
         return jsonify({'precos': precos})
+
+    @bp.route('/planos', methods=['GET'])
+    @requer_autenticacao_api
+    def planos_api():
+        payload = request.usuario_token
+        if payload['tipo'] != 'empresa':
+            return jsonify({'erro': 'Planos estao disponiveis apenas para empresas'}), 403
+        plano_atual = dados.buscar_plano_empresa(payload['sub'])
+        return jsonify({
+            'plano_atual': plano_atual,
+            'feature_flags': recursos_do_plano(plano_atual),
+            'planos': listar_planos(),
+            'ambiente_demonstracao': True,
+        })
+
+    @bp.route('/planos/alterar', methods=['POST'])
+    @requer_autenticacao_api
+    def alterar_plano_api():
+        payload = request.usuario_token
+        if payload['tipo'] != 'empresa':
+            return jsonify({'erro': 'Planos estao disponiveis apenas para empresas'}), 403
+        corpo = request.get_json(silent=True) or {}
+        plano_id = str(corpo.get('plano', '')).strip().lower()
+        if buscar_plano(plano_id) is None:
+            return jsonify({'erro': 'Plano invalido'}), 400
+        plano_anterior = dados.buscar_plano_empresa(payload['sub'])
+        repetido = plano_anterior == plano_id
+        if not repetido:
+            dados.atualizar_plano_empresa(payload['sub'], plano_id)
+        return jsonify({
+            'ok': True,
+            'plano_anterior': plano_anterior,
+            'plano_atual': plano_id,
+            'repetido': repetido,
+            'feature_flags': recursos_do_plano(plano_id),
+            'planos': listar_planos(),
+            'ambiente_demonstracao': True,
+        })
 
     @bp.route('/operacoes', methods=['GET'])
     @requer_autenticacao_api
