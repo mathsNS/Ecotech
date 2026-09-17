@@ -148,6 +148,14 @@ void main() {
     expect(find.text('EM PROCESSAMENTO'), findsNWidgets(2));
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Operações'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Ações rápidas')).dy,
+      lessThan(tester.getTopLeft(find.text('Desempenho e impacto')).dy),
+    );
+
+    final greeting = tester.widget<Text>(find.text('Olá, João!'));
+    expect(greeting.style?.fontWeight, FontWeight.w700);
+    expect(greeting.style?.letterSpacing, isNull);
 
     await tester.scrollUntilVisible(
       find.text('Ações rápidas'),

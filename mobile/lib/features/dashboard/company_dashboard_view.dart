@@ -302,8 +302,7 @@ class CompanyDashboardView extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 30,
                           height: 1.08,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.1,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFF111315),
                         ),
                       ),
@@ -317,23 +316,9 @@ class CompanyDashboardView extends StatelessWidget {
                       ),
                       const SizedBox(height: 21),
                       _MonthlySummary(data),
-                      const SizedBox(height: 33),
-                      const Text(
-                        'Desempenho e impacto',
-                        style: _SectionStyles.title,
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Visão dos últimos seis meses e distribuição dos materiais processados.',
-                        style: _SectionStyles.subtitle,
-                      ),
-                      const SizedBox(height: 17),
-                      _PerformanceCard(data),
-                      const SizedBox(height: 32),
-                      _ProcessingSection(data),
-                      const SizedBox(height: 33),
+                      const SizedBox(height: 30),
                       const Text('Ações rápidas', style: _SectionStyles.title),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       const Row(
                         children: [
                           Expanded(
@@ -357,6 +342,20 @@ class CompanyDashboardView extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 33),
+                      const Text(
+                        'Desempenho e impacto',
+                        style: _SectionStyles.title,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Visão dos últimos seis meses e distribuição dos materiais processados.',
+                        style: _SectionStyles.subtitle,
+                      ),
+                      const SizedBox(height: 17),
+                      _PerformanceCard(data),
+                      const SizedBox(height: 32),
+                      _ProcessingSection(data),
                     ],
                   ),
                 ),
@@ -376,8 +375,7 @@ abstract final class _SectionStyles {
   static const title = TextStyle(
     fontSize: 21,
     height: 1.2,
-    fontWeight: FontWeight.w800,
-    letterSpacing: -0.55,
+    fontWeight: FontWeight.w700,
     color: Color(0xFF151719),
   );
   static const subtitle = TextStyle(
@@ -556,8 +554,7 @@ class _SummaryValue extends StatelessWidget {
         style: const TextStyle(
           color: Colors.white,
           fontSize: 24,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -.4,
+          fontWeight: FontWeight.w700,
         ),
       ),
       const SizedBox(height: 11),
@@ -652,7 +649,7 @@ class _PerformanceCard extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Peso processado por mês',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
               Container(
@@ -801,7 +798,7 @@ class _ImpactMetrics extends StatelessWidget {
                     items[index].$1,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -974,7 +971,7 @@ class _ProcessingCard extends StatelessWidget {
                     'Solicitação #$shortId',
                     style: const TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -1065,8 +1062,8 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 174,
-    padding: const EdgeInsets.all(15),
+    height: 124,
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(19),
@@ -1080,32 +1077,51 @@ class _QuickAction extends StatelessWidget {
       ],
     ),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE1F4E8),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: _deepGreen, size: 22),
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE1F4E8),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: _deepGreen, size: 20),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF62686E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const Spacer(),
-        Text(
-          title,
-          maxLines: 1,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF62686E)),
-        ),
-        const SizedBox(height: 11),
         SizedBox(
           width: double.infinity,
-          height: 37,
+          height: 34,
           child: ElevatedButton(
             onPressed: () => context.go(route),
             style: ElevatedButton.styleFrom(
@@ -1117,7 +1133,10 @@ class _QuickAction extends StatelessWidget {
             ),
             child: Text(
               button,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -1145,7 +1164,7 @@ class _CompanyFooter extends StatelessWidget {
               style: TextStyle(
                 color: Color(0xFF2D805B),
                 fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 18),
@@ -1163,7 +1182,7 @@ class _CompanyFooter extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 13.5,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 7),
