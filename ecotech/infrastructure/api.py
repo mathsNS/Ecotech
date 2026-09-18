@@ -217,7 +217,11 @@ def criar_blueprint_api_v1(
                 'meta': tier['meta'],
                 'progresso_percentual': tier['progresso_pct'],
             },
-            'entregas_recentes': entregas[:5],
+            'total_entregas_concluidas': sum(
+                1 for entrega in entregas
+                if str(entrega['status']).lower() == 'finalizado'
+            ),
+            'entregas_recentes': entregas[:6],
             'solicitacoes_ativas': [
                 _resumo_solicitacao(s)
                 for s in sorted(ativas, key=lambda s: s.data_criacao, reverse=True)[:5]

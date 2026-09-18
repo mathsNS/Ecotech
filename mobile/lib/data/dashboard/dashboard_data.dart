@@ -89,6 +89,7 @@ class DashboardData {
     this.missao,
     this.proximoTier,
     this.comparativoMensal,
+    this.totalEntregasConcluidas = 0,
     this.totalEmProcessamento = 0,
     this.entregas = const [],
     this.solicitacoesAtivas = const [],
@@ -119,6 +120,7 @@ class DashboardData {
       comparativoMensal: json['comparativo_mensal_percentual'] == null
           ? null
           : _double(json['comparativo_mensal_percentual']),
+      totalEntregasConcluidas: _int(json['total_entregas_concluidas']),
       totalEmProcessamento: _int(json['total_em_processamento']),
       entregas: lista('entregas_recentes', EntregaResumo.fromJson),
       solicitacoesAtivas: lista(
@@ -141,6 +143,7 @@ class DashboardData {
   final Map<String, dynamic>? missao;
   final Map<String, dynamic>? proximoTier;
   final double? comparativoMensal;
+  final int totalEntregasConcluidas;
   final int totalEmProcessamento;
   final List<EntregaResumo> entregas;
   final List<SolicitacaoResumo> solicitacoesAtivas;

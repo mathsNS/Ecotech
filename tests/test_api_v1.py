@@ -166,6 +166,9 @@ def test_dashboard_retorna_contrato_especifico_por_perfil(
     assert corpo["tipo"] == tipo
     assert corpo["usuario"]["tipo"] == tipo
     assert chaves_metricas <= corpo["metricas"].keys()
+    if tipo == "cidadao":
+        assert corpo["total_entregas_concluidas"] >= 0
+        assert len(corpo["entregas_recentes"]) <= 6
     if tipo == "empresa":
         assert all(
             "base_operacional" in solicitacao
