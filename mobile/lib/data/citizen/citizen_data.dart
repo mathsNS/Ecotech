@@ -82,6 +82,7 @@ class SolicitacoesPagina {
     required this.pagina,
     required this.totalPaginas,
     required this.total,
+    this.estatisticas = const {},
   });
 
   factory SolicitacoesPagina.fromJson(Map<String, dynamic> json) =>
@@ -96,12 +97,16 @@ class SolicitacoesPagina {
         pagina: _int(json['pagina']),
         totalPaginas: _int(json['total_paginas']),
         total: _int(json['total']),
+        estatisticas: Map<String, dynamic>.from(
+          json['estatisticas'] as Map? ?? const {},
+        ).map((key, value) => MapEntry(key, _int(value))),
       );
 
   final List<SolicitacaoData> itens;
   final int pagina;
   final int totalPaginas;
   final int total;
+  final Map<String, int> estatisticas;
 }
 
 class ItemSolicitacaoData {

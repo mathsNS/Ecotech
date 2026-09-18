@@ -1215,6 +1215,7 @@ def criar_blueprint_api_v1(
         payload = request.usuario_token
         if request.method == 'GET':
             solicitacoes = _solicitacoes_do_usuario(payload['sub'], payload['tipo'])
+            estatisticas = servico_descarte.calcular_stats_estados(solicitacoes)
             estado = request.args.get('estado', '').strip().lower()
             if estado:
                 solicitacoes = [
@@ -1234,6 +1235,7 @@ def criar_blueprint_api_v1(
                 'limite': limite,
                 'total': len(solicitacoes),
                 'total_paginas': max((len(solicitacoes) + limite - 1) // limite, 1),
+                'estatisticas': estatisticas,
             })
 
         bloqueio = _exigir_cidadao()

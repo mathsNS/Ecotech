@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ecotech_mobile/data/company/operation_data.dart';
+import 'package:ecotech_mobile/data/citizen/citizen_data.dart';
 
 void main() {
   test('detalhes da operacao carregam peso, avaliacao e precos', () {
@@ -60,5 +61,23 @@ void main() {
     expect(pagina.pagina, 2);
     expect(pagina.totalPaginas, 4);
     expect(pagina.total, 68);
+  });
+
+  test('pagina de solicitacoes carrega resumo por estado', () {
+    final pagina = SolicitacoesPagina.fromJson({
+      'itens': [],
+      'pagina': 1,
+      'total_paginas': 1,
+      'total': 15,
+      'estatisticas': {
+        'pendentes': 4,
+        'em_coleta': 4,
+        'processando': 2,
+        'finalizadas': 5,
+      },
+    });
+
+    expect(pagina.estatisticas['pendentes'], 4);
+    expect(pagina.estatisticas['finalizadas'], 5);
   });
 }

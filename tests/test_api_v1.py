@@ -330,6 +330,9 @@ def test_entregas_e_listagem_sao_exclusivas_do_usuario(client):
     entregas = client.get("/api/v1/entregas", headers=headers)
     assert lista.status_code == 200
     assert len(lista.get_json()["itens"]) <= 5
+    assert set(lista.get_json()["estatisticas"]) == {
+        "pendentes", "em_coleta", "processando", "finalizadas"
+    }
     assert entregas.status_code == 200
     assert isinstance(entregas.get_json()["entregas"], list)
 
