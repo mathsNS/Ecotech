@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
-import '../../core/theme/app_colors.dart';
-import '../../data/citizen/citizen_data.dart';
-import '../../shared/widgets/dashboard_widgets.dart';
+import '../auth/auth_controller.dart';
+import '../dashboard/dashboard_header.dart';
+import '../operations/operations_widgets.dart';
 import 'citizen_controller.dart';
 import 'widgets/citizen_navigation.dart';
 import 'widgets/citizen_states.dart';
@@ -23,75 +23,82 @@ class _SolicitacoesScreenState extends ConsumerState<SolicitacoesScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(solicitacoesProvider(_estado));
+    final name = ref.watch(authControllerProvider).valueOrNull?.nome ?? 'EcoTech';
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas solicitações'),
-        actions: [
-          IconButton(
-            tooltip: 'Histórico de incentivos',
-            onPressed: () => context.push('/entregas'),
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          SizedBox(
-            height: 58,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              children: [
-                _Filtro('Todas', '', _estado, _selecionar),
-                _Filtro('Solicitadas', 'Solicitado', _estado, _selecionar),
-                _Filtro('Em coleta', 'Coletado', _estado, _selecionar),
-                _Filtro(
-                  'Processando',
-                  'Em Processamento',
-                  _estado,
-                  _selecionar,
+      backgroundColor: operationsBackground,
+      appBar: EcoTechDashboardHeader(name: name),
+      body: state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => CitizenError(
+          error: error,
+          onRetry: () => ref.invalidate(solicitacoesProvider(_estado)),
+        ),
+        data: (page) => RefreshIndicator(
+          onRefresh: () => ref.refresh(solicitacoesProvider(_estado).future),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 27, 16, 100),
+            children: [
+              const Text(
+                'Minhas\nOperações',
+                style: TextStyle(
+                  fontSize: 29,
+                  height: 1.22,
+                  fontWeight: FontWeight.w700,
+                  color: operationsDark,
+                  letterSpacing: -.8,
                 ),
-                _Filtro('Finalizadas', 'Reciclado', _estado, _selecionar),
-              ],
-            ),
-          ),
-          Expanded(
-            child: state.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => CitizenError(
-                error: error,
-                onRetry: () => ref.invalidate(solicitacoesProvider(_estado)),
               ),
-              data: (pagina) => RefreshIndicator(
-                onRefresh: () =>
-                    ref.refresh(solicitacoesProvider(_estado).future),
-                child: pagina.itens.isEmpty
-                    ? ListView(
-                        children: [
-                          const SizedBox(height: 100),
-                          CitizenEmpty(
-                            message: 'Nenhuma solicitação encontrada.',
-                            action: ElevatedButton(
-                              onPressed: () =>
-                                  context.push('/solicitacoes/nova'),
-                              child: const Text('Criar solicitação'),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: pagina.itens.length,
-                        itemBuilder: (context, index) =>
-                            _SolicitacaoCard(pagina.itens[index]),
-                      ),
+              const SizedBox(height: 8),
+              const Text(
+                'Acompanhe todas as suas solicitações de descarte',
+                style: TextStyle(fontSize: 13.5, color: operationsMuted),
               ),
-            ),
+              const SizedBox(height: 21),
+              _CitizenMetrics(page.estatisticas),
+              const SizedBox(height: 25),
+              OperationsFilters(
+                selected: _estado,
+                onSelected: (value) => setState(() => _estado = value),
+              ),
+              const SizedBox(height: 24),
+              OperationsSectionTitle(total: page.total),
+              const SizedBox(height: 14),
+              if (page.itens.isEmpty)
+                CitizenEmpty(
+                  message: 'Nenhuma solicitação encontrada para este estado.',
+                  action: FilledButton(
+                    onPressed: () => context.push('/solicitacoes/nova'),
+                    child: const Text('Criar solicitação'),
+                  ),
+                )
+              else
+                ...page.itens.map(
+                  (request) => OperationsCard(
+                    title: 'Solicitação #${_shortId(request.id)}',
+                    subtitle: request.pontoColeta ??
+                        request.empresa ??
+                        'Empresa ainda não definida',
+                    status: request.estado,
+                    weight:
+                        '${AppFormatters.numero(request.pesoExibidoKg, casas: 1)} kg',
+                    date: AppFormatters.data(request.dataCriacao),
+                    shortId: _shortId(request.id),
+                    onDetails: () =>
+                        context.push('/solicitacoes/${request.id}'),
+                    onSchedule: () =>
+                        context.push('/solicitacoes/${request.id}/agenda'),
+                    onChat: () => context.push('/conversas/${request.id}'),
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/solicitacoes/nova'),
+        backgroundColor: operationsDeepGreen,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Nova solicitação'),
       ),
@@ -99,88 +106,57 @@ class _SolicitacoesScreenState extends ConsumerState<SolicitacoesScreen> {
     );
   }
 
-  void _selecionar(String estado) => setState(() => _estado = estado);
+  static String _shortId(String id) =>
+      id.substring(0, id.length < 8 ? id.length : 8);
 }
 
-class _Filtro extends StatelessWidget {
-  const _Filtro(this.label, this.value, this.selected, this.onSelected);
-  final String label;
-  final String value;
-  final String selected;
-  final ValueChanged<String> onSelected;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(right: 7),
-    child: ChoiceChip(
-      label: Text(label),
-      selected: selected == value,
-      onSelected: (_) => onSelected(value),
-    ),
-  );
-}
+class _CitizenMetrics extends StatelessWidget {
+  const _CitizenMetrics(this.stats);
 
-class _SolicitacaoCard extends StatelessWidget {
-  const _SolicitacaoCard(this.solicitacao);
-  final SolicitacaoData solicitacao;
+  final Map<String, int> stats;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => context.push('/solicitacoes/${solicitacao.id}'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Solicitação #${solicitacao.id.substring(0, 8)}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                StatusBadge(solicitacao.estado),
-              ],
+  Widget build(BuildContext context) => Column(
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: OperationsMetric(
+              icon: Icons.alarm_outlined,
+              value: stats['pendentes'] ?? 0,
+              label: 'Solicitações Pendentes',
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(
-                  Icons.scale_outlined,
-                  size: 18,
-                  color: AppColors.textLight,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${AppFormatters.numero(solicitacao.pesoExibidoKg, casas: 2)} kg (${solicitacao.pesoOrigem})',
-                ),
-                const Spacer(),
-                Text(AppFormatters.data(solicitacao.dataCriacao)),
-              ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OperationsMetric(
+              icon: Icons.local_shipping_outlined,
+              value: stats['em_coleta'] ?? 0,
+              label: 'Em Coleta',
             ),
-            const SizedBox(height: 7),
-            Text(
-              solicitacao.empresa ??
-                  solicitacao.pontoColeta ??
-                  'Empresa ainda não definida',
-            ),
-            const SizedBox(height: 12),
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Ver detalhes',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(
+            child: OperationsMetric(
+              icon: Icons.settings_outlined,
+              value: stats['processando'] ?? 0,
+              label: 'Em Processamento',
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OperationsMetric(
+              icon: Icons.check_circle_outline,
+              value: stats['finalizadas'] ?? 0,
+              label: 'Finalizadas',
+            ),
+          ),
+        ],
+      ),
+    ],
   );
 }
