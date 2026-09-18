@@ -124,7 +124,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       ),
       bottomNavigationBar: switch (estado.valueOrNull?.usuario.tipo) {
         'cidadao' => const CitizenNavigation(selectedIndex: 3),
-        'empresa' => const CompanyNavigation(selectedIndex: 5),
+        'empresa' => const CompanyNavigation(selectedIndex: 4),
         _ => NavigationBar(
           selectedIndex: 1,
           onDestinationSelected: (indice) {

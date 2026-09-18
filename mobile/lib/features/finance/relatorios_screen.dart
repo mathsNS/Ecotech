@@ -6,8 +6,11 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/finance/finance_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
+import '../auth/auth_controller.dart';
 import '../communication/widgets/communication_actions.dart';
+import '../company/widgets/company_navigation.dart';
 import '../company/widgets/company_states.dart';
 import 'finance_controller.dart';
 
@@ -28,8 +31,10 @@ class _RelatoriosScreenState extends ConsumerState<RelatoriosScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(relatorioProvider(_periodo));
+    final userType = ref.watch(authControllerProvider).valueOrNull?.tipo;
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('Relatórios ambientais'),
         actions: const [CommunicationActions()],
       ),
@@ -109,6 +114,9 @@ class _RelatoriosScreenState extends ConsumerState<RelatoriosScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: userType == 'empresa'
+          ? const CompanyNavigation(selectedIndex: 2)
+          : null,
     );
   }
 

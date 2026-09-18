@@ -88,7 +88,7 @@ class _OperacoesEmpresaScreenState
           ),
         ),
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 2),
+      bottomNavigationBar: const CompanyNavigation(selectedIndex: 1),
     );
   }
 }

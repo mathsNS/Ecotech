@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../auth/auth_controller.dart';
+import '../company/widgets/company_navigation.dart';
 import '../company/widgets/company_states.dart';
 import 'communication_controller.dart';
 import 'widgets/communication_actions.dart';
@@ -39,8 +42,10 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(conversasProvider);
+    final userType = ref.watch(authControllerProvider).valueOrNull?.tipo;
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('Conversas'),
         actions: const [CommunicationActions()],
       ),
@@ -71,6 +76,9 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
                 ),
         ),
       ),
+      bottomNavigationBar: userType == 'empresa'
+          ? const CompanyNavigation(selectedIndex: 3)
+          : null,
     );
   }
 }

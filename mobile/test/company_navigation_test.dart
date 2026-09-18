@@ -42,7 +42,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('3'), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Operações'), findsOneWidget);
+    expect(find.text('Relatórios'), findsOneWidget);
+    expect(find.text('Conversas'), findsOneWidget);
+    expect(find.text('Mais'), findsOneWidget);
+    expect(find.text('Oportunidades'), findsNothing);
+
+    await tester.tap(find.text('Mais'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Oportunidades'), findsOneWidget);
+    expect(find.text('Pontos de coleta'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });

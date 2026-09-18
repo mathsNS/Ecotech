@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../company/widgets/company_states.dart';
 import 'communication_controller.dart';
 
@@ -25,7 +26,10 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(agendaProvider(widget.solicitacaoId));
     return Scaffold(
-      appBar: AppBar(title: const Text('Agenda da coleta')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Agenda da coleta'),
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(

@@ -28,7 +28,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
         title: const Text('Planos EcoTech'),
         actions: const [CommunicationActions()],
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 6),
+      bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -112,9 +112,8 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
       final message = error is ApiException
           ? error.mensagem
           : 'Não foi possível alterar o plano.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _changingPlan = null);
     }

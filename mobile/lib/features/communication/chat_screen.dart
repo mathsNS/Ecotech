@@ -8,6 +8,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import 'communication_controller.dart';
 
@@ -53,7 +54,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final usuario = ref.watch(authControllerProvider).valueOrNull;
     return Scaffold(
-      appBar: AppBar(title: const Text('Conversa da coleta')),
+      appBar: AppBar(
+        leading: const AppBackButton(fallbackRoute: '/conversas'),
+        title: const Text('Conversa da coleta'),
+      ),
       body: Column(
         children: [
           _ContextoConversa(

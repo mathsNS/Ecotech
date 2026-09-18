@@ -77,7 +77,7 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
                 ),
         ),
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 1),
+      bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
     );
   }
 }

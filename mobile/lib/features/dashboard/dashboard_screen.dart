@@ -10,6 +10,7 @@ import '../../data/dashboard/dashboard_data.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../admin/widgets/admin_navigation.dart';
 import '../citizen/widgets/citizen_navigation.dart';
+import '../company/widgets/company_navigation.dart';
 import '../communication/widgets/communication_actions.dart';
 import 'company_dashboard_view.dart';
 import 'dashboard_controller.dart';
@@ -60,7 +61,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       bottomNavigationBar: switch (estado.valueOrNull?.tipo) {
         'cidadao' => const CitizenNavigation(selectedIndex: 0),
-        'empresa' => const CompanyDashboardNavigation(),
+        'empresa' => const CompanyNavigation(selectedIndex: 0),
         'administrador' => const AdminNavigation(selectedIndex: 0),
         _ => NavigationBar(
           selectedIndex: 0,

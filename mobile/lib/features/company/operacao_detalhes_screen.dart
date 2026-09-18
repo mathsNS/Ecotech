@@ -10,6 +10,7 @@ import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_data.dart';
 import '../../data/company/operation_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../communication/widgets/communication_actions.dart';
 import 'company_controller.dart';
@@ -24,6 +25,7 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
     final state = ref.watch(operacaoDetalhesProvider(id));
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(fallbackRoute: '/empresa/operacoes'),
         title: Text('Operacao #${id.substring(0, 8)}'),
         actions: const [CommunicationActions()],
       ),
