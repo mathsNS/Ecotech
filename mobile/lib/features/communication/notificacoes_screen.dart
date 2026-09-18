@@ -9,6 +9,8 @@ import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
 import '../../shared/widgets/app_back_button.dart';
+import '../auth/auth_controller.dart';
+import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_states.dart';
 import 'communication_controller.dart';
 
@@ -41,6 +43,7 @@ class _NotificacoesScreenState extends ConsumerState<NotificacoesScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificacoesProvider);
+    final userType = ref.watch(authControllerProvider).valueOrNull?.tipo;
     return Scaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
@@ -79,6 +82,9 @@ class _NotificacoesScreenState extends ConsumerState<NotificacoesScreen> {
                 ),
         ),
       ),
+      bottomNavigationBar: userType == 'cidadao'
+          ? const CitizenNavigation(selectedIndex: 3)
+          : null,
     );
   }
 

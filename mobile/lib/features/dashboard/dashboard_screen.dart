@@ -12,7 +12,9 @@ import '../admin/widgets/admin_navigation.dart';
 import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_navigation.dart';
 import '../communication/widgets/communication_actions.dart';
+import 'citizen_dashboard_view.dart';
 import 'company_dashboard_view.dart';
+import 'dashboard_header.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -23,10 +25,11 @@ class DashboardScreen extends ConsumerWidget {
     final estado = ref.watch(dashboardControllerProvider);
     final dadosAtuais = estado.valueOrNull;
     final empresa = dadosAtuais?.tipo == 'empresa';
+    final citizen = dadosAtuais?.tipo == 'cidadao';
     return Scaffold(
-      backgroundColor: empresa ? const Color(0xFFF6F7F8) : null,
-      appBar: empresa
-          ? CompanyDashboardHeader(name: dadosAtuais!.usuario.nome)
+      backgroundColor: empresa || citizen ? const Color(0xFFF6F7F8) : null,
+      appBar: empresa || citizen
+          ? EcoTechDashboardHeader(name: dadosAtuais!.usuario.nome)
           : AppBar(
               title: Image.asset(
                 'assets/images/ecotech navbar.png',
@@ -47,17 +50,23 @@ class DashboardScreen extends ConsumerWidget {
           onRetry: () =>
               ref.read(dashboardControllerProvider.notifier).recarregar(),
         ),
-        data: (dados) => dados.tipo == 'empresa'
-            ? CompanyDashboardView(
-                data: dados,
-                onRefresh: () =>
-                    ref.read(dashboardControllerProvider.notifier).recarregar(),
-              )
-            : RefreshIndicator(
-                onRefresh: () =>
-                    ref.read(dashboardControllerProvider.notifier).recarregar(),
-                child: _ConteudoDashboard(dados: dados),
-              ),
+        data: (dados) => switch (dados.tipo) {
+          'empresa' => CompanyDashboardView(
+            data: dados,
+            onRefresh: () =>
+                ref.read(dashboardControllerProvider.notifier).recarregar(),
+          ),
+          'cidadao' => CitizenDashboardView(
+            data: dados,
+            onRefresh: () =>
+                ref.read(dashboardControllerProvider.notifier).recarregar(),
+          ),
+          _ => RefreshIndicator(
+            onRefresh: () =>
+                ref.read(dashboardControllerProvider.notifier).recarregar(),
+            child: _ConteudoDashboard(dados: dados),
+          ),
+        },
       ),
       bottomNavigationBar: switch (estado.valueOrNull?.tipo) {
         'cidadao' => const CitizenNavigation(selectedIndex: 0),

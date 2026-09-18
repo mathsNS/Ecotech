@@ -57,7 +57,7 @@ class PontosScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('Nova solicitação'),
       ),
-      bottomNavigationBar: const CitizenNavigation(selectedIndex: 2),
+      bottomNavigationBar: const CitizenNavigation(selectedIndex: -1),
     );
   }
 }

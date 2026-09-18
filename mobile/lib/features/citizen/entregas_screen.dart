@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import 'citizen_controller.dart';
+import 'widgets/citizen_navigation.dart';
 import 'widgets/citizen_states.dart';
 
 class EntregasScreen extends ConsumerWidget {
@@ -15,7 +17,10 @@ class EntregasScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(entregasProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Histórico de incentivos')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Histórico de incentivos'),
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CitizenError(
@@ -41,6 +46,7 @@ class EntregasScreen extends ConsumerWidget {
                 ),
         ),
       ),
+      bottomNavigationBar: const CitizenNavigation(selectedIndex: -1),
     );
   }
 }

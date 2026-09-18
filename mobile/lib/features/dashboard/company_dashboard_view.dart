@@ -1,106 +1,16 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/dashboard/dashboard_data.dart';
-import '../communication/communication_controller.dart';
 
 const _pageBackground = Color(0xFFF6F7F8);
 const _cardBorder = Color(0xFFE9EBED);
 const _deepGreen = Color(0xFF1E5D3B);
 const _softGreen = Color(0xFFEAF3EE);
-
-class CompanyDashboardHeader extends ConsumerStatefulWidget
-    implements PreferredSizeWidget {
-  const CompanyDashboardHeader({required this.name, super.key});
-
-  final String name;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(60);
-
-  @override
-  ConsumerState<CompanyDashboardHeader> createState() =>
-      _CompanyDashboardHeaderState();
-}
-
-class _CompanyDashboardHeaderState
-    extends ConsumerState<CompanyDashboardHeader> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => ref.invalidate(badgesProvider),
-    );
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final notifications =
-        ref.watch(badgesProvider).valueOrNull?.notificacoes ?? 0;
-    final initial = widget.name.trim().isEmpty
-        ? 'E'
-        : widget.name.trim().substring(0, 1).toUpperCase();
-    return AppBar(
-      toolbarHeight: 60,
-      backgroundColor: const Color(0xFFF2F6F3),
-      shape: const Border(bottom: BorderSide(color: Color(0xFFDDE4E0))),
-      titleSpacing: 16,
-      title: Image.asset(
-        'assets/images/ecotech navbar.png',
-        width: 104,
-        fit: BoxFit.contain,
-      ),
-      actions: [
-        IconButton(
-          tooltip: 'Notificações',
-          onPressed: () => context.push('/notificacoes'),
-          icon: Badge.count(
-            count: notifications,
-            isLabelVisible: notifications > 0,
-            backgroundColor: const Color(0xFFE31D2D),
-            child: const Icon(Icons.notifications_none_rounded, size: 25),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Semantics(
-          button: true,
-          label: 'Abrir perfil',
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () => context.go('/perfil'),
-            child: CircleAvatar(
-              radius: 19,
-              backgroundColor: const Color(0xFFDFF0E6),
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: _deepGreen,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-      ],
-    );
-  }
-}
 
 class CompanyDashboardView extends StatelessWidget {
   const CompanyDashboardView({

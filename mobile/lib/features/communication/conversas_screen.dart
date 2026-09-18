@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
 import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
+import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_navigation.dart';
 import '../company/widgets/company_states.dart';
 import 'communication_controller.dart';
@@ -76,9 +77,11 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
                 ),
         ),
       ),
-      bottomNavigationBar: userType == 'empresa'
-          ? const CompanyNavigation(selectedIndex: 3)
-          : null,
+      bottomNavigationBar: switch (userType) {
+        'empresa' => const CompanyNavigation(selectedIndex: 3),
+        'cidadao' => const CitizenNavigation(selectedIndex: 4),
+        _ => null,
+      },
     );
   }
 }

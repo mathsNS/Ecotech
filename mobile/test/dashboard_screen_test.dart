@@ -6,6 +6,7 @@ import 'package:ecotech_mobile/data/dashboard/dashboard_data.dart';
 import 'package:ecotech_mobile/data/dashboard/dashboard_repository.dart';
 import 'package:ecotech_mobile/data/communication/communication_data.dart';
 import 'package:ecotech_mobile/data/models/usuario.dart';
+import 'package:ecotech_mobile/core/theme/app_theme.dart';
 import 'package:ecotech_mobile/features/communication/communication_controller.dart';
 import 'package:ecotech_mobile/features/dashboard/dashboard_controller.dart';
 import 'package:ecotech_mobile/features/dashboard/dashboard_screen.dart';
@@ -81,6 +82,39 @@ DashboardData _dashboard(String tipo) {
           ]
         : const [],
     totalEmProcessamento: tipo == 'empresa' ? 3 : 0,
+    totalEntregasConcluidas: tipo == 'cidadao' ? 10 : 0,
+    entregas: tipo == 'cidadao'
+        ? const [
+            EntregaResumo(
+              id: 'entrega-1',
+              valor: 40.2,
+              empresa: 'GreenCycle Nordeste',
+              data: '2026-04-12',
+              status: 'Finalizado',
+            ),
+            EntregaResumo(
+              id: 'entrega-2',
+              valor: 12.4,
+              empresa: 'TechLixo Soluções',
+              data: '2026-03-28',
+              status: 'Finalizado',
+            ),
+            EntregaResumo(
+              id: 'entrega-3',
+              valor: 5.4,
+              empresa: 'Recicla Kariri',
+              data: '2026-03-15',
+              status: 'Finalizado',
+            ),
+            EntregaResumo(
+              id: 'entrega-4',
+              valor: 3.68,
+              empresa: 'Recicla Kariri',
+              data: '2026-02-28',
+              status: 'Cancelado',
+            ),
+          ]
+        : const [],
     emProcessamento: tipo == 'empresa'
         ? [
             SolicitacaoResumo(
@@ -123,7 +157,10 @@ Future<void> _abrir(WidgetTester tester, String tipo) async {
               const BadgesData(notificacoes: 4, mensagens: 0, oportunidades: 0),
         ),
       ],
-      child: const MaterialApp(home: DashboardScreen()),
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: const DashboardScreen(),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -133,9 +170,22 @@ void main() {
   testWidgets('cidadão visualiza pontos, missão e tier', (tester) async {
     await _abrir(tester, 'cidadao');
 
-    expect(find.text('Pontos acumulados'), findsOneWidget);
-    expect(find.text('Missão atual'), findsOneWidget);
-    expect(find.text('Próxima recompensa'), findsOneWidget);
+    expect(find.text('Bem-vindo de volta,'), findsOneWidget);
+    expect(find.text('Olá, João!'), findsOneWidget);
+    expect(find.text('Saldo disponível'), findsOneWidget);
+    expect(find.text('EcoPoints'), findsOneWidget);
+    expect(find.text('MISSÃO ATUAL'), findsOneWidget);
+    expect(find.text('Ações rápidas'), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Operações'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Últimas entregas'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('10 concluídas'), findsOneWidget);
+    expect(find.text('Ver todas (4)'), findsOneWidget);
   });
 
   testWidgets('empresa visualiza desempenho e impacto', (tester) async {
@@ -174,4 +224,5 @@ void main() {
     expect(find.text('Receita EcoTech'), findsOneWidget);
     expect(find.text('Últimas solicitações do sistema'), findsOneWidget);
   });
+
 }
