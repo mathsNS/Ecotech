@@ -79,6 +79,7 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(

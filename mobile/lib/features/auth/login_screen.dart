@@ -73,6 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Image.asset(
