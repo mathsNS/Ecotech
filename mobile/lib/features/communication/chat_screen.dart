@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
 import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
+import '../operations/operations_widgets.dart';
 import 'communication_controller.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -33,6 +34,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int _pagina = 1;
   String _cidadao = '';
   String _estado = '';
+  String _localizacao = '';
   String? _erro;
 
   @override
@@ -53,16 +55,84 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final usuario = ref.watch(authControllerProvider).valueOrNull;
+    var contato = usuario?.tipo == 'empresa' ? _cidadao : '';
+    for (final conversa
+        in ref.watch(conversasProvider).valueOrNull ?? <ConversaData>[]) {
+      if (conversa.solicitacaoId == widget.solicitacaoId) {
+        contato = conversa.contatoNome;
+      }
+    }
+    final id = widget.solicitacaoId.length > 8
+        ? widget.solicitacaoId.substring(0, 8)
+        : widget.solicitacaoId;
     return Scaffold(
+      backgroundColor: operationsBackground,
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF2F6F3),
+        shape: const Border(bottom: BorderSide(color: operationsBorder)),
         leading: const AppBackButton(fallbackRoute: '/conversas'),
-        title: const Text('Conversa da coleta'),
+        leadingWidth: 48,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: operationsSoftGreen,
+              foregroundColor: operationsDeepGreen,
+              child: Text(
+                contato.trim().isEmpty
+                    ? 'E'
+                    : contato.trim().substring(0, 1).toUpperCase(),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    contato.isEmpty ? 'Conversa da coleta' : contato,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Coleta #$id',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: operationsMuted,
+                      letterSpacing: .5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton.filledTonal(
+            tooltip: 'Agenda',
+            style: IconButton.styleFrom(
+              backgroundColor: operationsSoftGreen,
+              foregroundColor: operationsDeepGreen,
+            ),
+            onPressed: () =>
+                context.push('/solicitacoes/${widget.solicitacaoId}/agenda'),
+            icon: const Icon(Icons.calendar_month_outlined, size: 20),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: Column(
         children: [
           _ContextoConversa(
             solicitacaoId: widget.solicitacaoId,
-            cidadao: _cidadao,
+            localizacao: _localizacao,
             estado: _estado,
             tipoUsuario: usuario?.tipo,
           ),
@@ -160,6 +230,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _temMais = pagina.temMais;
         _cidadao = pagina.cidadao;
         _estado = pagina.estado;
+        _localizacao = pagina.localizacao;
         _carregando = false;
       });
       await _marcarLida();
@@ -188,6 +259,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _mensagens.addAll(novas);
         _cidadao = pagina.cidadao;
         _estado = pagina.estado;
+        _localizacao = pagina.localizacao;
       });
       if (novas.isNotEmpty) _irAoFim();
       await _marcarLida();
@@ -276,59 +348,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 class _ContextoConversa extends StatelessWidget {
   const _ContextoConversa({
     required this.solicitacaoId,
-    required this.cidadao,
+    required this.localizacao,
     required this.estado,
     required this.tipoUsuario,
   });
 
   final String solicitacaoId;
-  final String cidadao;
+  final String localizacao;
   final String estado;
   final String? tipoUsuario;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: AppColors.secondary,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-      child: Row(
-        children: [
-          const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cidadao.isEmpty
-                      ? 'Coleta #${solicitacaoId.substring(0, 8)}'
-                      : cidadao,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  '#${solicitacaoId.substring(0, 8)} · ${estado.replaceAll('_', ' ')}',
-                ),
-              ],
+  Widget build(BuildContext context) => Column(
+    children: [
+      Container(
+        width: double.infinity,
+        color: const Color(0xFFECF6F0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline, size: 13, color: operationsDeepGreen),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Canal privado entre cidadão e empresa responsável.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: operationsDeepGreen),
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Agenda',
-            onPressed: () =>
-                context.push('/solicitacoes/$solicitacaoId/agenda'),
-            icon: const Icon(Icons.calendar_month_outlined),
-          ),
-          IconButton(
-            tooltip: 'Detalhes',
-            onPressed: () => context.push(
-              tipoUsuario == 'empresa'
-                  ? '/empresa/operacoes/$solicitacaoId'
-                  : '/solicitacoes/$solicitacaoId',
-            ),
-            icon: const Icon(Icons.info_outline),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
+      TextButton.icon(
+        onPressed: () => context.push(
+          tipoUsuario == 'empresa' || tipoUsuario == 'administrador'
+              ? '/empresa/operacoes/$solicitacaoId'
+              : '/solicitacoes/$solicitacaoId',
+        ),
+        style: TextButton.styleFrom(foregroundColor: operationsMuted),
+        icon: Icon(
+          localizacao.isEmpty ? Icons.info_outline : Icons.location_on_outlined,
+          size: 14,
+        ),
+        label: Text(
+          localizacao.isNotEmpty
+              ? localizacao
+              : estado.isEmpty
+              ? 'Detalhes da coleta'
+              : estado.replaceAll('_', ' '),
+          style: const TextStyle(fontSize: 11),
+        ),
+      ),
+    ],
   );
 }
 
@@ -345,14 +417,21 @@ class _BolhaMensagem extends StatelessWidget {
         maxWidth: MediaQuery.sizeOf(context).width * 0.78,
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 10),
       decoration: BoxDecoration(
-        color: mensagem.propria ? AppColors.primary : AppColors.backgroundAlt,
+        color: mensagem.propria ? const Color(0xFF205C3D) : Colors.white,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 2,
+            offset: Offset(0, 2),
+          ),
+        ],
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(14),
-          topRight: const Radius.circular(14),
-          bottomLeft: Radius.circular(mensagem.propria ? 14 : 3),
-          bottomRight: Radius.circular(mensagem.propria ? 3 : 14),
+          topLeft: const Radius.circular(22),
+          topRight: const Radius.circular(22),
+          bottomLeft: Radius.circular(mensagem.propria ? 22 : 12),
+          bottomRight: Radius.circular(mensagem.propria ? 12 : 22),
         ),
       ),
       child: Column(
@@ -363,13 +442,17 @@ class _BolhaMensagem extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: mensagem.propria ? Colors.white70 : AppColors.primary,
+              color: mensagem.propria ? Colors.white70 : operationsMuted,
             ),
           ),
           const SizedBox(height: 3),
           Text(
             mensagem.texto,
-            style: TextStyle(color: mensagem.propria ? Colors.white : null),
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.6,
+              color: mensagem.propria ? Colors.white : operationsDark,
+            ),
           ),
           const SizedBox(height: 4),
           Align(
@@ -470,25 +553,63 @@ class _CampoMensagem extends StatelessWidget {
               minLines: 1,
               maxLines: 5,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                hintText: 'Escreva uma mensagem',
+              decoration: InputDecoration(
+                hintText: 'Escreva uma mensagem...',
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: operationsMuted,
+                ),
                 counterText: '',
+                fillColor: const Color(0xFFEDF7F1),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: const BorderSide(color: Color(0xFFBDD5C7)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFBDD5C7),
+                    width: 1.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 7),
-          IconButton.filled(
-            tooltip: 'Enviar',
-            onPressed: enviando ? null : onEnviar,
-            icon: enviando
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.send),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) => IconButton.filled(
+              tooltip: 'Enviar',
+              style: IconButton.styleFrom(
+                backgroundColor: operationsDeepGreen,
+                disabledBackgroundColor: const Color(0xFFA3BDAE),
+                disabledForegroundColor: Colors.white,
+                minimumSize: const Size(46, 46),
+              ),
+              onPressed: enviando || value.text.trim().isEmpty
+                  ? null
+                  : onEnviar,
+              icon: enviando
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send_outlined, size: 21),
+            ),
           ),
         ],
       ),

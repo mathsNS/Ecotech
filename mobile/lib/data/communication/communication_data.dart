@@ -177,6 +177,7 @@ class MensagensPaginaData {
     required this.temMais,
     required this.cidadao,
     required this.estado,
+    this.localizacao = '',
   });
 
   factory MensagensPaginaData.fromJson(Map<String, dynamic> json) {
@@ -194,6 +195,10 @@ class MensagensPaginaData {
       temMais: json['tem_mais'] == true,
       cidadao: solicitacao['cidadao'] as String? ?? '',
       estado: solicitacao['estado'] as String? ?? '',
+      localizacao:
+          (solicitacao['ponto_coleta'] ?? solicitacao['base_operacional'])
+              as String? ??
+          '',
     );
   }
 
@@ -202,6 +207,7 @@ class MensagensPaginaData {
   final bool temMais;
   final String cidadao;
   final String estado;
+  final String localizacao;
 }
 
 class NotificacaoData {

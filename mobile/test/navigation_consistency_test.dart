@@ -21,7 +21,7 @@ class _CompanyAuthController extends AuthController {
 }
 
 void main() {
-  testWidgets('conversas mantém navegação da empresa e retorno visível', (
+  testWidgets('conversas mantém navegação da empresa e cabeçalho da marca', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -43,7 +43,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Voltar'), findsOneWidget);
+    expect(find.text('Central de conversas'), findsOneWidget);
+    expect(find.byTooltip('Notificações'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Operações'), findsOneWidget);
     expect(find.text('Relatórios'), findsOneWidget);
