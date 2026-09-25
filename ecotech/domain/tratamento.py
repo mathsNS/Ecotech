@@ -1,20 +1,21 @@
 """
 Modulo de tratamento e rastreamento de dispositivos.
 
-Implementa o padrão Strategy para métodos de tratamento ecológico e 
+Implementa o padrão Strategy para métodos de tratamento ecológico e
 gerencia a auditoria e geração de relatórios de impacto.
 """
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
 from .dispositivos import DispositivoEletronico, StatusDispositivo
+
 
 class MetodoTratamento(ABC):
     """
     Classe base para estratégias de tratamento ecológico.
-    
+
     Utiliza o padrão Strategy permitindo trocar o algoritmo de tratamento em
     tempo de execução. Fornece atributos básicos de custo e redução de impacto.
     """
@@ -34,7 +35,7 @@ class MetodoTratamento(ABC):
     @property
     def reducao_impacto_percentual(self) -> float:
         return self._reducao_impacto_percentual
-    
+
     # ------------------
     # MÉTODOS ABSTRATOS
     # ------------------
@@ -42,19 +43,16 @@ class MetodoTratamento(ABC):
     @abstractmethod
     def obter_nome(self) -> str:
         """Retorna o nome identificador do método."""
-        pass
 
     @abstractmethod
-    def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_custo(self, dispositivos: list[DispositivoEletronico]) -> float:
         """Calcula custo total baseado no peso dos dispositivos."""
-        pass
 
     @abstractmethod
-    def calcular_impacto_ambiental(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_impacto_ambiental(self, dispositivos: list[DispositivoEletronico]) -> float:
         """Calcula o impacto ambiental resultante do tratamento."""
-        pass
 
-    def validar_compatibilidade(self, dispositivos: List[DispositivoEletronico]) -> None:
+    def validar_compatibilidade(self, dispositivos: list[DispositivoEletronico]) -> None:
         """
         Valida se o método de tratamento é compatível com os dispositivos fornecidos.
 
@@ -67,7 +65,6 @@ class MetodoTratamento(ABC):
         Raises:
             ValueError: Se algum dispositivo for incompatível com o método.
         """
-        pass
 
     # ---------------
     # REPRESENTAÇÃO
@@ -75,6 +72,7 @@ class MetodoTratamento(ABC):
 
     def __str__(self) -> str:
         return self.obter_nome()
+
 
 class Reciclagem(MetodoTratamento):
     """
@@ -85,19 +83,20 @@ class Reciclagem(MetodoTratamento):
     """
 
     def __init__(self):
-        super().__init__(custo_base_por_kg = 15.0, reducao_impacto_percentual = 80.0)
+        super().__init__(custo_base_por_kg=15.0, reducao_impacto_percentual=80.0)
 
     def obter_nome(self) -> str:
         return "Reciclagem"
 
-    def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_custo(self, dispositivos: list[DispositivoEletronico]) -> float:
         peso_total = sum(d.peso_kg for d in dispositivos)
         return round(peso_total * self._custo_base_por_kg, 2)
-    
-    def calcular_impacto_ambiental(self, dispositivos: List[DispositivoEletronico]) -> float:
+
+    def calcular_impacto_ambiental(self, dispositivos: list[DispositivoEletronico]) -> float:
         impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
         impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
         return round(impacto_liquido, 2)
+
 
 class Reuso(MetodoTratamento):
     """
@@ -109,21 +108,21 @@ class Reuso(MetodoTratamento):
     """
 
     def __init__(self):
-        super().__init__(custo_base_por_kg = 8.0, reducao_impacto_percentual = 95.0)
+        super().__init__(custo_base_por_kg=8.0, reducao_impacto_percentual=95.0)
 
     def obter_nome(self) -> str:
         return "Reuso"
 
-    def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_custo(self, dispositivos: list[DispositivoEletronico]) -> float:
         peso_total = sum(d.peso_kg for d in dispositivos)
         return round(peso_total * self._custo_base_por_kg, 2)
 
-    def calcular_impacto_ambiental(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_impacto_ambiental(self, dispositivos: list[DispositivoEletronico]) -> float:
         impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
         impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
         return round(impacto_liquido, 2)
 
-    def validar_compatibilidade(self, dispositivos: List[DispositivoEletronico]) -> None:
+    def validar_compatibilidade(self, dispositivos: list[DispositivoEletronico]) -> None:
         """
         Valida que nenhum dispositivo está no estado 'danificado'.
 
@@ -141,27 +140,29 @@ class Reuso(MetodoTratamento):
                     "status 'danificado' é incompatível com reaproveitamento."
                 )
 
+
 class DescarteControlado(MetodoTratamento):
     """
     Método de descarte em aterro especializado.
 
     Custo elevado e redução de impacto moderada comparado aos demais métodos.
     """
-    
+
     def __init__(self):
-        super().__init__(custo_base_por_kg = 25.0, reducao_impacto_percentual = 40.0)
+        super().__init__(custo_base_por_kg=25.0, reducao_impacto_percentual=40.0)
 
     def obter_nome(self) -> str:
         return "Descarte Controlado"
 
-    def calcular_custo(self, dispositivos: List[DispositivoEletronico]) -> float:
+    def calcular_custo(self, dispositivos: list[DispositivoEletronico]) -> float:
         peso_total = sum(d.peso_kg for d in dispositivos)
         return round(peso_total * self._custo_base_por_kg, 2)
-    
-    def calcular_impacto_ambiental(self, dispositivos: List[DispositivoEletronico]) -> float:
+
+    def calcular_impacto_ambiental(self, dispositivos: list[DispositivoEletronico]) -> float:
         impacto_total = sum(d.calcular_impacto_ambiental() for d in dispositivos)
         impacto_liquido = impacto_total * (1 - self._reducao_impacto_percentual / 100)
         return round(impacto_liquido, 2)
+
 
 class RastreamentoMetodo:
     """
@@ -175,7 +176,7 @@ class RastreamentoMetodo:
         self._id_aplicacao = id_aplicacao
         self._metodo = metodo
         self._peso_total_kg = peso_total_kg
-        self._data_aplicacao = datetime.now()
+        self._data_aplicacao = datetime.now(timezone(timedelta(hours=-3)))
 
     # -------------------
     # PROPERTIES
@@ -205,22 +206,23 @@ class RastreamentoMetodo:
     def impacto_evitado(self) -> float:
         return round((self._metodo.reducao_impacto_percentual / 100) * self._peso_total_kg, 2)
 
-    def obter_resumo(self) -> Dict:
+    def obter_resumo(self) -> dict:
         return {
             "id_aplicacao": self._id_aplicacao,
             "metodo": self._metodo.obter_nome(),
             "peso_kg": self._peso_total_kg,
             "data": self._data_aplicacao.isoformat(),
             "custo": self.custo,
-            "impacto_evitado_percentual": self.impacto_evitado
+            "impacto_evitado_percentual": self.impacto_evitado,
         }
-    
+
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
-    
+
     def __str__(self) -> str:
         return f"Rastreamento {self._id_aplicacao}: {self._metodo.obter_nome()} ({self._peso_total_kg}kg)"
+
 
 class RelatorioImpactoPorMetodo:
     """
@@ -228,23 +230,24 @@ class RelatorioImpactoPorMetodo:
 
     Gera métricas de peso, custo e impacto evitado por método de tratamento.
     """
+
     def __init__(self, titulo: str = "Relatório de Impacto"):
         self._titulo = titulo
-        self._rastreamentos: List[RastreamentoMetodo] = []
-        self._data_geracao = datetime.now()
+        self._rastreamentos: list[RastreamentoMetodo] = []
+        self._data_geracao = datetime.now(timezone(timedelta(hours=-3)))
 
     # -------------------
     # PROPERTIES
     # -------------------
-    
+
     @property
     def titulo(self) -> str:
         return self._titulo
-    
+
     @property
     def rastreamentos(self) -> str:
         return self._rastreamentos
-    
+
     @property
     def data_geracao(self) -> str:
         return self._data_geracao
@@ -252,7 +255,7 @@ class RelatorioImpactoPorMetodo:
     def adicionar_rastreamento(self, rastreamento: RastreamentoMetodo):
         self._rastreamentos.append(rastreamento)
 
-    def gerar_relatorio_completo(self) -> Dict:
+    def gerar_relatorio_completo(self) -> dict:
         """Calcula métricas agregadas por método de forma eficiente."""
         totais_peso = defaultdict(float)
         totais_custo = defaultdict(float)
@@ -272,17 +275,13 @@ class RelatorioImpactoPorMetodo:
             "peso_por_metodo": dict(totais_peso),
             "custo_por_metodo": dict(totais_custo),
             "impacto_evitado_por_metodo": dict(totais_impacto),
-            "aplicacoes_por_metodo": dict(contagens)
+            "aplicacoes_por_metodo": dict(contagens),
         }
-    
+
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
-    
+
     def __str__(self) -> str:
         """Representação textual do relatório com número de rastreamentos."""
         return f"Relatorio '{self.titulo}' com {len(self._rastreamentos)} rastreamentos"
-
-
-
-        

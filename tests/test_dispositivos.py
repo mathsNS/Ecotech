@@ -1,11 +1,17 @@
 """Testes para o módulo de dispositivos eletrônicos."""
 
 import pytest
-from ecotech.domain.dispositivos import Celular, Computador, Eletrodomestico, StatusDispositivo, EstadoProduto
+
+from ecotech.domain.dispositivos import (
+    Celular,
+    Computador,
+    Eletrodomestico,
+    EstadoProduto,
+    StatusDispositivo,
+)
 
 
 class TestDispositivos:
-
     def test_criacao_celular(self):
         celular = Celular("1", "iPhone 11", 0.2)
         assert celular.nome == "iPhone 11"
@@ -24,7 +30,6 @@ class TestDispositivos:
 
 
 class TestValidacaoMarca:
-
     def test_marca_valida(self):
         celular = Celular("1", "iPhone", 0.2, marca="Apple")
         assert celular.marca == "Apple"
@@ -53,7 +58,6 @@ class TestValidacaoMarca:
 
 
 class TestValidacaoModelo:
-
     def test_modelo_valido(self):
         celular = Celular("1", "iPhone", 0.2, modelo="13 Pro")
         assert celular.modelo == "13 Pro"
@@ -82,7 +86,6 @@ class TestValidacaoModelo:
 
 
 class TestValidacaoPeso:
-
     def test_peso_valido(self):
         celular = Celular("1", "iPhone", 0.2)
         assert celular.peso_kg == 0.2
@@ -101,7 +104,6 @@ class TestValidacaoPeso:
 
 
 class TestValorRevenda:
-
     def test_valor_revenda_celular(self):
         celular = Celular("1", "iPhone", 0.2)
         assert celular.calcular_valor_revenda() == 0.2 * 10.0
@@ -130,7 +132,6 @@ class TestValorRevenda:
 
 
 class TestImpactoAmbiental:
-
     def test_impacto_celular(self):
         celular = Celular("1", "iPhone", 0.2)
         assert celular.calcular_impacto_ambiental() == 0.2 * 5.0
@@ -149,14 +150,9 @@ class TestImpactoAmbiental:
 
 
 class TestTodosCombinados:
-
     def test_dispositivo_completo_valido(self):
         celular = Celular(
-            id="1",
-            nome="iPhone 13 Pro",
-            peso_kg=0.203,
-            marca="Apple",
-            modelo="A2635"
+            id="1", nome="iPhone 13 Pro", peso_kg=0.203, marca="Apple", modelo="A2635"
         )
         assert celular.id == "1"
         assert celular.nome == "iPhone 13 Pro"
@@ -178,8 +174,8 @@ class TestTodosCombinados:
 # TESTES StatusDispositivo (Item 15)
 # -----------------------------------------
 
-class TestStatusDispositivo:
 
+class TestStatusDispositivo:
     def test_status_padrao_e_funcionando(self):
         """Status padrão ao criar dispositivo deve ser FUNCIONANDO."""
         celular = Celular("1", "iPhone", 0.2)
@@ -202,39 +198,36 @@ class TestStatusDispositivo:
 
 
 class TestSubcategoria:
-
     def test_subcategoria_padrao_celular(self):
         celular = Celular("1", "Galaxy", 0.2)
-        assert celular.subcategoria == 'smartphone_medio'
+        assert celular.subcategoria == "smartphone_medio"
 
     def test_subcategoria_padrao_computador(self):
         computador = Computador("2", "Dell", 2.5)
-        assert computador.subcategoria == 'notebook_basico'
+        assert computador.subcategoria == "notebook_basico"
 
     def test_subcategoria_padrao_eletrodomestico(self):
         eletro = Eletrodomestico("3", "Brastemp", 60.0)
-        assert eletro.subcategoria == 'geladeira'
+        assert eletro.subcategoria == "geladeira"
 
     def test_subcategoria_customizada(self):
-        celular = Celular("1", "iPhone 15 Pro", 0.2, subcategoria='iphone')
-        assert celular.subcategoria == 'iphone'
+        celular = Celular("1", "iPhone 15 Pro", 0.2, subcategoria="iphone")
+        assert celular.subcategoria == "iphone"
 
     def test_subcategoria_customizada_computador(self):
-        computador = Computador("2", "Alienware", 3.5, subcategoria='notebook_gamer')
-        assert computador.subcategoria == 'notebook_gamer'
+        computador = Computador("2", "Alienware", 3.5, subcategoria="notebook_gamer")
+        assert computador.subcategoria == "notebook_gamer"
 
 
 class TestEstadoProduto:
-
     def test_enum_valores(self):
-        assert EstadoProduto.FUNCIONANDO.value == 'funcionando'
-        assert EstadoProduto.DEFEITO_LEVE.value == 'defeito_leve'
-        assert EstadoProduto.DEFEITO_GRAVE.value == 'defeito_grave'
-        assert EstadoProduto.SUCATA.value == 'sucata'
+        assert EstadoProduto.FUNCIONANDO.value == "funcionando"
+        assert EstadoProduto.DEFEITO_LEVE.value == "defeito_leve"
+        assert EstadoProduto.DEFEITO_GRAVE.value == "defeito_grave"
+        assert EstadoProduto.SUCATA.value == "sucata"
 
 
 class TestCalcularValorAvaliado:
-
     def test_funcionando_usa_valor_base_completo(self):
         celular = Celular("1", "Galaxy", 0.2)
         assert celular.calcular_valor_avaliado(EstadoProduto.FUNCIONANDO, 600.0, 10.0) == 600.0
@@ -265,5 +258,5 @@ class TestCalcularValorAvaliado:
         assert eletro.calcular_valor_avaliado(EstadoProduto.FUNCIONANDO, 900.0, 130.0) == 900.0
 
     def test_iphone_defeito_grave(self):
-        celular = Celular("1", "iPhone 15", 0.2, subcategoria='iphone')
+        celular = Celular("1", "iPhone 15", 0.2, subcategoria="iphone")
         assert celular.calcular_valor_avaliado(EstadoProduto.DEFEITO_GRAVE, 2500.0, 20.0) == 375.0

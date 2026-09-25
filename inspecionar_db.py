@@ -2,7 +2,7 @@
 
 import sqlite3
 
-conn = sqlite3.connect('ecotech.db')
+conn = sqlite3.connect("ecotech.db")
 conn.row_factory = sqlite3.Row
 cursor = conn.cursor()
 
@@ -12,14 +12,14 @@ cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
 tables = cursor.fetchall()
 
 for table in tables:
-    nome_tabela = table['name']
+    nome_tabela = table["name"]
     print(f"\ntabela {nome_tabela}")
-    
+
     # conta quantos registros tem
     cursor.execute(f"SELECT COUNT(*) as total FROM {nome_tabela}")
     count = cursor.fetchone()
     print(f"   Registros: {count['total']}")
-    
+
     # mostra estrutura da tabela
     cursor.execute(f"PRAGMA table_info({nome_tabela})")
     colunas = cursor.fetchall()
@@ -40,14 +40,16 @@ for row in cursor.fetchall():
 print("\nDISPOSITIVOS:")
 cursor.execute("SELECT id, nome, marca, modelo, peso_kg FROM dispositivo LIMIT 5")
 for row in cursor.fetchall():
-    print(f"   {row['id'][:8]}... | {row['nome']} | {row['marca']} {row['modelo']} | {row['peso_kg']}kg")
+    print(
+        f"   {row['id'][:8]}... | {row['nome']} | {row['marca']} {row['modelo']} | {row['peso_kg']}kg"
+    )
 
 # solicitacoes
 print("\nSOLICITAÇÕES:")
 cursor.execute("SELECT id, id_usuario, estado FROM solicitacao_descarte LIMIT 5")
 for row in cursor.fetchall():
-    user_id = row['id_usuario'] if row['id_usuario'] else 'N/A'
-    user_str = user_id[:8] + '...' if len(str(user_id)) > 8 else user_id
+    user_id = row["id_usuario"] if row["id_usuario"] else "N/A"
+    user_str = user_id[:8] + "..." if len(str(user_id)) > 8 else user_id
     print(f"   {row['id'][:8]}... | Usuario: {user_str} | Estado: {row['estado']}")
 
 # pontos de coleta

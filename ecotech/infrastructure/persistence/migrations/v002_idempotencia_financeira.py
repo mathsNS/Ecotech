@@ -18,9 +18,7 @@ def aplicar(conn) -> None:
         LIMIT 1
     """).fetchone()
     if duplicada:
-        raise RuntimeError(
-            "Migration bloqueada: há mais de uma receita para a mesma solicitação"
-        )
+        raise RuntimeError("Migration bloqueada: há mais de uma receita para a mesma solicitação")
 
     for comando in (
         """CREATE UNIQUE INDEX IF NOT EXISTS uq_entrega_solicitacao

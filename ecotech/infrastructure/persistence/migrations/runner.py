@@ -16,7 +16,6 @@ from .v011_fotos_solicitacao import aplicar as aplicar_v011
 from .v012_peso_aferido import aplicar as aplicar_v012
 from .v013_ano_dispositivo import aplicar as aplicar_v013
 
-
 MIGRATIONS = (
     (1, "integridade_basica", aplicar_v001),
     (2, "idempotencia_financeira", aplicar_v002),
@@ -46,18 +45,14 @@ def _criar_tabela_controle(conn) -> None:
 
 def versao_atual(conn) -> int:
     _criar_tabela_controle(conn)
-    row = conn.execute(
-        "SELECT COALESCE(MAX(versao), 0) AS versao FROM schema_migration"
-    ).fetchone()
+    row = conn.execute("SELECT COALESCE(MAX(versao), 0) AS versao FROM schema_migration").fetchone()
     return int(row["versao"] if hasattr(row, "keys") else row[0])
 
 
 def executar_migrations(conn) -> None:
     """Executa uma única vez cada migration, em transação individual."""
     _criar_tabela_controle(conn)
-    aplicadas = {
-        row[0] for row in conn.execute("SELECT versao FROM schema_migration")
-    }
+    aplicadas = {row[0] for row in conn.execute("SELECT versao FROM schema_migration")}
 
     for versao, nome, aplicar in MIGRATIONS:
         if versao in aplicadas:
@@ -65,7 +60,6 @@ def executar_migrations(conn) -> None:
         with conn:
             aplicar(conn)
             conn.execute(
-                "INSERT INTO schema_migration (versao, nome, aplicada_em) "
-                "VALUES (?, ?, ?)",
+                "INSERT INTO schema_migration (versao, nome, aplicada_em) VALUES (?, ?, ?)",
                 (versao, nome, datetime.now(timezone.utc).isoformat()),
             )

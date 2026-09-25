@@ -7,14 +7,18 @@ def _coluna_existe(conn, tabela, coluna):
 
 def aplicar(conn) -> None:
     for coluna, definicao in (
-        ('empresa_responsavel_id', 'TEXT'),
-        ('atribuida_em', 'TEXT'),
-        ('versao_atribuicao', 'INTEGER NOT NULL DEFAULT 0'),
+        ("empresa_responsavel_id", "TEXT"),
+        ("atribuida_em", "TEXT"),
+        ("versao_atribuicao", "INTEGER NOT NULL DEFAULT 0"),
     ):
-        if not _coluna_existe(conn, 'solicitacao_descarte', coluna):
+        if not _coluna_existe(conn, "solicitacao_descarte", coluna):
             conn.execute(f"ALTER TABLE solicitacao_descarte ADD COLUMN {coluna} {definicao}")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_solicitacao_empresa_responsavel ON solicitacao_descarte(empresa_responsavel_id, estado)")
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_oferta_aceita_solicitacao ON oferta_coleta(solicitacao_id) WHERE status = 'ACEITA'")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_solicitacao_empresa_responsavel ON solicitacao_descarte(empresa_responsavel_id, estado)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_oferta_aceita_solicitacao ON oferta_coleta(solicitacao_id) WHERE status = 'ACEITA'"
+    )
     conn.execute("""
         CREATE TRIGGER IF NOT EXISTS trg_atribuicao_consistente
         BEFORE UPDATE OF empresa_responsavel_id, base_operacional_id ON solicitacao_descarte

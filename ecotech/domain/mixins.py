@@ -5,8 +5,7 @@ Fornece comportamentos transversais que podem ser compostos em classes
 de domínio via herança múltipla, sem criar acoplamento entre hierarquias.
 """
 
-from datetime import datetime
-from typing import List, Dict
+from datetime import datetime, timedelta, timezone
 
 
 class LoggableMixin:
@@ -22,7 +21,7 @@ class LoggableMixin:
 
     def __init_log__(self) -> None:
         """Inicializa a estrutura interna de log."""
-        self._log_registros: List[Dict[str, str]] = []
+        self._log_registros: list[dict[str, str]] = []
 
     def registrar_log(self, acao: str, detalhe: str = "") -> None:
         """
@@ -33,19 +32,19 @@ class LoggableMixin:
             detalhe: Informação adicional sobre a ação.
         """
         entrada = {
-            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "timestamp": datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S"),
             "acao": acao,
             "detalhe": detalhe,
         }
         self._log_registros.append(entrada)
 
     @property
-    def log_registros(self) -> List[Dict[str, str]]:
+    def log_registros(self) -> list[dict[str, str]]:
         """Retorna cópia defensiva dos registros de log."""
         return self._log_registros.copy()
 
     @property
-    def ultimo_log(self) -> Dict[str, str]:
+    def ultimo_log(self) -> dict[str, str]:
         """Retorna a última entrada de log, ou dicionário vazio se não houver."""
         if self._log_registros:
             return self._log_registros[-1].copy()
@@ -69,7 +68,7 @@ class NotificavelMixin:
 
     def __init_notificacoes__(self) -> None:
         """Inicializa a fila interna de notificações."""
-        self._fila_notificacoes: List[Dict] = []
+        self._fila_notificacoes: list[dict] = []
 
     def emitir_notificacao(self, titulo: str, mensagem: str, prioridade: str = "normal") -> None:
         """
@@ -88,7 +87,7 @@ class NotificavelMixin:
             raise ValueError(f"Prioridade deve ser uma de: {prioridades_validas}")
 
         notificacao = {
-            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "timestamp": datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S"),
             "titulo": titulo,
             "mensagem": mensagem,
             "prioridade": prioridade,
@@ -97,7 +96,7 @@ class NotificavelMixin:
         self._fila_notificacoes.append(notificacao)
 
     @property
-    def notificacoes_pendentes(self) -> List[Dict]:
+    def notificacoes_pendentes(self) -> list[dict]:
         """Retorna notificações ainda não lidas."""
         return [n for n in self._fila_notificacoes if not n["lida"]]
 

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from datetime import datetime, time
 from enum import Enum
-from typing import FrozenSet, Tuple
 
 
 def validar_coordenadas(latitude: float, longitude: float) -> None:
@@ -37,19 +36,16 @@ class JanelaAtendimento:
             raise ValueError("início da janela deve anteceder o fim")
 
     def contem(self, instante: datetime) -> bool:
-        return (
-            instante.weekday() == self.dia_semana
-            and self.inicio <= instante.time() < self.fim
-        )
+        return instante.weekday() == self.dia_semana and self.inicio <= instante.time() < self.fim
 
 
 class StatusOferta(str, Enum):
-    AGUARDANDO = 'AGUARDANDO'
-    ATIVA = 'ATIVA'
-    ACEITA = 'ACEITA'
-    RECUSADA = 'RECUSADA'
-    EXPIRADA = 'EXPIRADA'
-    CANCELADA = 'CANCELADA'
+    AGUARDANDO = "AGUARDANDO"
+    ATIVA = "ATIVA"
+    ACEITA = "ACEITA"
+    RECUSADA = "RECUSADA"
+    EXPIRADA = "EXPIRADA"
+    CANCELADA = "CANCELADA"
 
 
 @dataclass(frozen=True)
@@ -66,8 +62,7 @@ class OfertaColeta:
     snapshot_fatores: dict | None = None
 
     def __post_init__(self):
-        if not all((self.id, self.solicitacao_id, self.empresa_id,
-                    self.base_operacional_id)):
+        if not all((self.id, self.solicitacao_id, self.empresa_id, self.base_operacional_id)):
             raise ValueError("oferta deve possuir identificadores")
         if self.distancia_km < 0 or self.prioridade < 1 or self.rodada < 1:
             raise ValueError("distância, prioridade ou rodada inválida")
@@ -90,8 +85,8 @@ class BaseOperacional:
         realiza_coleta_domiciliar: bool = True,
         ativa: bool = True,
         ponto_coleta_id: str | None = None,
-        categorias_atendidas=('*',),
-        disponibilidade: Tuple[JanelaAtendimento, ...] = (),
+        categorias_atendidas=("*",),
+        disponibilidade: tuple[JanelaAtendimento, ...] = (),
         indisponivel_ate: datetime | None = None,
         empresa_ativa: bool = True,
         carga_operacional: int = 0,
@@ -123,79 +118,94 @@ class BaseOperacional:
         self._realiza_coleta_domiciliar = bool(realiza_coleta_domiciliar)
         self._ativa = bool(ativa)
         self._ponto_coleta_id = ponto_coleta_id
-        self._categorias_atendidas: FrozenSet[str] = frozenset(
-            str(categoria).strip().lower() for categoria in categorias_atendidas
+        self._categorias_atendidas: frozenset[str] = frozenset(
+            str(categoria).strip().lower()
+            for categoria in categorias_atendidas
             if str(categoria).strip()
         )
         self._disponibilidade = tuple(disponibilidade)
         self._indisponivel_ate = indisponivel_ate
         self._empresa_ativa = bool(empresa_ativa)
         self._carga_operacional = max(0, int(carga_operacional))
-        self._capacidade_comprometida_kg = max(
-            0.0, float(capacidade_comprometida_kg)
-        )
+        self._capacidade_comprometida_kg = max(0.0, float(capacidade_comprometida_kg))
 
     @property
-    def id(self): return self._id
+    def id(self):
+        return self._id
 
     @property
-    def empresa_id(self): return self._empresa_id
+    def empresa_id(self):
+        return self._empresa_id
 
     @property
-    def nome(self): return self._nome
+    def nome(self):
+        return self._nome
 
     @property
-    def endereco(self): return self._endereco
+    def endereco(self):
+        return self._endereco
 
     @property
-    def latitude(self): return self._latitude
+    def latitude(self):
+        return self._latitude
 
     @property
-    def longitude(self): return self._longitude
+    def longitude(self):
+        return self._longitude
 
     @property
-    def raio_atendimento_km(self): return self._raio_atendimento_km
+    def raio_atendimento_km(self):
+        return self._raio_atendimento_km
 
     @property
-    def capacidade_kg(self): return self._capacidade_kg
+    def capacidade_kg(self):
+        return self._capacidade_kg
 
     @property
-    def ocupacao_atual_kg(self): return self._ocupacao_atual_kg
+    def ocupacao_atual_kg(self):
+        return self._ocupacao_atual_kg
 
     @property
-    def realiza_coleta_domiciliar(self): return self._realiza_coleta_domiciliar
+    def realiza_coleta_domiciliar(self):
+        return self._realiza_coleta_domiciliar
 
     @property
-    def ativa(self): return self._ativa
+    def ativa(self):
+        return self._ativa
 
     @property
-    def ponto_coleta_id(self): return self._ponto_coleta_id
+    def ponto_coleta_id(self):
+        return self._ponto_coleta_id
 
     @property
-    def categorias_atendidas(self): return self._categorias_atendidas
+    def categorias_atendidas(self):
+        return self._categorias_atendidas
 
     @property
-    def disponibilidade(self): return self._disponibilidade
+    def disponibilidade(self):
+        return self._disponibilidade
 
     @property
-    def indisponivel_ate(self): return self._indisponivel_ate
+    def indisponivel_ate(self):
+        return self._indisponivel_ate
 
     @property
-    def empresa_ativa(self): return self._empresa_ativa
+    def empresa_ativa(self):
+        return self._empresa_ativa
 
     @property
-    def carga_operacional(self): return self._carga_operacional
+    def carga_operacional(self):
+        return self._carga_operacional
 
     @property
-    def capacidade_comprometida_kg(self): return self._capacidade_comprometida_kg
+    def capacidade_comprometida_kg(self):
+        return self._capacidade_comprometida_kg
 
     @property
     def capacidade_disponivel_kg(self) -> float:
         return max(
             0.0,
-            self._capacidade_kg
-            - self._ocupacao_atual_kg
-            - self._capacidade_comprometida_kg,
+            self._capacidade_kg - self._ocupacao_atual_kg - self._capacidade_comprometida_kg,
         )
 
     @property

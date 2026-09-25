@@ -4,11 +4,11 @@
 def aplicar(conn):
     colunas = {row[1] for row in conn.execute("PRAGMA table_info(solicitacao_descarte)")}
     for nome, definicao in (
-        ('peso_estimado_kg', 'REAL'),
-        ('peso_informado_cidadao', 'INTEGER NOT NULL DEFAULT 1'),
-        ('peso_confirmado_kg', 'REAL'),
-        ('peso_confirmado_em', 'TEXT'),
-        ('peso_confirmado_por', 'TEXT'),
+        ("peso_estimado_kg", "REAL"),
+        ("peso_informado_cidadao", "INTEGER NOT NULL DEFAULT 1"),
+        ("peso_confirmado_kg", "REAL"),
+        ("peso_confirmado_em", "TEXT"),
+        ("peso_confirmado_por", "TEXT"),
     ):
         if nome not in colunas:
             conn.execute(f"ALTER TABLE solicitacao_descarte ADD COLUMN {nome} {definicao}")

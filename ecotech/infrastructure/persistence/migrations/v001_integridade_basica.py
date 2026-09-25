@@ -8,9 +8,7 @@ def _validar_sem_duplicatas(conn, tabela, coluna) -> None:
         f"GROUP BY {coluna} HAVING COUNT(*) > 1 LIMIT 1"
     ).fetchone()
     if row:
-        raise RuntimeError(
-            f"Migration bloqueada: {tabela}.{coluna} possui valor duplicado"
-        )
+        raise RuntimeError(f"Migration bloqueada: {tabela}.{coluna} possui valor duplicado")
 
 
 def aplicar(conn) -> None:

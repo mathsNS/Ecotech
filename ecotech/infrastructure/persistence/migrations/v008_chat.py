@@ -1,5 +1,6 @@
 """Migration 008: conversa segura por solicitação atribuída."""
 
+
 def aplicar(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS conversa_solicitacao (
         id TEXT PRIMARY KEY, solicitacao_id TEXT NOT NULL UNIQUE,
@@ -14,5 +15,9 @@ def aplicar(conn):
         texto TEXT, payload TEXT NOT NULL DEFAULT '{}', criado_em TEXT NOT NULL, lida_em TEXT,
         FOREIGN KEY(conversa_id) REFERENCES conversa_solicitacao(id)
     )""")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mensagem_conversa_data ON mensagem_chat(conversa_id,criado_em,id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mensagem_leitura ON mensagem_chat(conversa_id,lida_em)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mensagem_conversa_data ON mensagem_chat(conversa_id,criado_em,id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mensagem_leitura ON mensagem_chat(conversa_id,lida_em)"
+    )

@@ -6,11 +6,13 @@ incluindo cidadãos, empresas e administradores.
 """
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import List, Dict
+
 import re
+from abc import ABC, abstractmethod
+from datetime import datetime, timedelta, timezone
+
 from .mixins import NotificavelMixin
+
 
 class Usuario(ABC, NotificavelMixin):
     """
@@ -36,11 +38,11 @@ class Usuario(ABC, NotificavelMixin):
         self._id: str = id
         self._nome: str = nome
         self._email: str = email
-        self._data_cadastro: datetime = datetime.now()
+        self._data_cadastro: datetime = datetime.now(timezone(timedelta(hours=-3)))
         self._ativo: bool = True
 
         # Sistema de histórico
-        self._historico_acoes: List[Dict] = []
+        self._historico_acoes: list[dict] = []
 
         self._registrar_acao("Usuário criado")
 
@@ -88,15 +90,12 @@ class Usuario(ABC, NotificavelMixin):
         return self._data_cadastro
 
     @property
-    def notificacoes(self) -> List[str]:
+    def notificacoes(self) -> list[str]:
         """Retorna todas as notificações como strings formatadas."""
-        return [
-            f"[{n['timestamp']}] {n['mensagem']}"
-            for n in self._fila_notificacoes
-        ]
+        return [f"[{n['timestamp']}] {n['mensagem']}" for n in self._fila_notificacoes]
 
     @property
-    def historico_acoes(self) -> List[Dict]:
+    def historico_acoes(self) -> list[dict]:
         """Retorna o histórico de ações."""
         return self._historico_acoes.copy()
 
@@ -146,7 +145,7 @@ class Usuario(ABC, NotificavelMixin):
         self._historico_acoes.append(
             {
                 "descricao": descricao,
-                "data": datetime.now(),
+                "data": datetime.now(timezone(timedelta(hours=-3))),
             }
         )
 
@@ -175,12 +174,10 @@ class Usuario(ABC, NotificavelMixin):
     @abstractmethod
     def pode_solicitar_descarte(self) -> bool:
         """Define se o usuário pode solicitar descarte."""
-        pass
 
     @abstractmethod
     def obter_tipo(self) -> str:
         """Retorna o tipo do usuário."""
-        pass
 
     # ---------------
     # REPRESENTAÇÃO
@@ -189,9 +186,11 @@ class Usuario(ABC, NotificavelMixin):
     def __str__(self) -> str:
         return f"{self.obter_tipo()} - {self.nome} ({self.email})"
 
+
 # ---------
 # CIDADÃO
 # ---------
+
 
 class Cidadao(Usuario):
     """
@@ -270,17 +269,16 @@ class Cidadao(Usuario):
             self._registrar_acao("Solicitação finalizada")
 
     def pode_solicitar_descarte(self) -> bool:
-        return (
-            self.ativo
-            and self._solicitacoes_ativas < self.MAX_SOLICITACOES_ATIVAS
-        )
+        return self.ativo and self._solicitacoes_ativas < self.MAX_SOLICITACOES_ATIVAS
 
     def obter_tipo(self) -> str:
         return "Cidadão"
 
+
 # ---------
 # EMPRESA
 # ---------
+
 
 class Empresa(Usuario):
     """
@@ -306,7 +304,7 @@ class Empresa(Usuario):
     @property
     def cnpj(self) -> str:
         return self._cnpj
-    
+
     @property
     def razao_social(self) -> str:
         return self._razao_social

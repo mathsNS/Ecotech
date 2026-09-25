@@ -1,7 +1,7 @@
 """Interfaces abstratas de repositório."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any
+from typing import Any
 
 
 class RepositorioBase(ABC):
@@ -27,37 +27,37 @@ class RepositorioBase(ABC):
     # --- Usuários: buscar ---
 
     @abstractmethod
-    def buscar_usuario(self, id_usuario: str) -> Optional[Any]:
+    def buscar_usuario(self, id_usuario: str) -> Any | None:
         """Busca um usuário pelo ID."""
         ...
 
     @abstractmethod
-    def buscar_usuario_por_cpf(self, cpf: str) -> Optional[Any]:
+    def buscar_usuario_por_cpf(self, cpf: str) -> Any | None:
         """Busca um cidadão pelo CPF. Retorna linha com password_hash."""
         ...
 
     @abstractmethod
-    def buscar_usuario_por_cnpj(self, cnpj: str) -> Optional[Any]:
+    def buscar_usuario_por_cnpj(self, cnpj: str) -> Any | None:
         """Busca uma empresa pelo CNPJ. Retorna linha com password_hash."""
         ...
 
     @abstractmethod
-    def buscar_usuario_por_email(self, email: str) -> Optional[Any]:
+    def buscar_usuario_por_email(self, email: str) -> Any | None:
         """Busca um usuário pelo e-mail. Retorna linha com password_hash."""
         ...
 
     @abstractmethod
-    def buscar_todos_usuarios(self) -> List[Any]:
+    def buscar_todos_usuarios(self) -> list[Any]:
         """Retorna todos os usuários cadastrados."""
         ...
 
     @abstractmethod
-    def buscar_cidadao(self, id_usuario: str) -> Optional[Any]:
+    def buscar_cidadao(self, id_usuario: str) -> Any | None:
         """Busca dados de cidadão (com CPF e pontos) pelo ID do usuário."""
         ...
 
     @abstractmethod
-    def buscar_empresa(self, id_usuario: str) -> Optional[Any]:
+    def buscar_empresa(self, id_usuario: str) -> Any | None:
         """Busca dados de empresa (com CNPJ e razão social) pelo ID do usuário."""
         ...
 
@@ -76,7 +76,7 @@ class RepositorioBase(ABC):
         ...
 
     @abstractmethod
-    def buscar_dispositivo(self, id_dispositivo: str) -> Optional[Any]:
+    def buscar_dispositivo(self, id_dispositivo: str) -> Any | None:
         """Busca um dispositivo pelo ID."""
         ...
 
@@ -88,12 +88,12 @@ class RepositorioBase(ABC):
         ...
 
     @abstractmethod
-    def buscar_ponto_coleta(self, id_ponto: str) -> Optional[Any]:
+    def buscar_ponto_coleta(self, id_ponto: str) -> Any | None:
         """Busca um ponto de coleta pelo ID."""
         ...
 
     @abstractmethod
-    def buscar_todos_pontos_coleta(self) -> List[Any]:
+    def buscar_todos_pontos_coleta(self) -> list[Any]:
         """Retorna todos os pontos de coleta ativos."""
         ...
 
@@ -106,30 +106,28 @@ class RepositorioBase(ABC):
     def salvar_base_operacional(self, base: Any) -> None: ...
 
     @abstractmethod
-    def buscar_base_operacional(self, id_base: str) -> Optional[Any]: ...
+    def buscar_base_operacional(self, id_base: str) -> Any | None: ...
 
     @abstractmethod
-    def buscar_bases_empresa(self, id_empresa: str) -> List[Any]: ...
+    def buscar_bases_empresa(self, id_empresa: str) -> list[Any]: ...
 
     @abstractmethod
     def atualizar_base_operacional(self, base: Any) -> None: ...
 
     @abstractmethod
-    def definir_atividade_base(
-        self, id_base: str, id_empresa: str, ativa: bool
-    ) -> None: ...
+    def definir_atividade_base(self, id_base: str, id_empresa: str, ativa: bool) -> None: ...
 
     @abstractmethod
-    def buscar_bases_candidatas(self) -> List[Any]: ...
+    def buscar_bases_candidatas(self) -> list[Any]: ...
 
     @abstractmethod
     def configurar_categorias_base(
-        self, id_base: str, id_empresa: str, categorias: List[str]
+        self, id_base: str, id_empresa: str, categorias: list[str]
     ) -> None: ...
 
     @abstractmethod
     def configurar_disponibilidade_base(
-        self, id_base: str, id_empresa: str, janelas: List[Any]
+        self, id_base: str, id_empresa: str, janelas: list[Any]
     ) -> None: ...
 
     @abstractmethod
@@ -157,102 +155,111 @@ class RepositorioBase(ABC):
     # --- Solicitações: buscar ---
 
     @abstractmethod
-    def buscar_solicitacao(self, id_solicitacao: str) -> Optional[Any]:
+    def buscar_solicitacao(self, id_solicitacao: str) -> Any | None:
         """Busca uma solicitação de descarte pelo ID."""
         ...
 
     @abstractmethod
-    def buscar_todas_solicitacoes(self) -> List[Any]:
+    def buscar_todas_solicitacoes(self) -> list[Any]:
         """Retorna todas as solicitações de descarte."""
         ...
 
     @abstractmethod
-    def buscar_solicitacoes_usuario(self, id_usuario: str) -> List[Any]:
+    def buscar_solicitacoes_usuario(self, id_usuario: str) -> list[Any]:
         """Retorna todas as solicitações de um usuário específico."""
         ...
 
     @abstractmethod
-    def buscar_itens_solicitacao(self, id_solicitacao: str) -> List[Any]:
+    def buscar_itens_solicitacao(self, id_solicitacao: str) -> list[Any]:
         """Retorna todos os itens de uma solicitação específica."""
         ...
 
     # --- Solicitações: atualizar ---
 
     @abstractmethod
-    def atualizar_solicitacao(self, id_solicitacao: str, estado: str,
-                               metodo_tratamento: Optional[str] = None) -> None:
+    def atualizar_solicitacao(
+        self, id_solicitacao: str, estado: str, metodo_tratamento: str | None = None
+    ) -> None:
         """Atualiza o estado (e opcionalmente o método de tratamento) de uma solicitação."""
         ...
 
     @abstractmethod
     def atualizar_localizacao_coleta(
-        self, id_solicitacao: str, latitude: float, longitude: float,
-        origem: str
+        self, id_solicitacao: str, latitude: float, longitude: float, origem: str
     ) -> None: ...
 
     # --- Notificações e Entregas ---
 
     @abstractmethod
     def salvar_notificacao(
-        self, id_usuario: str, mensagem: str,
-        chave_idempotencia: Optional[str] = None
+        self, id_usuario: str, mensagem: str, chave_idempotencia: str | None = None
     ) -> None:
         """Persiste uma notificação para um usuário."""
         ...
 
     @abstractmethod
-    def salvar_ofertas_coleta(self, ofertas: List[Any], criada_em: str) -> None: ...
+    def salvar_ofertas_coleta(self, ofertas: list[Any], criada_em: str) -> None: ...
 
     @abstractmethod
     def ativar_proxima_rodada_ofertas(
         self, solicitacao_id: str, ativada_em: str, expira_em: str
-    ) -> List[Any]: ...
+    ) -> list[Any]: ...
 
     @abstractmethod
-    def expirar_ofertas_vencidas(
-        self, agora: str, proxima_expiracao: str
-    ) -> List[Any]: ...
+    def expirar_ofertas_vencidas(self, agora: str, proxima_expiracao: str) -> list[Any]: ...
 
     @abstractmethod
-    def buscar_ofertas_solicitacao(self, solicitacao_id: str) -> List[Any]: ...
+    def buscar_ofertas_solicitacao(self, solicitacao_id: str) -> list[Any]: ...
 
     @abstractmethod
-    def marcar_despacho_esgotado(
-        self, solicitacao_id: str, agora: str
-    ) -> None: ...
+    def marcar_despacho_esgotado(self, solicitacao_id: str, agora: str) -> None: ...
 
     @abstractmethod
-    def aceitar_oferta_coleta(
-        self, oferta_id: str, empresa_id: str, agora: str
-    ) -> Any: ...
+    def aceitar_oferta_coleta(self, oferta_id: str, empresa_id: str, agora: str) -> Any: ...
 
     @abstractmethod
-    def buscar_ofertas_ativas_empresa(self, empresa_id: str) -> List[Any]: ...
+    def buscar_ofertas_ativas_empresa(self, empresa_id: str) -> list[Any]: ...
 
     @abstractmethod
-    def buscar_notificacoes_usuario(self, id_usuario: str) -> List[Any]:
+    def buscar_notificacoes_usuario(self, id_usuario: str) -> list[Any]:
         """Retorna todas as notificações de um usuário."""
         ...
 
     @abstractmethod
-    def salvar_entrega(self, id_entrega: str, id_usuario: str, valor: float,
-                       empresa: str, data: str, hora: str, status: str) -> None:
+    def salvar_entrega(
+        self,
+        id_entrega: str,
+        id_usuario: str,
+        valor: float,
+        empresa: str,
+        data: str,
+        hora: str,
+        status: str,
+    ) -> None:
         """Persiste uma entrega/transação."""
         ...
 
     @abstractmethod
-    def buscar_entregas_usuario(self, id_usuario: str) -> List[Any]:
+    def buscar_entregas_usuario(self, id_usuario: str) -> list[Any]:
         """Retorna todas as entregas de um usuário."""
         ...
 
     @abstractmethod
-    def salvar_saque(self, id_saque: str, id_usuario: str, valor: float,
-                     metodo: str, data: str, hora: str, status: str) -> None:
+    def salvar_saque(
+        self,
+        id_saque: str,
+        id_usuario: str,
+        valor: float,
+        metodo: str,
+        data: str,
+        hora: str,
+        status: str,
+    ) -> None:
         """Persiste uma solicitação de saque."""
         ...
 
     @abstractmethod
-    def buscar_saques_usuario(self, id_usuario: str) -> List[Any]:
+    def buscar_saques_usuario(self, id_usuario: str) -> list[Any]:
         """Retorna todos os saques de um usuário."""
         ...
 
@@ -274,11 +281,11 @@ class RepositorioBase(ABC):
         ...
 
     @abstractmethod
-    def buscar_todos_cidadaos_admin(self) -> List[Any]:
+    def buscar_todos_cidadaos_admin(self) -> list[Any]:
         """Retorna dados completos de todos os cidadãos para visão administrativa."""
         ...
 
     @abstractmethod
-    def buscar_todos_empresas_admin(self) -> List[Any]:
+    def buscar_todos_empresas_admin(self) -> list[Any]:
         """Retorna dados completos de todas as empresas para visão administrativa."""
         ...

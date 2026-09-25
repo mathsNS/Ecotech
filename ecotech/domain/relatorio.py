@@ -4,10 +4,9 @@ Gera estatísticas sobre descarte, reciclagem e impacto ambiental,
 calculando métricas de sustentabilidade do sistema.
 """
 
-from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
 from .descarte import SolicitacaoDescarte
-from .estados import Reciclado, Reutilizado, Descartado
 
 
 class RelatorioAmbiental:
@@ -16,12 +15,12 @@ class RelatorioAmbiental:
     Agrupa solicitações de descarte e calcula métricas ambientais
     como peso reciclado, reutilizado e impacto evitado.
     """
-    
+
     def __init__(self, titulo: str):
         """Inicializa o relatório com título e timestamp."""
         self._titulo = titulo
-        self._solicitacoes: List[SolicitacaoDescarte] = []
-        self._data_geracao = datetime.now()
+        self._solicitacoes: list[SolicitacaoDescarte] = []
+        self._data_geracao = datetime.now(timezone(timedelta(hours=-3)))
 
     @property
     def titulo(self) -> str:
@@ -41,7 +40,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações recicladas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if sol.estado.obter_nome() == 'Reciclado':
+            if sol.estado.obter_nome() == "Reciclado":
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -49,7 +48,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações reutilizadas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if sol.estado.obter_nome() == 'Reutilizado':
+            if sol.estado.obter_nome() == "Reutilizado":
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -57,7 +56,7 @@ class RelatorioAmbiental:
         """Soma o peso de todas as solicitações descartadas."""
         total = 0.0
         for sol in self._solicitacoes:
-            if sol.estado.obter_nome() == 'Descartado':
+            if sol.estado.obter_nome() == "Descartado":
                 total += sol.calcular_peso_total()
         return round(total, 2)
 
@@ -71,15 +70,16 @@ class RelatorioAmbiental:
     def calcular_eficiencia_reciclagem(self) -> float:
         """Percentual do peso reciclado/reutilizado sobre o total processado."""
         total = sum(
-            sol.calcular_peso_total() for sol in self._solicitacoes
-            if sol.estado.obter_nome() in {'Reciclado', 'Reutilizado', 'Descartado'}
+            sol.calcular_peso_total()
+            for sol in self._solicitacoes
+            if sol.estado.obter_nome() in {"Reciclado", "Reutilizado", "Descartado"}
         )
         if total == 0:
             return 0.0
         tratado = self.calcular_total_peso_reciclado() + self.calcular_total_peso_reutilizado()
         return round((tratado / total) * 100, 2)
 
-    def gerar_relatorio(self) -> Dict:
+    def gerar_relatorio(self) -> dict:
         """Retorna dicionário com todas as métricas consolidadas."""
         return {
             "titulo": self._titulo,
@@ -89,7 +89,7 @@ class RelatorioAmbiental:
             "peso_reutilizado_kg": self.calcular_total_peso_reutilizado(),
             "peso_descartado_kg": self.calcular_total_peso_descartado(),
             "impacto_evitado": self.calcular_impacto_evitado(),
-            "eficiencia_reciclagem_pct": self.calcular_eficiencia_reciclagem()
+            "eficiencia_reciclagem_pct": self.calcular_eficiencia_reciclagem(),
         }
 
     def __str__(self) -> str:

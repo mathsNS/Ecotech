@@ -12,4 +12,6 @@ def aplicar(conn):
         criada_em TEXT NOT NULL,
         FOREIGN KEY(solicitacao_id) REFERENCES solicitacao_descarte(id)
     )""")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_foto_solicitacao ON solicitacao_foto(solicitacao_id, criada_em)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_foto_solicitacao ON solicitacao_foto(solicitacao_id, criada_em)"
+    )

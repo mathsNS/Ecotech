@@ -1,14 +1,15 @@
 """Testes para os Mixins de herança múltipla (LoggableMixin e NotificavelMixin)."""
 
 import pytest
-from ecotech.domain.mixins import LoggableMixin, NotificavelMixin
-from ecotech.domain.descarte import PontoColeta, SolicitacaoDescarte
-from ecotech.domain.usuarios import Cidadao
 
+from ecotech.domain.descarte import PontoColeta, SolicitacaoDescarte
+from ecotech.domain.mixins import LoggableMixin, NotificavelMixin
+from ecotech.domain.usuarios import Cidadao
 
 # ---------------------------------
 # TESTES LoggableMixin via PontoColeta
 # ---------------------------------
+
 
 class TestLoggableMixin:
     """Testes para o LoggableMixin aplicado ao PontoColeta."""
@@ -59,6 +60,7 @@ class TestLoggableMixin:
 # TESTES NotificavelMixin via SolicitacaoDescarte
 # -----------------------------------------
 
+
 class TestNotificavelMixin:
     """Testes para o NotificavelMixin aplicado ao SolicitacaoDescarte."""
 
@@ -108,6 +110,7 @@ class TestNotificavelMixin:
 # -----------------------------------------
 # TESTES herança múltipla (ambos Mixins)
 # -----------------------------------------
+
 
 class TestHerancaMultipla:
     """Testes que verificam a coexistência dos dois Mixins na mesma classe."""

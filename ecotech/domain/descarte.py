@@ -4,13 +4,14 @@ Contem as classes principais para gerenciar solicitacoes de descarte.
 Usa composicao para relacionar usuarios, dispositivos e pontos de coleta.
 """
 
-from datetime import datetime
-from typing import List, Optional, Dict
+from datetime import datetime, timedelta, timezone
+
 from .dispositivos import DispositivoEletronico
-from .usuarios import Usuario
-from .estados import EstadoDescarte, Solicitado, Cancelado
-from .tratamento import MetodoTratamento
+from .estados import Cancelado, EstadoDescarte, Solicitado
 from .mixins import LoggableMixin, NotificavelMixin
+from .tratamento import MetodoTratamento
+from .usuarios import Usuario
+
 
 class RastreamentoEntrega:
     """Registra o status e histórico de movimentação de uma solicitação."""
@@ -18,7 +19,7 @@ class RastreamentoEntrega:
     def __init__(self, id_rastreio: str):
         """Inicializa o rastreamento com ID e histórico inicial."""
         self._id_rastreio = id_rastreio
-        self._historico: List[str] = ["Solicitação iniciada"]
+        self._historico: list[str] = ["Solicitação iniciada"]
 
     @property
     def id_rastreio(self) -> str:
@@ -26,28 +27,28 @@ class RastreamentoEntrega:
         return self._id_rastreio
 
     @property
-    def historico(self) -> List[str]:
+    def historico(self) -> list[str]:
         """Retorna cópia do histórico de movimentações."""
         return self._historico.copy()
 
     def atualizar_status(self, mensagem: str):
         """Adiciona uma entrada ao histórico com timestamp."""
-        self._historico.append(f"{datetime.now()}: {mensagem}")
+        self._historico.append(f"{datetime.now(timezone(timedelta(hours=-3)))}: {mensagem}")
 
 
 class ItemDescarte:
     """Representa um item individual de descarte."""
-    
+
     def __init__(
         self,
         dispositivo: DispositivoEletronico,
         quantidade: int = 1,
-        observacoes: str = ""
+        observacoes: str = "",
     ):
         """Inicializa um item de descarte."""
         if quantidade <= 0:
             raise ValueError("quantidade deve ser positiva")
-            
+
         self._dispositivo = dispositivo
         self._quantidade = quantidade
         self._observacoes = observacoes
@@ -85,7 +86,7 @@ class ItemDescarte:
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
-    
+
     def __str__(self) -> str:
         return f"{self._quantidade}x {self._dispositivo.nome}"
 
@@ -96,7 +97,7 @@ class PontoColeta(LoggableMixin):
     Herda de LoggableMixin para registrar auditoria de operações
     como recebimento de resíduos e alterações de capacidade.
     """
-    
+
     def __init__(
         self,
         id: str,
@@ -104,7 +105,7 @@ class PontoColeta(LoggableMixin):
         endereco: str,
         latitude: float,
         longitude: float,
-        capacidade_kg: float = 1000.0
+        capacidade_kg: float = 1000.0,
     ):
         self.__init_log__()
         self._id = id
@@ -132,11 +133,11 @@ class PontoColeta(LoggableMixin):
     @property
     def endereco(self) -> str:
         return self._endereco
-    
+
     @property
     def latitude(self) -> str:
         return self._latitude
-    
+
     @property
     def longitude(self) -> str:
         return self._longitude
@@ -174,8 +175,10 @@ class PontoColeta(LoggableMixin):
     def adicionar_ocupacao(self, peso_kg: float):
         """Adiciona peso à ocupação atual e registra no log."""
         self._ocupacao_atual_kg += peso_kg
-        self.registrar_log("Ocupação adicionada", f"+{peso_kg}kg (total: {self._ocupacao_atual_kg}kg)")
-    
+        self.registrar_log(
+            "Ocupação adicionada", f"+{peso_kg}kg (total: {self._ocupacao_atual_kg}kg)"
+        )
+
     def calcular_disponibilidade_percentual(self) -> float:
         if self._capacidade_kg == 0:
             return 0.0
@@ -185,7 +188,7 @@ class PontoColeta(LoggableMixin):
     # ---------------
     # REPRESENTAÇÃO
     # ---------------
-    
+
     def __str__(self) -> str:
         return f"{self._nome} - {self._endereco}"
 
@@ -196,31 +199,26 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
     Herda de LoggableMixin e NotificavelMixin via herança múltipla,
     obtendo capacidades de auditoria e notificações sem duplicar código.
     """
-    
-    def __init__(
-        self,
-        id: str,
-        usuario: Usuario,
-        ponto_coleta: Optional[PontoColeta] = None
-    ):
+
+    def __init__(self, id: str, usuario: Usuario, ponto_coleta: PontoColeta | None = None):
         self.__init_log__()
         self.__init_notificacoes__()
         self._id = id
         self._usuario = usuario
         self._ponto_coleta = ponto_coleta
-        self._itens: List[ItemDescarte] = []
+        self._itens: list[ItemDescarte] = []
         self._estado: EstadoDescarte = Solicitado()
-        self._metodo_tratamento: Optional[MetodoTratamento] = None
-        self._metodo_tratamento_str: Optional[str] = None
+        self._metodo_tratamento: MetodoTratamento | None = None
+        self._metodo_tratamento_str: str | None = None
         self._impacto_evitado_db: float = 0.0
-        self._data_criacao = datetime.now()
-        self._data_agendamento: Optional[datetime] = None
-        self._empresa_responsavel_id: Optional[str] = None
-        self._base_operacional_id: Optional[str] = None
-        self._atribuida_em: Optional[datetime] = None
-        self._endereco_coleta: Optional[str] = None
-        self._nome_contato: Optional[str] = None
-        self._peso_confirmado_kg: Optional[float] = None
+        self._data_criacao = datetime.now(timezone(timedelta(hours=-3)))
+        self._data_agendamento: datetime | None = None
+        self._empresa_responsavel_id: str | None = None
+        self._base_operacional_id: str | None = None
+        self._atribuida_em: datetime | None = None
+        self._endereco_coleta: str | None = None
+        self._nome_contato: str | None = None
+        self._peso_confirmado_kg: float | None = None
         self._rastreamento = RastreamentoEntrega(f"R-{id}")
         self.registrar_log("Solicitação criada", f"ID: {id}")
 
@@ -237,7 +235,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         return self._usuario
 
     @property
-    def ponto_coleta(self) -> Optional[PontoColeta]:
+    def ponto_coleta(self) -> PontoColeta | None:
         return self._ponto_coleta
 
     @ponto_coleta.setter
@@ -250,7 +248,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         return self._rastreamento
 
     @property
-    def itens(self) -> List[ItemDescarte]:
+    def itens(self) -> list[ItemDescarte]:
         return self._itens.copy()
 
     @property
@@ -258,27 +256,27 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         return self._estado
 
     @property
-    def metodo_tratamento(self) -> Optional[MetodoTratamento]:
+    def metodo_tratamento(self) -> MetodoTratamento | None:
         return self._metodo_tratamento
 
     @metodo_tratamento.setter
     def metodo_tratamento(self, valor: MetodoTratamento):
         self._metodo_tratamento = valor
-    
+
     @property
-    def metodo_tratamento_str(self) -> Optional[str]:
+    def metodo_tratamento_str(self) -> str | None:
         """Retorna o método de tratamento como string (do banco de dados)."""
         return self._metodo_tratamento_str
-    
+
     @metodo_tratamento_str.setter
-    def metodo_tratamento_str(self, valor: Optional[str]):
+    def metodo_tratamento_str(self, valor: str | None):
         self._metodo_tratamento_str = valor
-    
+
     @property
     def impacto_evitado_db(self) -> float:
         """Retorna o impacto evitado calculado no banco de dados."""
         return self._impacto_evitado_db
-    
+
     @impacto_evitado_db.setter
     def impacto_evitado_db(self, valor: float):
         self._impacto_evitado_db = valor
@@ -327,12 +325,12 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         return sum(item.calcular_peso_total() for item in self._itens)
 
     @property
-    def peso_confirmado_kg(self) -> Optional[float]:
+    def peso_confirmado_kg(self) -> float | None:
         return self._peso_confirmado_kg
 
     def confirmar_peso(self, peso_kg: float) -> None:
         if peso_kg <= 0:
-            raise ValueError('O peso aferido deve ser maior que zero.')
+            raise ValueError("O peso aferido deve ser maior que zero.")
         self._peso_confirmado_kg = round(float(peso_kg), 3)
 
     def calcular_impacto_total(self) -> float:
@@ -350,8 +348,7 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self._rastreamento.atualizar_status(f"Estado mudado para {novo_estado}")
         self.registrar_log("Estado avançado", f"{estado_anterior} -> {novo_estado}")
         self.emitir_notificacao(
-            "Mudança de estado",
-            f"Solicitação {self._id} avançou para {novo_estado}"
+            "Mudança de estado", f"Solicitação {self._id} avançou para {novo_estado}"
         )
 
     def cancelar(self, motivo: str = ""):
@@ -364,18 +361,18 @@ class SolicitacaoDescarte(LoggableMixin, NotificavelMixin):
         self.emitir_notificacao(
             "Solicitação cancelada",
             f"Solicitação {self._id} foi cancelada: {motivo}",
-            prioridade="alta"
+            prioridade="alta",
         )
 
-    def obter_resumo(self) -> Dict:
+    def obter_resumo(self) -> dict:
         return {
             "id": self._id,
             "usuario": self._usuario.nome,
             "estado": self._estado.obter_nome(),
             "peso_total_kg": self.calcular_peso_total(),
-            "data_criacao": self._data_criacao.isoformat()
+            "data_criacao": self._data_criacao.isoformat(),
         }
-    
+
     # ---------------
     # REPRESENTAÇÃO
     # ---------------

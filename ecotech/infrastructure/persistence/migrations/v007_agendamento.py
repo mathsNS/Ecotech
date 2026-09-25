@@ -1,5 +1,6 @@
 """Migration 007: negociação formal de janelas de coleta."""
 
+
 def aplicar(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS agendamento_coleta (
         solicitacao_id TEXT PRIMARY KEY, janela_inicio TEXT NOT NULL, janela_fim TEXT NOT NULL,

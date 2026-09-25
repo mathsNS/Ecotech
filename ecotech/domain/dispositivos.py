@@ -11,10 +11,10 @@ from enum import Enum
 
 
 class EstadoProduto(Enum):
-    FUNCIONANDO   = "funcionando"
-    DEFEITO_LEVE  = "defeito_leve"
+    FUNCIONANDO = "funcionando"
+    DEFEITO_LEVE = "defeito_leve"
     DEFEITO_GRAVE = "defeito_grave"
-    SUCATA        = "sucata"
+    SUCATA = "sucata"
 
 
 class StatusDispositivo(Enum):
@@ -30,6 +30,7 @@ class StatusDispositivo(Enum):
     PARCIALMENTE_FUNCIONAL = "parcialmente_funcional"
     DANIFICADO = "danificado"
 
+
 class DispositivoEletronico(ABC):
     """
     Classe abstrata base para dispositivos eletrônicos.
@@ -39,12 +40,21 @@ class DispositivoEletronico(ABC):
     """
 
     _MULTIPLICADORES_ESTADO = {
-        EstadoProduto.FUNCIONANDO:   1.00,
-        EstadoProduto.DEFEITO_LEVE:  0.40,
+        EstadoProduto.FUNCIONANDO: 1.00,
+        EstadoProduto.DEFEITO_LEVE: 0.40,
         EstadoProduto.DEFEITO_GRAVE: 0.15,
     }
 
-    def __init__(self, id: str, nome: str, peso_kg: float, marca: str = "", modelo: str = "", status: StatusDispositivo = StatusDispositivo.FUNCIONANDO, subcategoria: str = ""):
+    def __init__(
+        self,
+        id: str,
+        nome: str,
+        peso_kg: float,
+        marca: str = "",
+        modelo: str = "",
+        status: StatusDispositivo = StatusDispositivo.FUNCIONANDO,
+        subcategoria: str = "",
+    ):
         """
         Inicializa um dispositivo eletrônico.
 
@@ -62,7 +72,7 @@ class DispositivoEletronico(ABC):
         """
         if peso_kg <= 0:
             raise ValueError("peso deve ser positivo")
-        
+
         for valor, nome_campo in [(marca, "marca"), (modelo, "modelo")]:
             if not isinstance(valor, str):
                 raise ValueError(f"{nome_campo} deve ser uma string")
@@ -80,12 +90,12 @@ class DispositivoEletronico(ABC):
         self._marca = marca
         self._modelo = modelo
         self._status = status
-        self._subcategoria = subcategoria or getattr(self.__class__, 'SUBCATEGORIA_PADRAO', '')
+        self._subcategoria = subcategoria or getattr(self.__class__, "SUBCATEGORIA_PADRAO", "")
 
     # -------------------
     # PROPERTIES
     # -------------------
-    
+
     @property
     def id(self) -> str:
         return self._id
@@ -118,23 +128,22 @@ class DispositivoEletronico(ABC):
     # ------------------
     # MÉTODOS ABSTRATOS
     # ------------------
-    
+
     @abstractmethod
     def obter_tipo(self) -> str:
         """Retorna o tipo do dispositivo."""
-        pass
 
     @abstractmethod
     def calcular_impacto_ambiental(self) -> float:
         """Calcula o impacto ambiental do dispositivo por kg."""
-        pass
 
     @abstractmethod
     def calcular_valor_revenda(self) -> float:
         """Calcula o valor de revenda estimado."""
-        pass
 
-    def calcular_valor_avaliado(self, estado: EstadoProduto, valor_base: float, valor_minimo_sucata: float) -> float:
+    def calcular_valor_avaliado(
+        self, estado: EstadoProduto, valor_base: float, valor_minimo_sucata: float
+    ) -> float:
         if estado == EstadoProduto.SUCATA:
             return round(valor_minimo_sucata, 2)
         return round(valor_base * self._MULTIPLICADORES_ESTADO[estado], 2)
@@ -146,10 +155,11 @@ class DispositivoEletronico(ABC):
     def __str__(self) -> str:
         return f"{self.obter_tipo()}: {self._nome} ({self._peso_kg}kg)"
 
+
 class Celular(DispositivoEletronico):
     """Implementação para dispositivos do tipo Celular."""
 
-    SUBCATEGORIA_PADRAO = 'smartphone_medio'
+    SUBCATEGORIA_PADRAO = "smartphone_medio"
 
     def obter_tipo(self) -> str:
         return "Celular"
@@ -160,10 +170,11 @@ class Celular(DispositivoEletronico):
     def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 10.0
 
+
 class Computador(DispositivoEletronico):
     """Implementação para dispositivos do tipo Computador."""
 
-    SUBCATEGORIA_PADRAO = 'notebook_basico'
+    SUBCATEGORIA_PADRAO = "notebook_basico"
 
     def obter_tipo(self) -> str:
         return "Computador"
@@ -174,10 +185,11 @@ class Computador(DispositivoEletronico):
     def calcular_valor_revenda(self) -> float:
         return self._peso_kg * 25.0
 
+
 class Eletrodomestico(DispositivoEletronico):
     """Implementação para dispositivos do tipo Eletrodoméstico."""
 
-    SUBCATEGORIA_PADRAO = 'geladeira'
+    SUBCATEGORIA_PADRAO = "geladeira"
 
     def obter_tipo(self) -> str:
         return "Eletrodomestico"

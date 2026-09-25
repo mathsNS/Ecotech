@@ -1,11 +1,12 @@
 """Testes da camada de persistência."""
 
 import sqlite3
+
 import pytest
 
-from ecotech.domain.usuarios import Cidadao, Empresa, Administrador
+from ecotech.domain.descarte import ItemDescarte, PontoColeta, SolicitacaoDescarte
 from ecotech.domain.dispositivos import Celular
-from ecotech.domain.descarte import PontoColeta, SolicitacaoDescarte, ItemDescarte
+from ecotech.domain.usuarios import Administrador, Cidadao, Empresa
 from ecotech.infrastructure.persistence.dados import Dados
 
 
@@ -21,19 +22,23 @@ def dados(tmp_path, monkeypatch):
     return Dados()
 
 
-
 def _cidadao():
     return Cidadao("cid-1", "João Silva", "joao@test.com", "12345678909")
 
+
 def _empresa():
-    return Empresa("emp-1", "Recicla Kariri", "rk@test.com", "11222333000181",
-                   "Recicla Kariri LTDA")
+    return Empresa(
+        "emp-1", "Recicla Kariri", "rk@test.com", "11222333000181", "Recicla Kariri LTDA"
+    )
+
 
 def _admin():
     return Administrador("adm-1", "Admin", "admin@test.com", 3)
 
+
 def _celular():
     return Celular("cel-1", "iPhone X", 0.194, "Apple", "X")
+
 
 def _ponto():
     return PontoColeta("pnt-1", "Ecoponto Sul", "Rua A, 1", -7.2, -39.3, 500.0)

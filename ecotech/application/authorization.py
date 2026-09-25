@@ -1,6 +1,6 @@
 """Políticas de autorização e escopo operacional do EcoTech."""
 
-from typing import Iterable, List
+from collections.abc import Iterable
 
 from ..domain.descarte import SolicitacaoDescarte
 
@@ -12,10 +12,10 @@ def empresa_pode_operar_solicitacao(
 ) -> bool:
     """Retorna se a empresa é responsável pela operação da solicitação."""
     empresa_responsavel_id = getattr(solicitacao, "empresa_responsavel_id", None)
-    if empresa_responsavel_id is None and hasattr(repositorio, 'buscar_solicitacao'):
+    if empresa_responsavel_id is None and hasattr(repositorio, "buscar_solicitacao"):
         row = repositorio.buscar_solicitacao(solicitacao.id)
-        if row and 'empresa_responsavel_id' in row.keys():
-            empresa_responsavel_id = row['empresa_responsavel_id']
+        if row and "empresa_responsavel_id" in row.keys():
+            empresa_responsavel_id = row["empresa_responsavel_id"]
     if empresa_responsavel_id is not None:
         return empresa_responsavel_id == empresa_id
 
@@ -38,9 +38,7 @@ def usuario_pode_visualizar_solicitacao(
     if usuario["tipo"] == "cidadao":
         return solicitacao.usuario.id == usuario["id"]
     if usuario["tipo"] == "empresa":
-        return empresa_pode_operar_solicitacao(
-            usuario["id"], solicitacao, repositorio
-        )
+        return empresa_pode_operar_solicitacao(usuario["id"], solicitacao, repositorio)
     return False
 
 
@@ -54,21 +52,17 @@ def usuario_pode_operar_solicitacao(
         return True
     if usuario["tipo"] != "empresa":
         return False
-    return empresa_pode_operar_solicitacao(
-        usuario["id"], solicitacao, repositorio
-    )
+    return empresa_pode_operar_solicitacao(usuario["id"], solicitacao, repositorio)
 
 
 def listar_solicitacoes_visiveis_empresa(
     empresa_id: str,
     solicitacoes: Iterable[SolicitacaoDescarte],
     repositorio,
-) -> List[SolicitacaoDescarte]:
+) -> list[SolicitacaoDescarte]:
     """Retorna o escopo operacional único de uma empresa."""
     return [
         solicitacao
         for solicitacao in solicitacoes
-        if empresa_pode_operar_solicitacao(
-            empresa_id, solicitacao, repositorio
-        )
+        if empresa_pode_operar_solicitacao(empresa_id, solicitacao, repositorio)
     ]

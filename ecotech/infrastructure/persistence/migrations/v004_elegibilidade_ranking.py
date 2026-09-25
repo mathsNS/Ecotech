@@ -6,9 +6,9 @@ def _coluna_existe(conn, tabela, coluna) -> bool:
 
 
 def aplicar(conn) -> None:
-    if not _coluna_existe(conn, 'base_operacional', 'indisponivel_ate'):
+    if not _coluna_existe(conn, "base_operacional", "indisponivel_ate"):
         conn.execute("ALTER TABLE base_operacional ADD COLUMN indisponivel_ate TEXT")
-    if not _coluna_existe(conn, 'solicitacao_descarte', 'base_operacional_id'):
+    if not _coluna_existe(conn, "solicitacao_descarte", "base_operacional_id"):
         conn.execute("ALTER TABLE solicitacao_descarte ADD COLUMN base_operacional_id TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS base_categoria (
@@ -27,6 +27,12 @@ def aplicar(conn) -> None:
             FOREIGN KEY(base_id) REFERENCES base_operacional(id) ON DELETE CASCADE
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_base_categoria_categoria ON base_categoria(categoria, base_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_solicitacao_base_estado ON solicitacao_descarte(base_operacional_id, estado)")
-    conn.execute("INSERT OR IGNORE INTO base_categoria(base_id, categoria) SELECT id, '*' FROM base_operacional")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_base_categoria_categoria ON base_categoria(categoria, base_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_solicitacao_base_estado ON solicitacao_descarte(base_operacional_id, estado)"
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO base_categoria(base_id, categoria) SELECT id, '*' FROM base_operacional"
+    )

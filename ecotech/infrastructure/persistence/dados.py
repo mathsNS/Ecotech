@@ -1,38 +1,31 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime
-from werkzeug.security import generate_password_hash
-from ...domain.usuarios import Cidadao, Empresa, Administrador
-from ...domain.dispositivos import Celular
-from ...domain.descarte import PontoColeta, ItemDescarte, SolicitacaoDescarte, RastreamentoEntrega
-from ...domain.repositorio import RepositorioBase
+from datetime import datetime, timedelta, timezone
+
 from ...domain.logistica import BaseOperacional
+from ...domain.repositorio import RepositorioBase
 from .migrations import executar_migrations, versao_atual
+
 
 class Dados(RepositorioBase):
     """Implementação SQLite do RepositorioBase."""
 
     def __init__(self):
-        self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
+        self.conn = sqlite3.connect("ecotech.db", check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.criar_tabelas()
 
     def _coluna_existe(self, tabela: str, coluna: str) -> bool:
         return any(
-            row['name'] == coluna
-            for row in self.conn.execute(f"PRAGMA table_info({tabela})")
+            row["name"] == coluna for row in self.conn.execute(f"PRAGMA table_info({tabela})")
         )
 
-    def _adicionar_coluna_se_ausente(
-        self, tabela: str, coluna: str, definicao: str
-    ) -> None:
+    def _adicionar_coluna_se_ausente(self, tabela: str, coluna: str, definicao: str) -> None:
         """Aplica uma evolução legada de coluna sem ocultar erros do SQLite."""
         if not self._coluna_existe(tabela, coluna):
-            self.conn.execute(
-                f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}"
-            )
+            self.conn.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}")
 
     def criar_tabelas(self):
         c = self.conn.cursor()
@@ -50,7 +43,7 @@ class Dados(RepositorioBase):
         )
         """)
 
-        self._adicionar_coluna_se_ausente('usuario', 'password_hash', 'TEXT')
+        self._adicionar_coluna_se_ausente("usuario", "password_hash", "TEXT")
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS cidadao (
@@ -103,12 +96,8 @@ class Dados(RepositorioBase):
             tipo TEXT DEFAULT 'celular'
         )
         """)
-        self._adicionar_coluna_se_ausente(
-            'dispositivo', 'tipo', "TEXT DEFAULT 'celular'"
-        )
-        self._adicionar_coluna_se_ausente(
-            'dispositivo', 'ano_fabricacao', 'INTEGER'
-        )
+        self._adicionar_coluna_se_ausente("dispositivo", "tipo", "TEXT DEFAULT 'celular'")
+        self._adicionar_coluna_se_ausente("dispositivo", "ano_fabricacao", "INTEGER")
 
         # Tabela de Ponto de Coleta
         c.execute("""
@@ -123,13 +112,9 @@ class Dados(RepositorioBase):
             ocupacao_atual_kg REAL 
         )
         """)
-        self._adicionar_coluna_se_ausente('ponto_coleta', 'id_empresa', 'TEXT')
-        self._adicionar_coluna_se_ausente(
-            'empresa', 'plano', "TEXT DEFAULT 'free'"
-        )
-        self._adicionar_coluna_se_ausente(
-            'empresa', 'saldo', 'REAL DEFAULT 0.0'
-        )
+        self._adicionar_coluna_se_ausente("ponto_coleta", "id_empresa", "TEXT")
+        self._adicionar_coluna_se_ausente("empresa", "plano", "TEXT DEFAULT 'free'")
+        self._adicionar_coluna_se_ausente("empresa", "saldo", "REAL DEFAULT 0.0")
 
         # Tabelas de Descarte
         c.execute("""
@@ -146,19 +131,17 @@ class Dados(RepositorioBase):
         )
         """)
         for coluna, definicao in (
-            ('tipo_coleta', "TEXT DEFAULT 'domiciliar'"),
-            ('endereco_coleta', 'TEXT'),
-            ('nome_contato', 'TEXT'),
-            ('confirmado_cidadao', 'INTEGER DEFAULT 0'),
-            ('confirmado_empresa', 'INTEGER DEFAULT 0'),
-            ('estado_produto', 'TEXT'),
-            ('valor_proposto', 'REAL'),
-            ('justificativa_valor', 'TEXT'),
-            ('status_override', "TEXT DEFAULT 'nenhum'"),
+            ("tipo_coleta", "TEXT DEFAULT 'domiciliar'"),
+            ("endereco_coleta", "TEXT"),
+            ("nome_contato", "TEXT"),
+            ("confirmado_cidadao", "INTEGER DEFAULT 0"),
+            ("confirmado_empresa", "INTEGER DEFAULT 0"),
+            ("estado_produto", "TEXT"),
+            ("valor_proposto", "REAL"),
+            ("justificativa_valor", "TEXT"),
+            ("status_override", "TEXT DEFAULT 'nenhum'"),
         ):
-            self._adicionar_coluna_se_ausente(
-                'solicitacao_descarte', coluna, definicao
-            )
+            self._adicionar_coluna_se_ausente("solicitacao_descarte", coluna, definicao)
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS item_descarte (
@@ -213,7 +196,7 @@ class Dados(RepositorioBase):
         """)
 
         self._adicionar_coluna_se_ausente(
-            'dispositivo', 'subcategoria', "TEXT DEFAULT 'smartphone_medio'"
+            "dispositivo", "subcategoria", "TEXT DEFAULT 'smartphone_medio'"
         )
 
         # tabela de precificacao por subcategoria
@@ -226,30 +209,36 @@ class Dados(RepositorioBase):
         )
         """)
         precos_padrao = [
-            ('smartphone_basico',    'celular',          8.00,   300.00),
-            ('smartphone_medio',     'celular',         10.00,   600.00),
-            ('smartphone_premium',   'celular',         15.00,  1500.00),
-            ('iphone',               'celular',         20.00,  2500.00),
-            ('notebook_basico',      'computador',      30.00,   800.00),
-            ('notebook_gamer',       'computador',      50.00,  3000.00),
-            ('desktop',              'computador',      40.00,   700.00),
-            ('geladeira',            'eletrodomestico', 130.00,  900.00),
-            ('lavadora',             'eletrodomestico',  80.00,  700.00),
-            ('ar_condicionado',      'eletrodomestico', 120.00, 1000.00),
-            ('micro_ondas',          'eletrodomestico',  15.00,  200.00),
-            ('tv',                   'eletrodomestico',  15.00,  500.00),
+            ("smartphone_basico", "celular", 8.00, 300.00),
+            ("smartphone_medio", "celular", 10.00, 600.00),
+            ("smartphone_premium", "celular", 15.00, 1500.00),
+            ("iphone", "celular", 20.00, 2500.00),
+            ("notebook_basico", "computador", 30.00, 800.00),
+            ("notebook_gamer", "computador", 50.00, 3000.00),
+            ("desktop", "computador", 40.00, 700.00),
+            ("geladeira", "eletrodomestico", 130.00, 900.00),
+            ("lavadora", "eletrodomestico", 80.00, 700.00),
+            ("ar_condicionado", "eletrodomestico", 120.00, 1000.00),
+            ("micro_ondas", "eletrodomestico", 15.00, 200.00),
+            ("tv", "eletrodomestico", 15.00, 500.00),
         ]
         c.executemany(
             "INSERT OR IGNORE INTO tabela_precos (subcategoria, categoria, valor_minimo_sucata, valor_base_funcionando) VALUES (?, ?, ?, ?)",
-            precos_padrao
+            precos_padrao,
         )
 
         # Índices para otimizar buscas frequentes
-        c.execute("CREATE INDEX IF NOT EXISTS idx_solicitacao_usuario ON solicitacao_descarte(id_usuario)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_item_solicitacao ON item_descarte(id_solicitacao)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_solicitacao_usuario ON solicitacao_descarte(id_usuario)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_item_solicitacao ON item_descarte(id_solicitacao)"
+        )
         c.execute("CREATE INDEX IF NOT EXISTS idx_notificacao_usuario ON notificacao(id_usuario)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_entrega_usuario ON entrega(id_usuario)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_rastreamento_solicitacao ON historico_rastreamento(id_solicitacao)")
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rastreamento_solicitacao ON historico_rastreamento(id_solicitacao)"
+        )
         c.execute("CREATE INDEX IF NOT EXISTS idx_saque_usuario ON saque(id_usuario)")
 
         # tabela de receita da EcoTech (comissao por solicitacao)
@@ -271,132 +260,226 @@ class Dados(RepositorioBase):
     # -------------------
 
     def salvar_cidadao(self, cidadao, password_hash: str = ""):
-        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        data_cadastro = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S")
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (cidadao.id, cidadao.nome, cidadao.email, data_cadastro, 1, "cidadao", password_hash))
+            """,
+                (
+                    cidadao.id,
+                    cidadao.nome,
+                    cidadao.email,
+                    data_cadastro,
+                    1,
+                    "cidadao",
+                    password_hash,
+                ),
+            )
             self.conn.execute(
                 "INSERT OR IGNORE INTO cidadao (id_usuario, cpf, solicitacoes_ativas, pontos) VALUES (?, ?, ?, ?)",
-                (cidadao.id, cidadao.cpf, 0, 0)
+                (cidadao.id, cidadao.cpf, 0, 0),
             )
 
     def salvar_empresa(self, empresa, password_hash: str = ""):
-        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        data_cadastro = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S")
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (empresa.id, empresa.nome, empresa.email, data_cadastro, 1, 'empresa', password_hash))
+            """,
+                (
+                    empresa.id,
+                    empresa.nome,
+                    empresa.email,
+                    data_cadastro,
+                    1,
+                    "empresa",
+                    password_hash,
+                ),
+            )
             self.conn.execute(
                 "INSERT OR IGNORE INTO empresa (id_usuario, cnpj, razao_social, limite_mensal, descartado_mes) VALUES (?, ?, ?, ?, ?)",
-                (empresa.id, empresa.cnpj, empresa.razao_social, empresa.limite_mensal, empresa.descartado_mes)
+                (
+                    empresa.id,
+                    empresa.cnpj,
+                    empresa.razao_social,
+                    empresa.limite_mensal,
+                    empresa.descartado_mes,
+                ),
             )
 
     def salvar_administrador(self, administrador, password_hash: str = ""):
-        data_cadastro = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        data_cadastro = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S")
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO usuario (id, nome, email, data_cadastro, ativo, tipo, password_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (administrador.id, administrador.nome, administrador.email, data_cadastro, 1, "administrador", password_hash))
+            """,
+                (
+                    administrador.id,
+                    administrador.nome,
+                    administrador.email,
+                    data_cadastro,
+                    1,
+                    "administrador",
+                    password_hash,
+                ),
+            )
             self.conn.execute(
                 "INSERT OR IGNORE INTO administrador (id_usuario, nivel) VALUES (?, ?)",
-                (administrador.id, administrador.nivel)
+                (administrador.id, administrador.nivel),
             )
+
     def salvar_notificacao(self, id_usuario, mensagem, chave_idempotencia=None):
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        timestamp = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S")
         try:
             with self.conn:
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                 INSERT INTO notificacao (
                     id_usuario, timestamp, mensagem, chave_idempotencia
                 ) VALUES (?, ?, ?, ?)
-                """, (id_usuario, timestamp, mensagem, chave_idempotencia))
+                """,
+                    (id_usuario, timestamp, mensagem, chave_idempotencia),
+                )
         except sqlite3.IntegrityError:
-            if chave_idempotencia and self.conn.execute(
-                "SELECT 1 FROM notificacao WHERE chave_idempotencia = ?",
-                (chave_idempotencia,),
-            ).fetchone():
+            if (
+                chave_idempotencia
+                and self.conn.execute(
+                    "SELECT 1 FROM notificacao WHERE chave_idempotencia = ?",
+                    (chave_idempotencia,),
+                ).fetchone()
+            ):
                 return
             raise
 
     def salvar_dispositivo(self, dispositivo):
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO dispositivo
                 (id, nome, peso_kg, marca, modelo, tipo, subcategoria, ano_fabricacao)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                dispositivo.id, dispositivo.nome, dispositivo.peso_kg,
-                dispositivo.marca, dispositivo.modelo,
-                dispositivo.obter_tipo().lower(), dispositivo.subcategoria,
-                getattr(dispositivo, 'ano_fabricacao', None),
-            ))
+            """,
+                (
+                    dispositivo.id,
+                    dispositivo.nome,
+                    dispositivo.peso_kg,
+                    dispositivo.marca,
+                    dispositivo.modelo,
+                    dispositivo.obter_tipo().lower(),
+                    dispositivo.subcategoria,
+                    getattr(dispositivo, "ano_fabricacao", None),
+                ),
+            )
 
     def salvar_ponto(self, ponto_coleta):
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO ponto_coleta (id, nome, endereco, latitude, longitude, ativo, capacidade_kg, ocupacao_atual_kg)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ponto_coleta.id, ponto_coleta.nome, ponto_coleta.endereco,
-                  ponto_coleta.latitude, ponto_coleta.longitude, 1,
-                  ponto_coleta.capacidade_kg, ponto_coleta.ocupacao_atual_kg))
+            """,
+                (
+                    ponto_coleta.id,
+                    ponto_coleta.nome,
+                    ponto_coleta.endereco,
+                    ponto_coleta.latitude,
+                    ponto_coleta.longitude,
+                    1,
+                    ponto_coleta.capacidade_kg,
+                    ponto_coleta.ocupacao_atual_kg,
+                ),
+            )
 
     def salvar_solicitacao(self, solicitacao_descarte):
-        data_criacao = datetime.now().strftime("%d/%m/%Y %H:%M")
-        estado_str = solicitacao_descarte.estado.obter_nome().upper().replace(' ', '_')
+        data_criacao = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M")
+        estado_str = solicitacao_descarte.estado.obter_nome().upper().replace(" ", "_")
         metodo_str = (
             solicitacao_descarte.metodo_tratamento.obter_nome()
-            if solicitacao_descarte.metodo_tratamento else None
+            if solicitacao_descarte.metodo_tratamento
+            else None
         )
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO solicitacao_descarte
                 (id, id_usuario, id_ponto_coleta, estado, metodo_tratamento, data_criacao, data_agendamento)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                solicitacao_descarte.id,
-                solicitacao_descarte.usuario.id,
-                solicitacao_descarte.ponto_coleta.id if solicitacao_descarte.ponto_coleta else None,
-                estado_str,
-                metodo_str,
-                data_criacao,
-                None
-            ))
+            """,
+                (
+                    solicitacao_descarte.id,
+                    solicitacao_descarte.usuario.id,
+                    solicitacao_descarte.ponto_coleta.id
+                    if solicitacao_descarte.ponto_coleta
+                    else None,
+                    estado_str,
+                    metodo_str,
+                    data_criacao,
+                    None,
+                ),
+            )
 
     def salvar_itens_descarte(self, id_solicitacao, item):
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO item_descarte (id_dispositivo, id_solicitacao, quantidade, observacoes)
             VALUES (?, ?, ?, ?)
-            """, (item.dispositivo.id, id_solicitacao, item.quantidade, item.observacoes))
+            """,
+                (
+                    item.dispositivo.id,
+                    id_solicitacao,
+                    item.quantidade,
+                    item.observacoes,
+                ),
+            )
 
     def salvar_historico_rastreamento(self, id_solicitacao, mensagem):
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        timestamp = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m/%Y %H:%M:%S")
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT INTO historico_rastreamento (id_solicitacao, timestamp, mensagem)
             VALUES (?, ?, ?)
-            """, (id_solicitacao, timestamp, mensagem))
+            """,
+                (id_solicitacao, timestamp, mensagem),
+            )
 
     def salvar_entrega(self, id_entrega, id_usuario, valor, empresa, data, hora, status):
         """Salva uma entrega/transação no histórico."""
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR REPLACE INTO entrega (id, id_usuario, valor, empresa, data, hora, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
+            """,
+                (id_entrega, id_usuario, valor, empresa, data, hora, status),
+            )
 
-    def salvar_saque(self, id_saque: str, id_usuario: str, valor: float,
-                     metodo: str, data: str, hora: str, status: str) -> None:
+    def salvar_saque(
+        self,
+        id_saque: str,
+        id_usuario: str,
+        valor: float,
+        metodo: str,
+        data: str,
+        hora: str,
+        status: str,
+    ) -> None:
         """Registra uma solicitação de saque."""
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             INSERT OR IGNORE INTO saque (id, id_usuario, valor, metodo, data, hora, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (id_saque, id_usuario, valor, metodo, data, hora, status))
+            """,
+                (id_saque, id_usuario, valor, metodo, data, hora, status),
+            )
 
     def buscar_saques_usuario(self, id_usuario: str):
         """Retorna todos os saques de um usuário."""
@@ -407,43 +490,55 @@ class Dados(RepositorioBase):
     def buscar_total_sacado_usuario(self, id_usuario: str) -> float:
         """Retorna o total já sacado (status pendente ou finalizado) por um usuário."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT COALESCE(SUM(valor), 0.0) as total
             FROM saque
             WHERE id_usuario = ? AND status IN ('pendente', 'finalizado')
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         row = c.fetchone()
-        return float(row['total']) if row else 0.0
+        return float(row["total"]) if row else 0.0
 
     # -------------------
     # ATUALIZAR
     # -------------------
 
-    def atualizar_solicitacao(self, id_solicitacao: str, estado: str,
-                               metodo_tratamento=None) -> None:
+    def atualizar_solicitacao(
+        self, id_solicitacao: str, estado: str, metodo_tratamento=None
+    ) -> None:
         """Atualiza estado e opcionalmente o método de tratamento de uma solicitação."""
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
             UPDATE solicitacao_descarte
                SET estado = ?,
                    metodo_tratamento = COALESCE(?, metodo_tratamento)
              WHERE id = ?
-            """, (estado, metodo_tratamento, id_solicitacao))
+            """,
+                (estado, metodo_tratamento, id_solicitacao),
+            )
 
     def atualizar_localizacao_coleta(
-        self, id_solicitacao: str, latitude: float, longitude: float,
-        origem: str
+        self, id_solicitacao: str, latitude: float, longitude: float, origem: str
     ) -> None:
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET latitude_coleta = ?, longitude_coleta = ?,
                     localizacao_obtida_em = ?, origem_localizacao = ?
                 WHERE id = ? AND tipo_coleta = 'domiciliar'
-            """, (
-                latitude, longitude, datetime.now().isoformat(timespec='seconds'),
-                origem, id_solicitacao,
-            ))
+            """,
+                (
+                    latitude,
+                    longitude,
+                    datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    origem,
+                    id_solicitacao,
+                ),
+            )
         if cursor.rowcount != 1:
             raise ValueError("solicitação domiciliar não encontrada")
 
@@ -452,27 +547,38 @@ class Dados(RepositorioBase):
         with self.conn:
             self.conn.execute(
                 "UPDATE ponto_coleta SET ocupacao_atual_kg = ? WHERE id = ?",
-                (ocupacao_atual_kg, id_ponto)
+                (ocupacao_atual_kg, id_ponto),
             )
 
     def salvar_base_operacional(self, base: BaseOperacional) -> None:
-        agora = datetime.now().isoformat(timespec='seconds')
+        agora = datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds")
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 INSERT INTO base_operacional (
                     id, empresa_id, ponto_coleta_id, nome, endereco,
                     latitude, longitude, raio_atendimento_km,
                     capacidade_kg, ocupacao_atual_kg,
                     realiza_coleta_domiciliar, ativa, criada_em, atualizada_em
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                base.id, base.empresa_id, base.ponto_coleta_id,
-                base.nome, base.endereco, base.latitude, base.longitude,
-                base.raio_atendimento_km, base.capacidade_kg,
-                base.ocupacao_atual_kg,
-                int(base.realiza_coleta_domiciliar), int(base.ativa),
-                agora, agora,
-            ))
+            """,
+                (
+                    base.id,
+                    base.empresa_id,
+                    base.ponto_coleta_id,
+                    base.nome,
+                    base.endereco,
+                    base.latitude,
+                    base.longitude,
+                    base.raio_atendimento_km,
+                    base.capacidade_kg,
+                    base.ocupacao_atual_kg,
+                    int(base.realiza_coleta_domiciliar),
+                    int(base.ativa),
+                    agora,
+                    agora,
+                ),
+            )
             self.conn.execute(
                 "INSERT OR IGNORE INTO base_categoria(base_id, categoria) VALUES (?, '*')",
                 (base.id,),
@@ -484,47 +590,60 @@ class Dados(RepositorioBase):
         ).fetchone()
 
     def buscar_bases_empresa(self, id_empresa: str):
-        return self.conn.execute("""
+        return self.conn.execute(
+            """
             SELECT * FROM base_operacional
             WHERE empresa_id = ? ORDER BY ativa DESC, nome
-        """, (id_empresa,)).fetchall()
+        """,
+            (id_empresa,),
+        ).fetchall()
 
     def atualizar_base_operacional(self, base: BaseOperacional) -> None:
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE base_operacional
                 SET nome = ?, endereco = ?, latitude = ?, longitude = ?,
                     raio_atendimento_km = ?, capacidade_kg = ?,
                     ocupacao_atual_kg = ?, realiza_coleta_domiciliar = ?,
                     atualizada_em = ?
                 WHERE id = ? AND empresa_id = ?
-            """, (
-                base.nome, base.endereco, base.latitude, base.longitude,
-                base.raio_atendimento_km, base.capacidade_kg,
-                base.ocupacao_atual_kg, int(base.realiza_coleta_domiciliar),
-                datetime.now().isoformat(timespec='seconds'),
-                base.id, base.empresa_id,
-            ))
+            """,
+                (
+                    base.nome,
+                    base.endereco,
+                    base.latitude,
+                    base.longitude,
+                    base.raio_atendimento_km,
+                    base.capacidade_kg,
+                    base.ocupacao_atual_kg,
+                    int(base.realiza_coleta_domiciliar),
+                    datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    base.id,
+                    base.empresa_id,
+                ),
+            )
         if cursor.rowcount != 1:
             raise ValueError("base operacional não encontrada para esta empresa")
 
-    def definir_atividade_base(
-        self, id_base: str, id_empresa: str, ativa: bool
-    ) -> None:
+    def definir_atividade_base(self, id_base: str, id_empresa: str, ativa: bool) -> None:
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE base_operacional SET ativa = ?, atualizada_em = ?
                 WHERE id = ? AND empresa_id = ?
-            """, (
-                int(ativa), datetime.now().isoformat(timespec='seconds'),
-                id_base, id_empresa,
-            ))
+            """,
+                (
+                    int(ativa),
+                    datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    id_base,
+                    id_empresa,
+                ),
+            )
         if cursor.rowcount != 1:
             raise ValueError("base operacional não encontrada para esta empresa")
 
-    def configurar_categorias_base(
-        self, id_base: str, id_empresa: str, categorias
-    ) -> None:
+    def configurar_categorias_base(self, id_base: str, id_empresa: str, categorias) -> None:
         categorias = sorted({c.strip().lower() for c in categorias if c.strip()})
         if not categorias:
             raise ValueError("informe ao menos uma categoria")
@@ -541,9 +660,7 @@ class Dados(RepositorioBase):
                 [(id_base, categoria) for categoria in categorias],
             )
 
-    def configurar_disponibilidade_base(
-        self, id_base: str, id_empresa: str, janelas
-    ) -> None:
+    def configurar_disponibilidade_base(self, id_base: str, id_empresa: str, janelas) -> None:
         with self.conn:
             existe = self.conn.execute(
                 "SELECT 1 FROM base_operacional WHERE id = ? AND empresa_id = ?",
@@ -551,27 +668,41 @@ class Dados(RepositorioBase):
             ).fetchone()
             if not existe:
                 raise ValueError("base operacional não encontrada para esta empresa")
-            self.conn.execute(
-                "DELETE FROM base_disponibilidade WHERE base_id = ?", (id_base,)
-            )
-            self.conn.executemany("""
+            self.conn.execute("DELETE FROM base_disponibilidade WHERE base_id = ?", (id_base,))
+            self.conn.executemany(
+                """
                 INSERT INTO base_disponibilidade(
                     base_id, dia_semana, hora_inicio, hora_fim
                 ) VALUES (?, ?, ?, ?)
-            """, [
-                (id_base, janela.dia_semana, janela.inicio.strftime('%H:%M'),
-                 janela.fim.strftime('%H:%M')) for janela in janelas
-            ])
+            """,
+                [
+                    (
+                        id_base,
+                        janela.dia_semana,
+                        janela.inicio.strftime("%H:%M"),
+                        janela.fim.strftime("%H:%M"),
+                    )
+                    for janela in janelas
+                ],
+            )
 
     def definir_indisponibilidade_base(
         self, id_base: str, id_empresa: str, indisponivel_ate
     ) -> None:
-        valor = indisponivel_ate.isoformat(timespec='seconds') if indisponivel_ate else None
+        valor = indisponivel_ate.isoformat(timespec="seconds") if indisponivel_ate else None
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE base_operacional SET indisponivel_ate = ?, atualizada_em = ?
                 WHERE id = ? AND empresa_id = ?
-            """, (valor, datetime.now().isoformat(timespec='seconds'), id_base, id_empresa))
+            """,
+                (
+                    valor,
+                    datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    id_base,
+                    id_empresa,
+                ),
+            )
         if cursor.rowcount != 1:
             raise ValueError("base operacional não encontrada para esta empresa")
 
@@ -610,30 +741,43 @@ class Dados(RepositorioBase):
             return
         solicitacao_id = ofertas[0].solicitacao_id
         with self.conn:
-            self.conn.executemany("""
+            self.conn.executemany(
+                """
                 INSERT OR IGNORE INTO oferta_coleta (
                     id, solicitacao_id, empresa_id, base_operacional_id,
                     distancia_km, score_prioridade, prioridade, rodada,
                     status, snapshot_fatores, criada_em
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [(
-                oferta.id, oferta.solicitacao_id, oferta.empresa_id,
-                oferta.base_operacional_id, oferta.distancia_km,
-                oferta.score_prioridade, oferta.prioridade, oferta.rodada,
-                oferta.status.value, json.dumps(
-                    oferta.snapshot_fatores or {}, sort_keys=True
-                ), criada_em,
-            ) for oferta in ofertas])
-            self.conn.execute("""
+            """,
+                [
+                    (
+                        oferta.id,
+                        oferta.solicitacao_id,
+                        oferta.empresa_id,
+                        oferta.base_operacional_id,
+                        oferta.distancia_km,
+                        oferta.score_prioridade,
+                        oferta.prioridade,
+                        oferta.rodada,
+                        oferta.status.value,
+                        json.dumps(oferta.snapshot_fatores or {}, sort_keys=True),
+                        criada_em,
+                    )
+                    for oferta in ofertas
+                ],
+            )
+            self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET estado = 'BUSCANDO_EMPRESA', despacho_esgotado_em = NULL
                 WHERE id = ? AND tipo_coleta = 'domiciliar'
-            """, (solicitacao_id,))
+            """,
+                (solicitacao_id,),
+            )
 
-    def _ativar_proxima_rodada(
-        self, solicitacao_id: str, ativada_em: str, expira_em: str
-    ):
-        cursor = self.conn.execute("""
+    def _ativar_proxima_rodada(self, solicitacao_id: str, ativada_em: str, expira_em: str):
+        cursor = self.conn.execute(
+            """
             UPDATE oferta_coleta
             SET status = 'ATIVA', enviada_em = ?, ativada_em = ?, expira_em = ?
             WHERE solicitacao_id = ? AND status = 'AGUARDANDO'
@@ -645,118 +789,185 @@ class Dados(RepositorioBase):
                   SELECT 1 FROM oferta_coleta
                   WHERE solicitacao_id = ? AND status IN ('ATIVA', 'ACEITA')
               )
-        """, (
-            ativada_em, ativada_em, expira_em, solicitacao_id,
-            solicitacao_id, solicitacao_id,
-        ))
+        """,
+            (
+                ativada_em,
+                ativada_em,
+                expira_em,
+                solicitacao_id,
+                solicitacao_id,
+                solicitacao_id,
+            ),
+        )
         if cursor.rowcount:
-            return self.conn.execute("""
+            return self.conn.execute(
+                """
                 SELECT * FROM oferta_coleta
                 WHERE solicitacao_id = ? AND status = 'ATIVA'
                   AND ativada_em = ? ORDER BY prioridade
-            """, (solicitacao_id, ativada_em)).fetchall()
-        pendente = self.conn.execute("""
+            """,
+                (solicitacao_id, ativada_em),
+            ).fetchall()
+        pendente = self.conn.execute(
+            """
             SELECT 1 FROM oferta_coleta
             WHERE solicitacao_id = ?
               AND status IN ('AGUARDANDO', 'ATIVA', 'ACEITA') LIMIT 1
-        """, (solicitacao_id,)).fetchone()
+        """,
+            (solicitacao_id,),
+        ).fetchone()
         if not pendente:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE solicitacao_descarte SET despacho_esgotado_em = ?
                 WHERE id = ? AND estado = 'BUSCANDO_EMPRESA'
-            """, (ativada_em, solicitacao_id))
+            """,
+                (ativada_em, solicitacao_id),
+            )
         return []
 
-    def ativar_proxima_rodada_ofertas(
-        self, solicitacao_id: str, ativada_em: str, expira_em: str
-    ):
+    def ativar_proxima_rodada_ofertas(self, solicitacao_id: str, ativada_em: str, expira_em: str):
         with self.conn:
-            return self._ativar_proxima_rodada(
-                solicitacao_id, ativada_em, expira_em
-            )
+            return self._ativar_proxima_rodada(solicitacao_id, ativada_em, expira_em)
 
     def atualizar_ponto_empresa(
-        self, id_ponto: str, id_empresa: str, nome: str, endereco: str,
-        latitude: float, longitude: float, capacidade_kg: float,
+        self,
+        id_ponto: str,
+        id_empresa: str,
+        nome: str,
+        endereco: str,
+        latitude: float,
+        longitude: float,
+        capacidade_kg: float,
     ) -> None:
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE ponto_coleta
                 SET nome = ?, endereco = ?, latitude = ?, longitude = ?,
                     capacidade_kg = ?
                 WHERE id = ? AND id_empresa = ?
                   AND ocupacao_atual_kg <= ?
-            """, (
-                nome, endereco, latitude, longitude, capacidade_kg,
-                id_ponto, id_empresa, capacidade_kg,
-            ))
-        if cursor.rowcount != 1:
-            raise ValueError(
-                "ponto nao encontrado ou capacidade menor que a ocupacao atual"
+            """,
+                (
+                    nome,
+                    endereco,
+                    latitude,
+                    longitude,
+                    capacidade_kg,
+                    id_ponto,
+                    id_empresa,
+                    capacidade_kg,
+                ),
             )
+        if cursor.rowcount != 1:
+            raise ValueError("ponto nao encontrado ou capacidade menor que a ocupacao atual")
 
     def definir_atividade_ponto_empresa(
-        self, id_ponto: str, id_empresa: str, ativo: bool,
+        self,
+        id_ponto: str,
+        id_empresa: str,
+        ativo: bool,
     ) -> None:
         with self.conn:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE ponto_coleta SET ativo = ?
                 WHERE id = ? AND id_empresa = ?
-            """, (int(ativo), id_ponto, id_empresa))
+            """,
+                (int(ativo), id_ponto, id_empresa),
+            )
         if cursor.rowcount != 1:
             raise ValueError("ponto de coleta nao pertence a empresa")
 
     def expirar_ofertas_vencidas(self, agora: str, proxima_expiracao: str):
         with self.conn:
-            solicitacoes = [row['solicitacao_id'] for row in self.conn.execute("""
+            solicitacoes = [
+                row["solicitacao_id"]
+                for row in self.conn.execute(
+                    """
                 SELECT DISTINCT solicitacao_id FROM oferta_coleta
                 WHERE status = 'ATIVA' AND expira_em <= ?
-            """, (agora,)).fetchall()]
+            """,
+                    (agora,),
+                ).fetchall()
+            ]
             if not solicitacoes:
                 return []
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE oferta_coleta
                 SET status = 'EXPIRADA', respondida_em = ?
                 WHERE status = 'ATIVA' AND expira_em <= ?
-            """, (agora, agora))
+            """,
+                (agora, agora),
+            )
             ativadas = []
             for solicitacao_id in solicitacoes:
-                ativadas.extend(self._ativar_proxima_rodada(
-                    solicitacao_id, agora, proxima_expiracao
-                ))
+                ativadas.extend(
+                    self._ativar_proxima_rodada(solicitacao_id, agora, proxima_expiracao)
+                )
             return ativadas
 
     def buscar_ofertas_solicitacao(self, solicitacao_id: str):
-        return self.conn.execute("""
+        return self.conn.execute(
+            """
             SELECT * FROM oferta_coleta WHERE solicitacao_id = ?
             ORDER BY prioridade
-        """, (solicitacao_id,)).fetchall()
+        """,
+            (solicitacao_id,),
+        ).fetchall()
 
     def buscar_ofertas_ativas_empresa(self, empresa_id: str):
-        return self.conn.execute("""
+        return self.conn.execute(
+            """
             SELECT o.id, o.solicitacao_id, o.base_operacional_id,
                    o.distancia_km, o.prioridade, o.rodada,
                    o.snapshot_fatores, o.expira_em
             FROM oferta_coleta o
             WHERE o.empresa_id = ? AND o.status = 'ATIVA'
             ORDER BY o.prioridade
-        """, (empresa_id,)).fetchall()
+        """,
+            (empresa_id,),
+        ).fetchall()
 
-    def recusar_oferta_coleta(self, oferta_id, empresa_id, agora, proxima_expiracao, motivo=''):
+    def recusar_oferta_coleta(self, oferta_id, empresa_id, agora, proxima_expiracao, motivo=""):
         with self.conn:
-            oferta=self.conn.execute("SELECT * FROM oferta_coleta WHERE id=? AND empresa_id=?",(oferta_id,empresa_id)).fetchone()
-            if not oferta: raise LookupError('oferta não encontrada para esta empresa')
-            if oferta['status']=='RECUSADA': return []
-            if oferta['status']!='ATIVA': raise ValueError('oferta não está ativa')
-            self.conn.execute("UPDATE oferta_coleta SET status='RECUSADA',respondida_em=?,motivo_recusa=? WHERE id=?",(agora,motivo[:500],oferta_id))
-            ativa=self.conn.execute("SELECT 1 FROM oferta_coleta WHERE solicitacao_id=? AND status='ATIVA'",(oferta['solicitacao_id'],)).fetchone()
-            return [] if ativa else self._ativar_proxima_rodada(oferta['solicitacao_id'],agora,proxima_expiracao)
+            oferta = self.conn.execute(
+                "SELECT * FROM oferta_coleta WHERE id=? AND empresa_id=?",
+                (oferta_id, empresa_id),
+            ).fetchone()
+            if not oferta:
+                raise LookupError("oferta não encontrada para esta empresa")
+            if oferta["status"] == "RECUSADA":
+                return []
+            if oferta["status"] != "ATIVA":
+                raise ValueError("oferta não está ativa")
+            self.conn.execute(
+                "UPDATE oferta_coleta SET status='RECUSADA',respondida_em=?,motivo_recusa=? WHERE id=?",
+                (agora, motivo[:500], oferta_id),
+            )
+            ativa = self.conn.execute(
+                "SELECT 1 FROM oferta_coleta WHERE solicitacao_id=? AND status='ATIVA'",
+                (oferta["solicitacao_id"],),
+            ).fetchone()
+            return (
+                []
+                if ativa
+                else self._ativar_proxima_rodada(oferta["solicitacao_id"], agora, proxima_expiracao)
+            )
 
     def buscar_diagnostico_despacho(self):
-        resumo=self.conn.execute("""SELECT status,COUNT(*) total FROM oferta_coleta GROUP BY status ORDER BY status""").fetchall()
-        pendentes=self.conn.execute("""SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY data_criacao DESC LIMIT 100""").fetchall()
-        atribuicoes=self.conn.execute("""SELECT sd.id,sd.empresa_responsavel_id,sd.atribuida_em,COUNT(o.id) total_ofertas,MAX(o.rodada) rodadas FROM solicitacao_descarte sd LEFT JOIN oferta_coleta o ON o.solicitacao_id=sd.id WHERE sd.empresa_responsavel_id IS NOT NULL GROUP BY sd.id ORDER BY sd.atribuida_em DESC LIMIT 100""").fetchall()
-        metricas=self.conn.execute("""SELECT
+        resumo = self.conn.execute(
+            """SELECT status,COUNT(*) total FROM oferta_coleta GROUP BY status ORDER BY status"""
+        ).fetchall()
+        pendentes = self.conn.execute(
+            """SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY data_criacao DESC LIMIT 100"""
+        ).fetchall()
+        atribuicoes = self.conn.execute(
+            """SELECT sd.id,sd.empresa_responsavel_id,sd.atribuida_em,COUNT(o.id) total_ofertas,MAX(o.rodada) rodadas FROM solicitacao_descarte sd LEFT JOIN oferta_coleta o ON o.solicitacao_id=sd.id WHERE sd.empresa_responsavel_id IS NOT NULL GROUP BY sd.id ORDER BY sd.atribuida_em DESC LIMIT 100"""
+        ).fetchall()
+        metricas = self.conn.execute("""SELECT
           COUNT(DISTINCT CASE WHEN o.status='ACEITA' THEN o.solicitacao_id END) aceitas,
           COUNT(DISTINCT o.solicitacao_id) solicitacoes_ofertadas,
           AVG(CASE WHEN o.status='ACEITA' THEN (julianday(o.respondida_em)-julianday(o.criada_em))*1440 END) minutos_ate_aceite,
@@ -768,18 +979,18 @@ class Dados(RepositorioBase):
           JOIN solicitacao_descarte sd ON sd.id=o.solicitacao_id
           JOIN (SELECT solicitacao_id,MIN(criada_em) criada_em FROM oferta_coleta GROUP BY solicitacao_id) primeira
             ON primeira.solicitacao_id=o.solicitacao_id""").fetchone()
-        eventos=self.conn.execute("""SELECT
+        eventos = self.conn.execute("""SELECT
           SUM(CASE WHEN tipo='CONFLITO_ACEITE' THEN 1 ELSE 0 END) conflitos,
           SUM(CASE WHEN tipo='SEM_EMPRESA_ELEGIVEL' THEN 1 ELSE 0 END) sem_empresa,
           SUM(CASE WHEN tipo='FALHA_GEOCODIFICACAO' THEN 1 ELSE 0 END) falhas_geocodificacao
           FROM evento_operacional""").fetchone()
-        tempo_agendamento=self.conn.execute("""SELECT AVG(
+        tempo_agendamento = self.conn.execute("""SELECT AVG(
           (julianday(e.criado_em)-julianday(sd.atribuida_em))*1440
           ) minutos_atribuicao_ate_agendamento
           FROM evento_operacional e JOIN solicitacao_descarte sd
             ON sd.id=e.solicitacao_id
           WHERE e.tipo='AGENDAMENTO_CONFIRMADO'""").fetchone()
-        destinatarios=self.conn.execute("""SELECT
+        destinatarios = self.conn.execute("""SELECT
           o.solicitacao_id,o.status,o.rodada,o.enviada_em,
           u.nome empresa_nome,b.nome base_nome
           FROM oferta_coleta o
@@ -788,29 +999,39 @@ class Dados(RepositorioBase):
           WHERE o.enviada_em IS NOT NULL
           ORDER BY o.enviada_em DESC,o.solicitacao_id,o.prioridade
           LIMIT 200""").fetchall()
-        return {'resumo':resumo,'pendentes':pendentes,'atribuicoes':atribuicoes,
-                'metricas':metricas,'eventos':eventos,
-                'tempo_agendamento':tempo_agendamento,
-                'destinatarios':destinatarios}
+        return {
+            "resumo": resumo,
+            "pendentes": pendentes,
+            "atribuicoes": atribuicoes,
+            "metricas": metricas,
+            "eventos": eventos,
+            "tempo_agendamento": tempo_agendamento,
+            "destinatarios": destinatarios,
+        }
 
-    def registrar_evento_operacional(self, tipo, solicitacao_id=None,
-                                     oferta_id=None, detalhes=None, agora=None):
+    def registrar_evento_operacional(
+        self, tipo, solicitacao_id=None, oferta_id=None, detalhes=None, agora=None
+    ):
         with self.conn:
             self.conn.execute(
                 "INSERT INTO evento_operacional(tipo,solicitacao_id,oferta_id,detalhes,criado_em) VALUES(?,?,?,?,?)",
-                (tipo, solicitacao_id, oferta_id,
-                 json.dumps(detalhes or {}, sort_keys=True),
-                 agora or datetime.now().isoformat(timespec='seconds')),
+                (
+                    tipo,
+                    solicitacao_id,
+                    oferta_id,
+                    json.dumps(detalhes or {}, sort_keys=True),
+                    agora
+                    or datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                ),
             )
 
-    def aceitar_oferta_coleta(
-        self, oferta_id: str, empresa_id: str, agora: str
-    ):
+    def aceitar_oferta_coleta(self, oferta_id: str, empresa_id: str, agora: str):
         """Executa todo o aceite sob lock de escrita; o cache nunca decide."""
         self.conn.commit()
         try:
             self.conn.execute("BEGIN IMMEDIATE")
-            oferta = self.conn.execute("""
+            oferta = self.conn.execute(
+                """
                 SELECT o.*, sd.id_usuario, sd.empresa_responsavel_id,
                        sd.endereco_coleta, sd.nome_contato, sd.data_agendamento,
                        u.nome AS nome_empresa
@@ -818,79 +1039,136 @@ class Dados(RepositorioBase):
                 JOIN solicitacao_descarte sd ON sd.id = o.solicitacao_id
                 JOIN usuario u ON u.id = o.empresa_id
                 WHERE o.id = ? AND o.empresa_id = ?
-            """, (oferta_id, empresa_id)).fetchone()
+            """,
+                (oferta_id, empresa_id),
+            ).fetchone()
             if not oferta:
                 raise LookupError("oferta não encontrada para esta empresa")
-            if oferta['empresa_responsavel_id']:
-                if oferta['empresa_responsavel_id'] == empresa_id and oferta['status'] == 'ACEITA':
+            if oferta["empresa_responsavel_id"]:
+                if oferta["empresa_responsavel_id"] == empresa_id and oferta["status"] == "ACEITA":
                     self.conn.commit()
                     return oferta
                 raise RuntimeError("coleta já atribuída a outra empresa")
-            if oferta['status'] != 'ATIVA':
+            if oferta["status"] != "ATIVA":
                 raise ValueError("oferta não está ativa")
-            if not oferta['expira_em'] or oferta['expira_em'] <= agora:
-                self.conn.execute("""
+            if not oferta["expira_em"] or oferta["expira_em"] <= agora:
+                self.conn.execute(
+                    """
                     UPDATE oferta_coleta SET status = 'EXPIRADA', respondida_em = ?
                     WHERE id = ? AND status = 'ATIVA'
-                """, (agora, oferta_id))
+                """,
+                    (agora, oferta_id),
+                )
                 self.conn.commit()
                 raise TimeoutError("oferta expirada")
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET empresa_responsavel_id = ?, base_operacional_id = ?,
                     atribuida_em = ?, versao_atribuicao = versao_atribuicao + 1,
                     estado = 'SOLICITADO', despacho_esgotado_em = NULL
                 WHERE id = ? AND empresa_responsavel_id IS NULL
                   AND estado = 'BUSCANDO_EMPRESA'
-            """, (
-                empresa_id, oferta['base_operacional_id'], agora,
-                oferta['solicitacao_id'],
-            ))
+            """,
+                (
+                    empresa_id,
+                    oferta["base_operacional_id"],
+                    agora,
+                    oferta["solicitacao_id"],
+                ),
+            )
             if cursor.rowcount != 1:
                 raise RuntimeError("coleta já atribuída a outra empresa")
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE oferta_coleta SET status = 'ACEITA', respondida_em = ?
                 WHERE id = ? AND status = 'ATIVA'
-            """, (agora, oferta_id))
-            self.conn.execute("""
+            """,
+                (agora, oferta_id),
+            )
+            self.conn.execute(
+                """
                 UPDATE oferta_coleta SET status = 'CANCELADA', respondida_em = ?
                 WHERE solicitacao_id = ? AND id <> ?
                   AND status IN ('AGUARDANDO', 'ATIVA')
-            """, (agora, oferta['solicitacao_id'], oferta_id))
-            self.conn.execute("""
+            """,
+                (agora, oferta["solicitacao_id"], oferta_id),
+            )
+            self.conn.execute(
+                """
                 INSERT INTO historico_rastreamento(id_solicitacao, timestamp, mensagem)
                 VALUES (?, ?, ?)
-            """, (oferta['solicitacao_id'], agora, f'Coleta atribuída à base {oferta["base_operacional_id"]}'))
-            chave = f'coleta:{oferta["solicitacao_id"]}:atribuida'
-            self.conn.execute("""
+            """,
+                (
+                    oferta["solicitacao_id"],
+                    agora,
+                    f"Coleta atribuída à base {oferta['base_operacional_id']}",
+                ),
+            )
+            chave = f"coleta:{oferta['solicitacao_id']}:atribuida"
+            self.conn.execute(
+                """
                 INSERT OR IGNORE INTO notificacao(
                     id_usuario, timestamp, mensagem, chave_idempotencia
                 ) VALUES (?, ?, ?, ?)
-            """, (
-                oferta['id_usuario'], datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
-                f'A empresa {oferta["nome_empresa"]} aceitou sua coleta domiciliar.', chave,
-            ))
-            self.conn.execute("""
+            """,
+                (
+                    oferta["id_usuario"],
+                    datetime.fromisoformat(agora).strftime("%d/%m/%Y %H:%M:%S"),
+                    f"A empresa {oferta['nome_empresa']} aceitou sua coleta domiciliar.",
+                    chave,
+                ),
+            )
+            self.conn.execute(
+                """
                 INSERT OR IGNORE INTO notificacao(
                     id_usuario, timestamp, mensagem, chave_idempotencia
                 ) VALUES (?, ?, ?, ?)
-            """, (
-                empresa_id, datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
-                'Coleta aceita com sucesso. Os dados completos já estão disponíveis em Operações.',
-                f'coleta:{oferta["solicitacao_id"]}:atribuida:empresa',
-            ))
-            self.conn.execute("""INSERT OR IGNORE INTO conversa_solicitacao
+            """,
+                (
+                    empresa_id,
+                    datetime.fromisoformat(agora).strftime("%d/%m/%Y %H:%M:%S"),
+                    "Coleta aceita com sucesso. Os dados completos já estão disponíveis em Operações.",
+                    f"coleta:{oferta['solicitacao_id']}:atribuida:empresa",
+                ),
+            )
+            self.conn.execute(
+                """INSERT OR IGNORE INTO conversa_solicitacao
                 (id,solicitacao_id,cidadao_id,empresa_id,criada_em)
-                VALUES(?,?,?,?,?)""",(str(uuid.uuid4()),oferta['solicitacao_id'],oferta['id_usuario'],empresa_id,agora))
-            self.conn.execute("INSERT INTO evento_operacional(tipo,solicitacao_id,oferta_id,detalhes,criado_em) VALUES('OFERTA_ACEITA',?,?,?,?)",
-                (oferta['solicitacao_id'],oferta_id,json.dumps({'empresa_id':empresa_id,'base_id':oferta['base_operacional_id']},sort_keys=True),agora))
+                VALUES(?,?,?,?,?)""",
+                (
+                    str(uuid.uuid4()),
+                    oferta["solicitacao_id"],
+                    oferta["id_usuario"],
+                    empresa_id,
+                    agora,
+                ),
+            )
+            self.conn.execute(
+                "INSERT INTO evento_operacional(tipo,solicitacao_id,oferta_id,detalhes,criado_em) VALUES('OFERTA_ACEITA',?,?,?,?)",
+                (
+                    oferta["solicitacao_id"],
+                    oferta_id,
+                    json.dumps(
+                        {
+                            "empresa_id": empresa_id,
+                            "base_id": oferta["base_operacional_id"],
+                        },
+                        sort_keys=True,
+                    ),
+                    agora,
+                ),
+            )
             self.conn.commit()
-            return self.conn.execute("""
+            return self.conn.execute(
+                """
                 SELECT o.*, sd.endereco_coleta, sd.nome_contato,
                        sd.data_agendamento, sd.empresa_responsavel_id
                 FROM oferta_coleta o JOIN solicitacao_descarte sd
                   ON sd.id = o.solicitacao_id WHERE o.id = ?
-            """, (oferta_id,)).fetchone()
+            """,
+                (oferta_id,),
+            ).fetchone()
         except Exception:
             if self.conn.in_transaction:
                 self.conn.rollback()
@@ -898,146 +1176,302 @@ class Dados(RepositorioBase):
 
     def marcar_despacho_esgotado(self, solicitacao_id: str, agora: str) -> None:
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET estado = 'BUSCANDO_EMPRESA', despacho_esgotado_em = ?
                 WHERE id = ? AND tipo_coleta = 'domiciliar'
-            """, (agora, solicitacao_id))
+            """,
+                (agora, solicitacao_id),
+            )
 
     def registrar_janela_agendamento(self, solicitacao_id, cidadao_id, inicio, fim, agora):
         with self.conn:
-            sol = self.conn.execute("SELECT id_usuario FROM solicitacao_descarte WHERE id=?", (solicitacao_id,)).fetchone()
-            if not sol or sol['id_usuario'] != cidadao_id: raise PermissionError('solicitação não pertence ao cidadão')
-            self.conn.execute("""INSERT INTO agendamento_coleta
+            sol = self.conn.execute(
+                "SELECT id_usuario FROM solicitacao_descarte WHERE id=?",
+                (solicitacao_id,),
+            ).fetchone()
+            if not sol or sol["id_usuario"] != cidadao_id:
+                raise PermissionError("solicitação não pertence ao cidadão")
+            self.conn.execute(
+                """INSERT INTO agendamento_coleta
                 (solicitacao_id,janela_inicio,janela_fim,status,atualizado_em)
                 VALUES(?,?,?,'AGUARDANDO_AGENDAMENTO',?)
-                ON CONFLICT(solicitacao_id) DO NOTHING""", (solicitacao_id,inicio,fim,agora))
-            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'JANELA_SOLICITADA',?,?,?)", (solicitacao_id,cidadao_id,inicio,fim,agora))
+                ON CONFLICT(solicitacao_id) DO NOTHING""",
+                (solicitacao_id, inicio, fim, agora),
+            )
+            self.conn.execute(
+                "INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'JANELA_SOLICITADA',?,?,?)",
+                (solicitacao_id, cidadao_id, inicio, fim, agora),
+            )
         return self.buscar_agendamento(solicitacao_id)
 
     def _participante_agendamento(self, solicitacao_id, usuario_id):
-        sol=self.conn.execute("""SELECT sd.id_usuario,
+        sol = self.conn.execute(
+            """SELECT sd.id_usuario,
             COALESCE(sd.empresa_responsavel_id,pc.id_empresa) empresa_responsavel_id
             FROM solicitacao_descarte sd LEFT JOIN ponto_coleta pc
-              ON pc.id=sd.id_ponto_coleta WHERE sd.id=?""",(solicitacao_id,)).fetchone()
-        if not sol or usuario_id not in (sol['id_usuario'],sol['empresa_responsavel_id']): raise PermissionError('usuário não participa da coleta')
+              ON pc.id=sd.id_ponto_coleta WHERE sd.id=?""",
+            (solicitacao_id,),
+        ).fetchone()
+        if not sol or usuario_id not in (
+            sol["id_usuario"],
+            sol["empresa_responsavel_id"],
+        ):
+            raise PermissionError("usuário não participa da coleta")
         return sol
 
     def _notificar_agendamento(self, sol, solicitacao_id, autor_id, mensagem, chave, agora):
-        destinatario = sol['empresa_responsavel_id'] if autor_id == sol['id_usuario'] else sol['id_usuario']
-        self.conn.execute("""INSERT OR IGNORE INTO notificacao
+        destinatario = (
+            sol["empresa_responsavel_id"] if autor_id == sol["id_usuario"] else sol["id_usuario"]
+        )
+        self.conn.execute(
+            """INSERT OR IGNORE INTO notificacao
             (id_usuario,timestamp,mensagem,chave_idempotencia) VALUES(?,?,?,?)""",
-            (destinatario,datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),mensagem,chave))
+            (
+                destinatario,
+                datetime.fromisoformat(agora).strftime("%d/%m/%Y %H:%M:%S"),
+                mensagem,
+                chave,
+            ),
+        )
 
     def propor_agendamento(self, solicitacao_id, usuario_id, inicio, fim, agora):
         with self.conn:
-            sol=self._participante_agendamento(solicitacao_id,usuario_id)
-            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
-            if not atual: raise LookupError('janela não encontrada')
-            if atual['status']=='AGENDADO': return atual
-            self.conn.execute("""UPDATE agendamento_coleta SET proposta_inicio=?,proposta_fim=?,proposta_por=?,status='PROPOSTA_PENDENTE',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(inicio,fim,usuario_id,agora,solicitacao_id))
-            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'PROPOSTA',?,?,?)",(solicitacao_id,usuario_id,inicio,fim,agora))
-            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Nova proposta de horário para a coleta.',f'agenda:{solicitacao_id}:proposta:{atual["versao"]+1}',agora)
+            sol = self._participante_agendamento(solicitacao_id, usuario_id)
+            atual = self.conn.execute(
+                "SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",
+                (solicitacao_id,),
+            ).fetchone()
+            if not atual:
+                raise LookupError("janela não encontrada")
+            if atual["status"] == "AGENDADO":
+                return atual
+            self.conn.execute(
+                """UPDATE agendamento_coleta SET proposta_inicio=?,proposta_fim=?,proposta_por=?,status='PROPOSTA_PENDENTE',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",
+                (inicio, fim, usuario_id, agora, solicitacao_id),
+            )
+            self.conn.execute(
+                "INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'PROPOSTA',?,?,?)",
+                (solicitacao_id, usuario_id, inicio, fim, agora),
+            )
+            self._notificar_agendamento(
+                sol,
+                solicitacao_id,
+                usuario_id,
+                "Nova proposta de horário para a coleta.",
+                f"agenda:{solicitacao_id}:proposta:{atual['versao'] + 1}",
+                agora,
+            )
         return self.buscar_agendamento(solicitacao_id)
 
     def aceitar_agendamento(self, solicitacao_id, usuario_id, agora):
         with self.conn:
-            sol=self._participante_agendamento(solicitacao_id,usuario_id)
-            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
-            if not atual: raise LookupError('janela não encontrada')
-            if atual['status']=='AGENDADO': return atual
-            if atual['status']=='PROPOSTA_PENDENTE':
-                if atual['proposta_por']==usuario_id: raise PermissionError('autor não pode aceitar a própria proposta')
-                inicio,fim=atual['proposta_inicio'],atual['proposta_fim']
+            sol = self._participante_agendamento(solicitacao_id, usuario_id)
+            atual = self.conn.execute(
+                "SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",
+                (solicitacao_id,),
+            ).fetchone()
+            if not atual:
+                raise LookupError("janela não encontrada")
+            if atual["status"] == "AGENDADO":
+                return atual
+            if atual["status"] == "PROPOSTA_PENDENTE":
+                if atual["proposta_por"] == usuario_id:
+                    raise PermissionError("autor não pode aceitar a própria proposta")
+                inicio, fim = atual["proposta_inicio"], atual["proposta_fim"]
             else:
-                if usuario_id != sol['empresa_responsavel_id']: raise PermissionError('apenas a empresa pode aceitar a janela inicial')
-                inicio,fim=atual['janela_inicio'],atual['janela_fim']
-            self.conn.execute("""UPDATE agendamento_coleta SET inicio_confirmado=?,fim_confirmado=?,status='AGENDADO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(inicio,fim,agora,solicitacao_id))
-            self.conn.execute("UPDATE solicitacao_descarte SET data_agendamento=? WHERE id=?",(inicio,solicitacao_id))
-            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'ACEITA',?,?,?)",(solicitacao_id,usuario_id,inicio,fim,agora))
-            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Horário da coleta confirmado.',f'agenda:{solicitacao_id}:aceita',agora)
-            self.conn.execute("INSERT INTO evento_operacional(tipo,solicitacao_id,detalhes,criado_em) VALUES('AGENDAMENTO_CONFIRMADO',?,?,?)",
-                (solicitacao_id,json.dumps({'inicio':inicio,'fim':fim},sort_keys=True),agora))
+                if usuario_id != sol["empresa_responsavel_id"]:
+                    raise PermissionError("apenas a empresa pode aceitar a janela inicial")
+                inicio, fim = atual["janela_inicio"], atual["janela_fim"]
+            self.conn.execute(
+                """UPDATE agendamento_coleta SET inicio_confirmado=?,fim_confirmado=?,status='AGENDADO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",
+                (inicio, fim, agora, solicitacao_id),
+            )
+            self.conn.execute(
+                "UPDATE solicitacao_descarte SET data_agendamento=? WHERE id=?",
+                (inicio, solicitacao_id),
+            )
+            self.conn.execute(
+                "INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,inicio,fim,criado_em) VALUES(?,?,'ACEITA',?,?,?)",
+                (solicitacao_id, usuario_id, inicio, fim, agora),
+            )
+            self._notificar_agendamento(
+                sol,
+                solicitacao_id,
+                usuario_id,
+                "Horário da coleta confirmado.",
+                f"agenda:{solicitacao_id}:aceita",
+                agora,
+            )
+            self.conn.execute(
+                "INSERT INTO evento_operacional(tipo,solicitacao_id,detalhes,criado_em) VALUES('AGENDAMENTO_CONFIRMADO',?,?,?)",
+                (
+                    solicitacao_id,
+                    json.dumps({"inicio": inicio, "fim": fim}, sort_keys=True),
+                    agora,
+                ),
+            )
         return self.buscar_agendamento(solicitacao_id)
 
     def rejeitar_agendamento(self, solicitacao_id, usuario_id, agora):
         with self.conn:
-            sol=self._participante_agendamento(solicitacao_id,usuario_id)
-            atual=self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
-            if not atual or atual['status']!='PROPOSTA_PENDENTE': raise ValueError('não existe proposta pendente')
-            if atual['proposta_por']==usuario_id: raise PermissionError('autor não pode rejeitar a própria proposta')
-            self.conn.execute("""UPDATE agendamento_coleta SET proposta_inicio=NULL,proposta_fim=NULL,proposta_por=NULL,status='AGUARDANDO_AGENDAMENTO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",(agora,solicitacao_id))
-            self.conn.execute("INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,criado_em) VALUES(?,?,'REJEITADA',?)",(solicitacao_id,usuario_id,agora))
-            self._notificar_agendamento(sol,solicitacao_id,usuario_id,'Proposta de horário rejeitada; a negociação permanece aberta.',f'agenda:{solicitacao_id}:rejeita:{atual["versao"]+1}',agora)
+            sol = self._participante_agendamento(solicitacao_id, usuario_id)
+            atual = self.conn.execute(
+                "SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",
+                (solicitacao_id,),
+            ).fetchone()
+            if not atual or atual["status"] != "PROPOSTA_PENDENTE":
+                raise ValueError("não existe proposta pendente")
+            if atual["proposta_por"] == usuario_id:
+                raise PermissionError("autor não pode rejeitar a própria proposta")
+            self.conn.execute(
+                """UPDATE agendamento_coleta SET proposta_inicio=NULL,proposta_fim=NULL,proposta_por=NULL,status='AGUARDANDO_AGENDAMENTO',versao=versao+1,atualizado_em=? WHERE solicitacao_id=?""",
+                (agora, solicitacao_id),
+            )
+            self.conn.execute(
+                "INSERT INTO historico_agendamento(solicitacao_id,autor_id,acao,criado_em) VALUES(?,?,'REJEITADA',?)",
+                (solicitacao_id, usuario_id, agora),
+            )
+            self._notificar_agendamento(
+                sol,
+                solicitacao_id,
+                usuario_id,
+                "Proposta de horário rejeitada; a negociação permanece aberta.",
+                f"agenda:{solicitacao_id}:rejeita:{atual['versao'] + 1}",
+                agora,
+            )
         return self.buscar_agendamento(solicitacao_id)
 
     def buscar_agendamento(self, solicitacao_id):
-        return self.conn.execute("SELECT * FROM agendamento_coleta WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+        return self.conn.execute(
+            "SELECT * FROM agendamento_coleta WHERE solicitacao_id=?", (solicitacao_id,)
+        ).fetchone()
 
     def buscar_historico_agendamento(self, solicitacao_id):
-        return self.conn.execute("""SELECT h.*, u.nome AS autor_nome,
+        return self.conn.execute(
+            """SELECT h.*, u.nome AS autor_nome,
             u.tipo AS autor_tipo FROM historico_agendamento h
             LEFT JOIN usuario u ON u.id=h.autor_id
             WHERE h.solicitacao_id=? ORDER BY h.criado_em,h.id""",
-            (solicitacao_id,)).fetchall()
+            (solicitacao_id,),
+        ).fetchall()
 
     def criar_conversa_solicitacao(self, solicitacao_id, agora):
         with self.conn:
-            sol=self.conn.execute("""SELECT sd.id_usuario,
+            sol = self.conn.execute(
+                """SELECT sd.id_usuario,
                 COALESCE(sd.empresa_responsavel_id,pc.id_empresa) empresa_id
                 FROM solicitacao_descarte sd LEFT JOIN ponto_coleta pc ON pc.id=sd.id_ponto_coleta
-                WHERE sd.id=?""",(solicitacao_id,)).fetchone()
-            if not sol or not sol['empresa_id']: raise ValueError('chat indisponível antes da atribuição')
-            self.conn.execute("INSERT OR IGNORE INTO conversa_solicitacao(id,solicitacao_id,cidadao_id,empresa_id,criada_em) VALUES(?,?,?,?,?)",(str(uuid.uuid4()),solicitacao_id,sol['id_usuario'],sol['empresa_id'],agora))
-        return self.conn.execute("SELECT * FROM conversa_solicitacao WHERE solicitacao_id=?",(solicitacao_id,)).fetchone()
+                WHERE sd.id=?""",
+                (solicitacao_id,),
+            ).fetchone()
+            if not sol or not sol["empresa_id"]:
+                raise ValueError("chat indisponível antes da atribuição")
+            self.conn.execute(
+                "INSERT OR IGNORE INTO conversa_solicitacao(id,solicitacao_id,cidadao_id,empresa_id,criada_em) VALUES(?,?,?,?,?)",
+                (
+                    str(uuid.uuid4()),
+                    solicitacao_id,
+                    sol["id_usuario"],
+                    sol["empresa_id"],
+                    agora,
+                ),
+            )
+        return self.conn.execute(
+            "SELECT * FROM conversa_solicitacao WHERE solicitacao_id=?",
+            (solicitacao_id,),
+        ).fetchone()
 
     def _conversa_autorizada(self, solicitacao_id, usuario_id, sistema=False):
-        row=self.conn.execute("""SELECT c.*,u.tipo AS usuario_tipo FROM conversa_solicitacao c
-            LEFT JOIN usuario u ON u.id=? WHERE c.solicitacao_id=?""",(usuario_id,solicitacao_id)).fetchone()
-        if not row: raise LookupError('conversa não encontrada')
-        if not sistema and usuario_id not in (row['cidadao_id'],row['empresa_id']) and row['usuario_tipo']!='administrador': raise PermissionError('acesso negado à conversa')
+        row = self.conn.execute(
+            """SELECT c.*,u.tipo AS usuario_tipo FROM conversa_solicitacao c
+            LEFT JOIN usuario u ON u.id=? WHERE c.solicitacao_id=?""",
+            (usuario_id, solicitacao_id),
+        ).fetchone()
+        if not row:
+            raise LookupError("conversa não encontrada")
+        if (
+            not sistema
+            and usuario_id not in (row["cidadao_id"], row["empresa_id"])
+            and row["usuario_tipo"] != "administrador"
+        ):
+            raise PermissionError("acesso negado à conversa")
         return row
 
-    def salvar_mensagem_chat(self,id_mensagem,solicitacao_id,remetente_id,tipo,texto,payload,agora,sistema=False):
-        conversa=self._conversa_autorizada(solicitacao_id,remetente_id,sistema)
-        if conversa['encerrada_em']: raise ValueError('conversa encerrada')
+    def salvar_mensagem_chat(
+        self,
+        id_mensagem,
+        solicitacao_id,
+        remetente_id,
+        tipo,
+        texto,
+        payload,
+        agora,
+        sistema=False,
+    ):
+        conversa = self._conversa_autorizada(solicitacao_id, remetente_id, sistema)
+        if conversa["encerrada_em"]:
+            raise ValueError("conversa encerrada")
         with self.conn:
-            cursor = self.conn.execute("INSERT OR IGNORE INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",(id_mensagem,conversa['id'],remetente_id,tipo,texto,payload,agora))
-            if cursor.rowcount and tipo == 'MENSAGEM' and remetente_id:
+            cursor = self.conn.execute(
+                "INSERT OR IGNORE INTO mensagem_chat(id,conversa_id,remetente_id,tipo,texto,payload,criado_em) VALUES(?,?,?,?,?,?,?)",
+                (
+                    id_mensagem,
+                    conversa["id"],
+                    remetente_id,
+                    tipo,
+                    texto,
+                    payload,
+                    agora,
+                ),
+            )
+            if cursor.rowcount and tipo == "MENSAGEM" and remetente_id:
                 destinatario = (
-                    conversa['empresa_id'] if remetente_id == conversa['cidadao_id']
-                    else conversa['cidadao_id']
+                    conversa["empresa_id"]
+                    if remetente_id == conversa["cidadao_id"]
+                    else conversa["cidadao_id"]
                 )
                 remetente = self.conn.execute(
                     "SELECT nome FROM usuario WHERE id=?", (remetente_id,)
                 ).fetchone()
-                self.conn.execute("""INSERT OR IGNORE INTO notificacao(
+                self.conn.execute(
+                    """INSERT OR IGNORE INTO notificacao(
                     id_usuario,timestamp,mensagem,chave_idempotencia
-                    ) VALUES(?,?,?,?)""", (
-                    destinatario,
-                    datetime.fromisoformat(agora).strftime('%d/%m/%Y %H:%M:%S'),
-                    f'Nova mensagem de {remetente["nome"]} na coleta.',
-                    f'chat:{id_mensagem}',
-                ))
-        return self.conn.execute("SELECT * FROM mensagem_chat WHERE id=?",(id_mensagem,)).fetchone()
+                    ) VALUES(?,?,?,?)""",
+                    (
+                        destinatario,
+                        datetime.fromisoformat(agora).strftime("%d/%m/%Y %H:%M:%S"),
+                        f"Nova mensagem de {remetente['nome']} na coleta.",
+                        f"chat:{id_mensagem}",
+                    ),
+                )
+        return self.conn.execute(
+            "SELECT * FROM mensagem_chat WHERE id=?", (id_mensagem,)
+        ).fetchone()
 
-    def buscar_mensagens_chat(self,solicitacao_id,usuario_id,pagina,limite):
-        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
-        return self.conn.execute("""SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
+    def buscar_mensagens_chat(self, solicitacao_id, usuario_id, pagina, limite):
+        conversa = self._conversa_autorizada(solicitacao_id, usuario_id)
+        return self.conn.execute(
+            """SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
             FROM mensagem_chat m LEFT JOIN usuario u ON u.id=m.remetente_id
             WHERE m.conversa_id=? ORDER BY m.criado_em,m.id LIMIT ? OFFSET ?""",
-            (conversa['id'],limite,(pagina-1)*limite)).fetchall()
+            (conversa["id"], limite, (pagina - 1) * limite),
+        ).fetchall()
 
-    def buscar_mensagens_chat_recentes(self,solicitacao_id,usuario_id,pagina,limite):
-        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
-        rows=self.conn.execute("""SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
+    def buscar_mensagens_chat_recentes(self, solicitacao_id, usuario_id, pagina, limite):
+        conversa = self._conversa_autorizada(solicitacao_id, usuario_id)
+        rows = self.conn.execute(
+            """SELECT m.*,u.nome remetente_nome,u.tipo remetente_tipo
             FROM mensagem_chat m LEFT JOIN usuario u ON u.id=m.remetente_id
             WHERE m.conversa_id=? ORDER BY m.criado_em DESC,m.id DESC LIMIT ? OFFSET ?""",
-            (conversa['id'],limite,(pagina-1)*limite)).fetchall()
+            (conversa["id"], limite, (pagina - 1) * limite),
+        ).fetchall()
         return list(reversed(rows))
 
     def listar_conversas_usuario(self, usuario_id):
-        return self.conn.execute("""SELECT c.*, sd.estado, sd.data_criacao,
+        return self.conn.execute(
+            """SELECT c.*, sd.estado, sd.data_criacao,
             CASE WHEN c.empresa_id=? THEN cid.nome ELSE emp.nome END contato_nome,
             (SELECT texto FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem,
             (SELECT tipo FROM mensagem_chat m WHERE m.conversa_id=c.id ORDER BY m.criado_em DESC,m.id DESC LIMIT 1) ultima_mensagem_tipo,
@@ -1048,43 +1482,72 @@ class Dados(RepositorioBase):
             JOIN usuario cid ON cid.id=c.cidadao_id JOIN usuario emp ON emp.id=c.empresa_id
             WHERE c.cidadao_id=? OR c.empresa_id=?
             ORDER BY COALESCE(ultima_mensagem_em,c.criada_em) DESC""",
-            (usuario_id,usuario_id,usuario_id,usuario_id)).fetchall()
+            (usuario_id, usuario_id, usuario_id, usuario_id),
+        ).fetchall()
 
     def contar_mensagens_nao_lidas(self, usuario_id):
-        return self.conn.execute("""SELECT COUNT(*) total
+        return self.conn.execute(
+            """SELECT COUNT(*) total
             FROM mensagem_chat m JOIN conversa_solicitacao c ON c.id=m.conversa_id
             WHERE (c.cidadao_id=? OR c.empresa_id=?) AND m.lida_em IS NULL
               AND (m.remetente_id IS NULL OR m.remetente_id<>?)""",
-            (usuario_id,usuario_id,usuario_id)).fetchone()['total']
+            (usuario_id, usuario_id, usuario_id),
+        ).fetchone()["total"]
 
     def buscar_solicitacao_mensagem(self, id_mensagem):
-        return self.conn.execute("""SELECT c.solicitacao_id
+        return self.conn.execute(
+            """SELECT c.solicitacao_id
             FROM mensagem_chat m JOIN conversa_solicitacao c ON c.id=m.conversa_id
-            WHERE m.id=?""", (id_mensagem,)).fetchone()
+            WHERE m.id=?""",
+            (id_mensagem,),
+        ).fetchone()
 
     def salvar_foto_solicitacao(self, foto_id, solicitacao_id, nome, mime_type, conteudo, agora):
         with self.conn:
-            self.conn.execute("""INSERT INTO solicitacao_foto
+            self.conn.execute(
+                """INSERT INTO solicitacao_foto
                 (id,solicitacao_id,nome_arquivo,mime_type,tamanho,conteudo,criada_em)
-                VALUES(?,?,?,?,?,?,?)""", (foto_id,solicitacao_id,nome,mime_type,len(conteudo),conteudo,agora))
+                VALUES(?,?,?,?,?,?,?)""",
+                (
+                    foto_id,
+                    solicitacao_id,
+                    nome,
+                    mime_type,
+                    len(conteudo),
+                    conteudo,
+                    agora,
+                ),
+            )
 
     def listar_fotos_solicitacao(self, solicitacao_id):
-        return self.conn.execute("""SELECT id,nome_arquivo,mime_type,tamanho,criada_em
-            FROM solicitacao_foto WHERE solicitacao_id=? ORDER BY criada_em,id""", (solicitacao_id,)).fetchall()
+        return self.conn.execute(
+            """SELECT id,nome_arquivo,mime_type,tamanho,criada_em
+            FROM solicitacao_foto WHERE solicitacao_id=? ORDER BY criada_em,id""",
+            (solicitacao_id,),
+        ).fetchall()
 
     def buscar_foto_solicitacao(self, foto_id):
         return self.conn.execute("SELECT * FROM solicitacao_foto WHERE id=?", (foto_id,)).fetchone()
 
-    def marcar_mensagens_chat_lidas(self,solicitacao_id,usuario_id,agora):
-        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
+    def marcar_mensagens_chat_lidas(self, solicitacao_id, usuario_id, agora):
+        conversa = self._conversa_autorizada(solicitacao_id, usuario_id)
         with self.conn:
-            cursor=self.conn.execute("UPDATE mensagem_chat SET lida_em=? WHERE conversa_id=? AND lida_em IS NULL AND (remetente_id IS NULL OR remetente_id<>?)",(agora,conversa['id'],usuario_id))
+            cursor = self.conn.execute(
+                "UPDATE mensagem_chat SET lida_em=? WHERE conversa_id=? AND lida_em IS NULL AND (remetente_id IS NULL OR remetente_id<>?)",
+                (agora, conversa["id"], usuario_id),
+            )
         return cursor.rowcount
 
-    def encerrar_conversa_solicitacao(self,solicitacao_id,usuario_id,agora):
-        conversa=self._conversa_autorizada(solicitacao_id,usuario_id)
-        with self.conn: self.conn.execute("UPDATE conversa_solicitacao SET encerrada_em=COALESCE(encerrada_em,?) WHERE id=?",(agora,conversa['id']))
-        return self.conn.execute("SELECT * FROM conversa_solicitacao WHERE id=?",(conversa['id'],)).fetchone()
+    def encerrar_conversa_solicitacao(self, solicitacao_id, usuario_id, agora):
+        conversa = self._conversa_autorizada(solicitacao_id, usuario_id)
+        with self.conn:
+            self.conn.execute(
+                "UPDATE conversa_solicitacao SET encerrada_em=COALESCE(encerrada_em,?) WHERE id=?",
+                (agora, conversa["id"]),
+            )
+        return self.conn.execute(
+            "SELECT * FROM conversa_solicitacao WHERE id=?", (conversa["id"],)
+        ).fetchone()
 
     # -------------------
     # DESATIVAR (soft-delete)
@@ -1094,8 +1557,7 @@ class Dados(RepositorioBase):
         """Marca o usuário como inativo sem remover o registro."""
         with self.conn:
             cursor = self.conn.execute(
-                "UPDATE usuario SET ativo = 0 WHERE id = ? AND ativo = 1",
-                (id_usuario,)
+                "UPDATE usuario SET ativo = 0 WHERE id = ? AND ativo = 1", (id_usuario,)
             )
         return cursor.rowcount == 1
 
@@ -1104,7 +1566,7 @@ class Dados(RepositorioBase):
         with self.conn:
             self.conn.execute(
                 "UPDATE cidadao SET pontos = pontos + ? WHERE id_usuario = ?",
-                (pontos_a_adicionar, id_usuario)
+                (pontos_a_adicionar, id_usuario),
             )
 
     def buscar_plano_empresa(self, id_usuario: str) -> str:
@@ -1112,31 +1574,32 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute("SELECT plano FROM empresa WHERE id_usuario = ?", (id_usuario,))
         row = c.fetchone()
-        return row['plano'] if row and row['plano'] else 'free'
+        return row["plano"] if row and row["plano"] else "free"
 
     def atualizar_plano_empresa(self, id_usuario: str, plano: str) -> None:
         """Atualiza o plano da empresa."""
-        planos_validos = {'free', 'professional', 'enterprise'}
+        planos_validos = {"free", "professional", "enterprise"}
         if plano not in planos_validos:
             raise ValueError(f"Plano inválido: {plano}")
         with self.conn:
             self.conn.execute(
-                "UPDATE empresa SET plano = ? WHERE id_usuario = ?",
-                (plano, id_usuario)
+                "UPDATE empresa SET plano = ? WHERE id_usuario = ?", (plano, id_usuario)
             )
 
-    def atualizar_usuario(self, id_usuario: str, nome: str, email: str, password_hash: str = None) -> None:
+    def atualizar_usuario(
+        self, id_usuario: str, nome: str, email: str, password_hash: str = None
+    ) -> None:
         """Atualiza nome e email do usuário. Se password_hash fornecido, atualiza também a senha."""
         with self.conn:
             if password_hash:
                 self.conn.execute(
                     "UPDATE usuario SET nome = ?, email = ?, password_hash = ? WHERE id = ?",
-                    (nome, email, password_hash, id_usuario)
+                    (nome, email, password_hash, id_usuario),
                 )
             else:
                 self.conn.execute(
                     "UPDATE usuario SET nome = ?, email = ? WHERE id = ?",
-                    (nome, email, id_usuario)
+                    (nome, email, id_usuario),
                 )
 
     # -------------------
@@ -1152,23 +1615,29 @@ class Dados(RepositorioBase):
     def buscar_usuario_por_cpf(self, cpf: str):
         """Busca por CPF ativo, retorna row com password_hash."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT u.*
             FROM usuario u
             JOIN cidadao ci ON u.id = ci.id_usuario
             WHERE ci.cpf = ? AND u.ativo = 1
-        """, (cpf,))
+        """,
+            (cpf,),
+        )
         return c.fetchone()
 
     def buscar_usuario_por_cnpj(self, cnpj: str):
         """Busca por CNPJ ativo, retorna row com password_hash."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT u.*
             FROM usuario u
             JOIN empresa e ON u.id = e.id_usuario
             WHERE e.cnpj = ? AND u.ativo = 1
-        """, (cnpj,))
+        """,
+            (cnpj,),
+        )
         return c.fetchone()
 
     def buscar_usuario_por_email(self, email: str):
@@ -1186,23 +1655,29 @@ class Dados(RepositorioBase):
     def buscar_cidadao(self, id_usuario):
         """Busca dados específicos de cidadão."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT u.*, c.cpf, c.solicitacoes_ativas, c.pontos
             FROM usuario u
             JOIN cidadao c ON u.id = c.id_usuario
             WHERE u.id = ?
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         return c.fetchone()
 
     def buscar_empresa(self, id_usuario):
         """Busca dados específicos de empresa."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT u.*, e.cnpj, e.razao_social, e.limite_mensal, e.descartado_mes
             FROM usuario u
             JOIN empresa e ON u.id = e.id_usuario
             WHERE u.id = ?
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         return c.fetchone()
 
     def buscar_dispositivo(self, id_dispositivo):
@@ -1244,85 +1719,114 @@ class Dados(RepositorioBase):
     def buscar_itens_solicitacao(self, id_solicitacao):
         """Retorna todos os itens de uma solicitação."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT i.*, d.nome, d.peso_kg, d.marca, d.modelo, d.tipo,
                    d.subcategoria, d.ano_fabricacao
             FROM item_descarte i
             JOIN dispositivo d ON i.id_dispositivo = d.id
             WHERE i.id_solicitacao = ?
-        """, (id_solicitacao,))
+        """,
+            (id_solicitacao,),
+        )
         return c.fetchall()
 
     def buscar_entregas_usuario(self, id_usuario):
         """Retorna todas as entregas de um usuário."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT * FROM entrega 
             WHERE id_usuario = ?
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         return c.fetchall()
 
     def buscar_notificacoes_usuario(self, id_usuario):
         """Retorna todas as notificações de um usuário."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT * FROM notificacao 
             WHERE id_usuario = ? 
             ORDER BY timestamp DESC
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         return c.fetchall()
 
     def buscar_historico_solicitacao(self, id_solicitacao):
-        return self.conn.execute("""
+        return self.conn.execute(
+            """
             SELECT timestamp, mensagem FROM historico_rastreamento
             WHERE id_solicitacao = ? ORDER BY id
-        """, (id_solicitacao,)).fetchall()
+        """,
+            (id_solicitacao,),
+        ).fetchall()
 
     def contar_notificacoes_nao_lidas(self, id_usuario):
-        return self.conn.execute("""SELECT COUNT(*) total FROM notificacao
-            WHERE id_usuario=? AND lida_em IS NULL""", (id_usuario,)).fetchone()['total']
+        return self.conn.execute(
+            """SELECT COUNT(*) total FROM notificacao
+            WHERE id_usuario=? AND lida_em IS NULL""",
+            (id_usuario,),
+        ).fetchone()["total"]
 
     def marcar_notificacoes_lidas(self, id_usuario, agora=None):
         with self.conn:
-            cursor = self.conn.execute("""UPDATE notificacao SET lida_em=?
-                WHERE id_usuario=? AND lida_em IS NULL""", (
-                agora or datetime.now().isoformat(timespec='seconds'), id_usuario,
-            ))
+            cursor = self.conn.execute(
+                """UPDATE notificacao SET lida_em=?
+                WHERE id_usuario=? AND lida_em IS NULL""",
+                (
+                    agora
+                    or datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    id_usuario,
+                ),
+            )
         return cursor.rowcount
 
     def marcar_notificacao_lida(self, id_usuario, notificacao_id, agora=None):
         with self.conn:
-            cursor = self.conn.execute("""UPDATE notificacao SET lida_em=?
-                WHERE id_usuario=? AND id=?""", (
-                agora or datetime.now().isoformat(timespec='seconds'),
-                id_usuario, notificacao_id,
-            ))
+            cursor = self.conn.execute(
+                """UPDATE notificacao SET lida_em=?
+                WHERE id_usuario=? AND id=?""",
+                (
+                    agora
+                    or datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds"),
+                    id_usuario,
+                    notificacao_id,
+                ),
+            )
         return cursor.rowcount
 
     def contar_ofertas_ativas_empresa(self, id_empresa):
-        return self.conn.execute("""SELECT COUNT(*) total FROM oferta_coleta
-            WHERE empresa_id=? AND status='ATIVA'""", (id_empresa,)).fetchone()['total']
+        return self.conn.execute(
+            """SELECT COUNT(*) total FROM oferta_coleta
+            WHERE empresa_id=? AND status='ATIVA'""",
+            (id_empresa,),
+        ).fetchone()["total"]
 
     def contar_usuarios(self):
         """Conta total de usuários no sistema."""
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) as total FROM usuario")
-        return c.fetchone()['total']
+        return c.fetchone()["total"]
 
     def contar_solicitacoes(self):
         """Conta total de solicitações no sistema."""
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) as total FROM solicitacao_descarte")
-        return c.fetchone()['total']
+        return c.fetchone()["total"]
 
     def vincular_empresa_a_ponto(self, id_ponto: str, id_empresa: str) -> None:
         """Associa uma empresa a um ponto de coleta."""
         with self.conn:
             self.conn.execute(
                 "UPDATE ponto_coleta SET id_empresa = ? WHERE id = ?",
-                (id_empresa, id_ponto)
+                (id_empresa, id_ponto),
             )
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 INSERT OR IGNORE INTO base_operacional (
                     id, empresa_id, ponto_coleta_id, nome, endereco,
                     latitude, longitude, raio_atendimento_km,
@@ -1333,11 +1837,16 @@ class Dados(RepositorioBase):
                        latitude, longitude, 25.0, capacidade_kg,
                        ocupacao_atual_kg, 1, ativo, datetime('now'), datetime('now')
                 FROM ponto_coleta WHERE id = ?
-            """, (id_empresa, id_ponto))
-            self.conn.execute("""
+            """,
+                (id_empresa, id_ponto),
+            )
+            self.conn.execute(
+                """
                 INSERT OR IGNORE INTO base_categoria(base_id, categoria)
                 SELECT id, '*' FROM base_operacional WHERE ponto_coleta_id = ?
-            """, (id_ponto,))
+            """,
+                (id_ponto,),
+            )
 
     def buscar_pontos_para_selecao(self):
         """Retorna apenas pontos vinculados a empresas para o select do formulario."""
@@ -1353,32 +1862,48 @@ class Dados(RepositorioBase):
         return [dict(row) for row in c.fetchall()]
 
     def atualizar_detalhes_coleta(
-        self, id_sol: str, tipo_coleta: str,
-        endereco_coleta: str, nome_contato: str, data_agendamento: str
+        self,
+        id_sol: str,
+        tipo_coleta: str,
+        endereco_coleta: str,
+        nome_contato: str,
+        data_agendamento: str,
     ) -> None:
         """Salva tipo, endereco, nome de contato e data agendada na solicitacao."""
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET tipo_coleta=?, endereco_coleta=?, nome_contato=?, data_agendamento=?
                 WHERE id=?
-            """, (tipo_coleta, endereco_coleta or None, nome_contato or None,
-                  data_agendamento or None, id_sol))
+            """,
+                (
+                    tipo_coleta,
+                    endereco_coleta or None,
+                    nome_contato or None,
+                    data_agendamento or None,
+                    id_sol,
+                ),
+            )
 
     def registrar_peso_estimado(self, id_sol, peso_kg, informado_cidadao):
         with self.conn:
-            self.conn.execute("""UPDATE solicitacao_descarte
+            self.conn.execute(
+                """UPDATE solicitacao_descarte
                 SET peso_estimado_kg=?, peso_informado_cidadao=? WHERE id=?""",
-                (round(float(peso_kg),3), 1 if informado_cidadao else 0, id_sol))
+                (round(float(peso_kg), 3), 1 if informado_cidadao else 0, id_sol),
+            )
 
     def confirmar_peso_solicitacao(self, id_sol, peso_kg, usuario_id, agora):
         peso = round(float(peso_kg), 3)
         if peso <= 0:
-            raise ValueError('O peso aferido deve ser maior que zero.')
+            raise ValueError("O peso aferido deve ser maior que zero.")
         with self.conn:
-            self.conn.execute("""UPDATE solicitacao_descarte SET peso_confirmado_kg=?,
+            self.conn.execute(
+                """UPDATE solicitacao_descarte SET peso_confirmado_kg=?,
                 peso_confirmado_por=?,peso_confirmado_em=? WHERE id=?""",
-                (peso,usuario_id,agora,id_sol))
+                (peso, usuario_id, agora, id_sol),
+            )
         return peso
 
     def buscar_todos_cidadaos_admin(self):
@@ -1407,32 +1932,44 @@ class Dados(RepositorioBase):
     def buscar_pontos_empresa(self, id_empresa: str):
         """Retorna todos os pontos de coleta ativos vinculados a esta empresa."""
         c = self.conn.cursor()
-        c.execute("SELECT * FROM ponto_coleta WHERE id_empresa = ? AND ativo = 1", (id_empresa,))
+        c.execute(
+            "SELECT * FROM ponto_coleta WHERE id_empresa = ? AND ativo = 1",
+            (id_empresa,),
+        )
         return [dict(row) for row in c.fetchall()]
 
     def buscar_todos_pontos_empresa(self, id_empresa: str):
-        return [dict(row) for row in self.conn.execute("""
+        return [
+            dict(row)
+            for row in self.conn.execute(
+                """
             SELECT * FROM ponto_coleta
             WHERE id_empresa = ? ORDER BY ativo DESC, nome
-        """, (id_empresa,)).fetchall()]
+        """,
+                (id_empresa,),
+            ).fetchall()
+        ]
 
     def buscar_solicitacoes_ponto(self, id_ponto: str):
         """Retorna todas as solicitações de um ponto, com nome do usuário."""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT s.*, u.nome AS nome_usuario
             FROM solicitacao_descarte s
             JOIN usuario u ON s.id_usuario = u.id
             WHERE s.id_ponto_coleta = ?
             ORDER BY s.data_criacao DESC
-        """, (id_ponto,))
+        """,
+            (id_ponto,),
+        )
         return [dict(row) for row in c.fetchall()]
 
     def confirmar_solicitacao(self, id_sol: str, quem: str) -> None:
         """Marca confirmado_cidadao ou confirmado_empresa na solicitação."""
-        if quem not in ('cidadao', 'empresa'):
+        if quem not in ("cidadao", "empresa"):
             raise ValueError("quem deve ser 'cidadao' ou 'empresa'")
-        col = f'confirmado_{quem}'
+        col = f"confirmado_{quem}"
         with self.conn:
             self.conn.execute(f"UPDATE solicitacao_descarte SET {col} = 1 WHERE id = ?", (id_sol,))
 
@@ -1441,46 +1978,59 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute(
             "SELECT confirmado_cidadao, confirmado_empresa FROM solicitacao_descarte WHERE id = ?",
-            (id_sol,)
+            (id_sol,),
         )
         row = c.fetchone()
         if not row:
-            return {'confirmado_cidadao': 0, 'confirmado_empresa': 0}
+            return {"confirmado_cidadao": 0, "confirmado_empresa": 0}
         return {
-            'confirmado_cidadao': row['confirmado_cidadao'] or 0,
-            'confirmado_empresa': row['confirmado_empresa'] or 0,
+            "confirmado_cidadao": row["confirmado_cidadao"] or 0,
+            "confirmado_empresa": row["confirmado_empresa"] or 0,
         }
 
     def buscar_solicitacoes_ativas_cidadao(self, id_usuario: str):
         """Retorna todas as solicitações não finalizadas de um cidadão."""
-        ESTADOS_FINAIS = ('RECICLADO', 'REUTILIZADO', 'DESCARTADO', 'CANCELADO')
+        ESTADOS_FINAIS = ("RECICLADO", "REUTILIZADO", "DESCARTADO", "CANCELADO")
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT s.*, pc.nome AS nome_ponto
             FROM solicitacao_descarte s
             LEFT JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id
             WHERE s.id_usuario = ?
             ORDER BY s.data_criacao DESC
-        """, (id_usuario,))
+        """,
+            (id_usuario,),
+        )
         rows = [dict(r) for r in c.fetchall()]
-        return [r for r in rows if r['estado'] not in ESTADOS_FINAIS]
+        return [r for r in rows if r["estado"] not in ESTADOS_FINAIS]
 
     def salvar_entrega_para_solicitacao(
         self, id_sol: str, id_usuario: str, valor: float, nome_empresa: str
     ) -> str:
         """Cria registro de entrega/incentivo quando a solicitação atinge estado final."""
         import uuid as _uuid
+
         id_entrega = str(_uuid.uuid4())
-        now = datetime.now()
+        now = datetime.now(timezone(timedelta(hours=-3)))
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 INSERT OR IGNORE INTO entrega
                     (id, id_solicitacao, id_usuario, valor, empresa, data, hora, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                id_entrega, id_sol, id_usuario, round(valor, 2), nome_empresa,
-                now.strftime('%d/%m/%Y'), now.strftime('%H:%M'), 'finalizado'
-            ))
+            """,
+                (
+                    id_entrega,
+                    id_sol,
+                    id_usuario,
+                    round(valor, 2),
+                    nome_empresa,
+                    now.strftime("%d/%m/%Y"),
+                    now.strftime("%H:%M"),
+                    "finalizado",
+                ),
+            )
         return id_entrega
 
     # -------------------
@@ -1506,23 +2056,39 @@ class Dados(RepositorioBase):
         return c.fetchone()
 
     def atualizar_avaliacao_solicitacao(
-        self, id_sol: str, estado_produto: str,
-        valor_proposto: float, justificativa: str, status_override: str
+        self,
+        id_sol: str,
+        estado_produto: str,
+        valor_proposto: float,
+        justificativa: str,
+        status_override: str,
     ):
         with self.conn:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 UPDATE solicitacao_descarte
                 SET estado_produto = ?, valor_proposto = ?,
                     justificativa_valor = ?, status_override = ?
                 WHERE id = ?
-            """, (estado_produto, valor_proposto, justificativa, status_override, id_sol))
+            """,
+                (
+                    estado_produto,
+                    valor_proposto,
+                    justificativa,
+                    status_override,
+                    id_sol,
+                ),
+            )
 
     def buscar_avaliacao_solicitacao(self, id_sol: str):
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT estado_produto, valor_proposto, justificativa_valor, status_override
             FROM solicitacao_descarte WHERE id = ?
-        """, (id_sol,))
+        """,
+            (id_sol,),
+        )
         return c.fetchone()
 
     def buscar_overrides_pendentes(self):
@@ -1544,7 +2110,7 @@ class Dados(RepositorioBase):
         c.execute(
             "UPDATE solicitacao_descarte SET status_override = 'aprovado' "
             "WHERE id = ? AND status_override = 'pendente_doc'",
-            (id_sol,)
+            (id_sol,),
         )
         self.conn.commit()
         return c.rowcount == 1
@@ -1555,7 +2121,7 @@ class Dados(RepositorioBase):
         c.execute(
             "UPDATE solicitacao_descarte SET status_override = 'rejeitado', "
             "valor_proposto = ? WHERE id = ? AND status_override = 'pendente_doc'",
-            (valor_recalculado, id_sol)
+            (valor_recalculado, id_sol),
         )
         self.conn.commit()
         return c.rowcount == 1
@@ -1569,7 +2135,7 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute(
             "UPDATE empresa SET saldo = COALESCE(saldo, 0.0) + ? WHERE id_usuario = ?",
-            (delta, id_empresa)
+            (delta, id_empresa),
         )
         self.conn.commit()
 
@@ -1578,16 +2144,22 @@ class Dados(RepositorioBase):
         c = self.conn.cursor()
         c.execute("SELECT saldo FROM empresa WHERE id_usuario = ?", (id_empresa,))
         row = c.fetchone()
-        return float(row['saldo']) if row and row['saldo'] is not None else 0.0
+        return float(row["saldo"]) if row and row["saldo"] is not None else 0.0
 
     def registrar_receita_ecotech(self, id_sol: str, valor: float) -> bool:
         """Registra uma única receita por solicitação e informa se foi criada."""
         import uuid
+
         c = self.conn.cursor()
         c.execute(
             "INSERT OR IGNORE INTO receita_ecotech "
             "(id, id_solicitacao, valor, data) VALUES (?, ?, ?, ?)",
-            (str(uuid.uuid4()), id_sol, valor, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            (
+                str(uuid.uuid4()),
+                id_sol,
+                valor,
+                datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%d %H:%M:%S"),
+            ),
         )
         self.conn.commit()
         return c.rowcount == 1
@@ -1596,7 +2168,7 @@ class Dados(RepositorioBase):
         """Retorna a receita total acumulada da EcoTech."""
         c = self.conn.cursor()
         c.execute("SELECT COALESCE(SUM(valor), 0.0) AS total FROM receita_ecotech")
-        return float(c.fetchone()['total'])
+        return float(c.fetchone()["total"])
 
     def buscar_historico_receita_ecotech(self):
         """Retorna todas as entradas de receita da EcoTech, mais recentes primeiro."""
@@ -1604,12 +2176,14 @@ class Dados(RepositorioBase):
         c.execute("SELECT * FROM receita_ecotech ORDER BY data DESC")
         return c.fetchall()
 
-    def atualizar_preco_subcategoria(self, subcategoria: str, valor_base: float, valor_minimo: float) -> bool:
+    def atualizar_preco_subcategoria(
+        self, subcategoria: str, valor_base: float, valor_minimo: float
+    ) -> bool:
         """Atualiza os valores de uma subcategoria na tabela de preços."""
         c = self.conn.cursor()
         c.execute(
             "UPDATE tabela_precos SET valor_base_funcionando = ?, valor_minimo_sucata = ? WHERE subcategoria = ?",
-            (valor_base, valor_minimo, subcategoria)
+            (valor_base, valor_minimo, subcategoria),
         )
         self.conn.commit()
         return c.rowcount == 1

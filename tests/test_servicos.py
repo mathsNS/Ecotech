@@ -1,53 +1,58 @@
-import pytest
 from datetime import datetime
-from unittest.mock import Mock
 
-from ecotech.application.factories import EstadoFactory
+import pytest
+
+from ecotech.application.factories import DispositivoFactory, EstadoFactory
 from ecotech.application.services import ServicoDescarte, ServicoRelatorio
-from ecotech.domain.usuarios import Cidadao, Empresa, Administrador
+from ecotech.domain.descarte import ItemDescarte, SolicitacaoDescarte
+from ecotech.domain.estados import (
+    Cancelado,
+    Coletado,
+    Descartado,
+    Reciclado,
+    Reutilizado,
+    Solicitado,
+)
 from ecotech.domain.relatorio import RelatorioAmbiental
-from ecotech.domain.descarte import SolicitacaoDescarte, ItemDescarte
-from ecotech.domain.estados import Solicitado, Coletado, Reciclado, Reutilizado, Descartado, Cancelado
-from ecotech.application.factories import DispositivoFactory
-
+from ecotech.domain.usuarios import Cidadao, Empresa
 
 # ---- EstadoFactory ----
 
-class TestEstadoFactory:
 
+class TestEstadoFactory:
     def test_solicitado(self):
-        estado = EstadoFactory.criar_do_banco('SOLICITADO')
+        estado = EstadoFactory.criar_do_banco("SOLICITADO")
         assert isinstance(estado, Solicitado)
 
     def test_coletado(self):
-        assert isinstance(EstadoFactory.criar_do_banco('COLETADO'), Coletado)
+        assert isinstance(EstadoFactory.criar_do_banco("COLETADO"), Coletado)
 
     def test_reciclado(self):
-        assert isinstance(EstadoFactory.criar_do_banco('RECICLADO'), Reciclado)
+        assert isinstance(EstadoFactory.criar_do_banco("RECICLADO"), Reciclado)
 
     def test_reutilizado(self):
-        assert isinstance(EstadoFactory.criar_do_banco('REUTILIZADO'), Reutilizado)
+        assert isinstance(EstadoFactory.criar_do_banco("REUTILIZADO"), Reutilizado)
 
     def test_descartado(self):
-        assert isinstance(EstadoFactory.criar_do_banco('DESCARTADO'), Descartado)
+        assert isinstance(EstadoFactory.criar_do_banco("DESCARTADO"), Descartado)
 
     def test_cancelado(self):
-        assert isinstance(EstadoFactory.criar_do_banco('CANCELADO'), Cancelado)
+        assert isinstance(EstadoFactory.criar_do_banco("CANCELADO"), Cancelado)
 
     def test_estado_desconhecido_retorna_solicitado(self):
-        estado = EstadoFactory.criar_do_banco('ESTADO_INEXISTENTE')
+        estado = EstadoFactory.criar_do_banco("ESTADO_INEXISTENTE")
         assert isinstance(estado, Solicitado)
 
     def test_cada_chamada_retorna_nova_instancia(self):
-        e1 = EstadoFactory.criar_do_banco('RECICLADO')
-        e2 = EstadoFactory.criar_do_banco('RECICLADO')
+        e1 = EstadoFactory.criar_do_banco("RECICLADO")
+        e2 = EstadoFactory.criar_do_banco("RECICLADO")
         assert e1 is not e2
 
 
 # ---- Guard criar_solicitacao ----
 
-class TestGuardCriarSolicitacao:
 
+class TestGuardCriarSolicitacao:
     def test_cidadao_ativo_pode_criar(self):
         servico = ServicoDescarte()
         cidadao = Cidadao("1", "João", "joao@test.com", "12345678909")
@@ -84,6 +89,7 @@ class TestGuardCriarSolicitacao:
 
 # ---- Filtro por data em gerar_relatorio_periodo ----
 
+
 def _criar_solicitacao_com_data(data_str: str) -> SolicitacaoDescarte:
     cidadao = Cidadao("x", "Teste", "t@test.com", "12345678909")
     sol = SolicitacaoDescarte("sol-" + data_str, cidadao, None)
@@ -92,7 +98,6 @@ def _criar_solicitacao_com_data(data_str: str) -> SolicitacaoDescarte:
 
 
 class TestServicoRelatorioFiltroData:
-
     def setup_method(self):
         self.servico = ServicoRelatorio()
         self.sol_jan = _criar_solicitacao_com_data("10/01/2025 10:00")
@@ -117,7 +122,9 @@ class TestServicoRelatorioFiltroData:
     def test_intervalo_exato(self):
         inicio = datetime(2025, 2, 1)
         fim = datetime(2025, 5, 1)
-        rel = self.servico.gerar_relatorio_periodo("periodo", self.todas, data_inicio=inicio, data_fim=fim)
+        rel = self.servico.gerar_relatorio_periodo(
+            "periodo", self.todas, data_inicio=inicio, data_fim=fim
+        )
         assert rel.gerar_relatorio()["total_solicitacoes"] == 1
 
     def test_intervalo_sem_resultados(self):
@@ -127,6 +134,7 @@ class TestServicoRelatorioFiltroData:
 
 
 # ---- calcular_eficiencia_reciclagem ----
+
 
 def _sol_com_estado(estado, peso_kg: float) -> SolicitacaoDescarte:
     cidadao = Cidadao("u", "Usr", "u@t.com", "12345678909")
@@ -139,7 +147,6 @@ def _sol_com_estado(estado, peso_kg: float) -> SolicitacaoDescarte:
 
 
 class TestCalcularEficienciaReciclagem:
-
     def test_sem_solicitacoes_retorna_zero(self):
         rel = RelatorioAmbiental("vazio")
         assert rel.calcular_eficiencia_reciclagem() == 0.0

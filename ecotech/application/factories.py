@@ -5,26 +5,27 @@ e pontos de coleta, aplicando o padrão Factory para desacoplar a lógica
 de criação do restante do sistema.
 """
 
-from typing import Dict, Any
+from typing import Any
 
+from ..domain.descarte import PontoColeta
 from ..domain.dispositivos import (
-    DispositivoEletronico,
     Celular,
     Computador,
-    Eletrodomestico
+    DispositivoEletronico,
+    Eletrodomestico,
 )
-from ..domain.usuarios import Usuario, Cidadao, Empresa, Administrador
-from ..domain.tratamento import (
-    MetodoTratamento,
-    Reciclagem,
-    Reuso,
-    DescarteControlado
-)
-from ..domain.descarte import PontoColeta
 from ..domain.estados import (
-    Solicitado, BuscandoEmpresa, Coletado, EmProcessamento,
-    Reciclado, Reutilizado, Descartado, Cancelado
+    BuscandoEmpresa,
+    Cancelado,
+    Coletado,
+    Descartado,
+    EmProcessamento,
+    Reciclado,
+    Reutilizado,
+    Solicitado,
 )
+from ..domain.tratamento import DescarteControlado, MetodoTratamento, Reciclagem, Reuso
+from ..domain.usuarios import Administrador, Cidadao, Empresa, Usuario
 
 
 class DispositivoFactory:
@@ -45,12 +46,14 @@ class DispositivoFactory:
         return Computador(id, nome, peso_kg, subcategoria=subcategoria)
 
     @staticmethod
-    def criar_eletrodomestico(id: str, nome: str, peso_kg: float, subcategoria: str = "") -> Eletrodomestico:
+    def criar_eletrodomestico(
+        id: str, nome: str, peso_kg: float, subcategoria: str = ""
+    ) -> Eletrodomestico:
         """Cria uma instância de Eletrodoméstico."""
         return Eletrodomestico(id, nome, peso_kg, subcategoria=subcategoria)
 
     @staticmethod
-    def criar_dispositivo(tipo: str, dados: Dict[str, Any]) -> DispositivoEletronico:
+    def criar_dispositivo(tipo: str, dados: dict[str, Any]) -> DispositivoEletronico:
         """Cria um dispositivo do tipo especificado a partir de um dicionário de dados."""
         tipo_lower = tipo.lower()
         if tipo_lower == "celular":
@@ -75,28 +78,17 @@ class UsuarioFactory:
         return Cidadao(id, nome, email, cpf)
 
     @staticmethod
-    def criar_empresa(
-        id: str,
-        nome: str,
-        email: str,
-        cnpj: str,
-        razao_social: str
-    ) -> Empresa:
+    def criar_empresa(id: str, nome: str, email: str, cnpj: str, razao_social: str) -> Empresa:
         """Cria uma instância de Empresa."""
         return Empresa(id, nome, email, cnpj, razao_social)
 
     @staticmethod
-    def criar_administrador(
-        id: str,
-        nome: str,
-        email: str,
-        nivel_acesso: int = 1
-    ) -> Administrador:
+    def criar_administrador(id: str, nome: str, email: str, nivel_acesso: int = 1) -> Administrador:
         """Cria uma instância de Administrador."""
         return Administrador(id, nome, email, nivel_acesso)
 
     @staticmethod
-    def criar_usuario(tipo: str, dados: Dict[str, Any]) -> Usuario:
+    def criar_usuario(tipo: str, dados: dict[str, Any]) -> Usuario:
         """Cria um usuário do tipo especificado a partir de um dicionário de dados."""
         tipo_lower = tipo.lower()
 
@@ -160,13 +152,13 @@ class PontoColetaFactory:
         endereco: str,
         latitude: float,
         longitude: float,
-        capacidade_kg: float = 1000.0
+        capacidade_kg: float = 1000.0,
     ) -> PontoColeta:
         """Cria uma instância de PontoColeta."""
         return PontoColeta(id, nome, endereco, latitude, longitude, capacidade_kg)
 
     @staticmethod
-    def criar_ponto(dados: Dict[str, Any]) -> PontoColeta:
+    def criar_ponto(dados: dict[str, Any]) -> PontoColeta:
         """Cria um ponto de coleta a partir de um dicionário de dados."""
         return PontoColetaFactory.criar_ponto_coleta(**dados)
 
@@ -175,14 +167,14 @@ class EstadoFactory:
     """Converte strings do banco em instâncias de estado."""
 
     _MAPA = {
-        'SOLICITADO': Solicitado,
-        'BUSCANDO_EMPRESA': BuscandoEmpresa,
-        'COLETADO': Coletado,
-        'EM_PROCESSAMENTO': EmProcessamento,
-        'RECICLADO': Reciclado,
-        'REUTILIZADO': Reutilizado,
-        'DESCARTADO': Descartado,
-        'CANCELADO': Cancelado,
+        "SOLICITADO": Solicitado,
+        "BUSCANDO_EMPRESA": BuscandoEmpresa,
+        "COLETADO": Coletado,
+        "EM_PROCESSAMENTO": EmProcessamento,
+        "RECICLADO": Reciclado,
+        "REUTILIZADO": Reutilizado,
+        "DESCARTADO": Descartado,
+        "CANCELADO": Cancelado,
     }
 
     @staticmethod

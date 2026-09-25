@@ -6,9 +6,9 @@ def _coluna_existe(conn, tabela, coluna) -> bool:
 
 
 def aplicar(conn) -> None:
-    if not _coluna_existe(conn, 'notificacao', 'chave_idempotencia'):
+    if not _coluna_existe(conn, "notificacao", "chave_idempotencia"):
         conn.execute("ALTER TABLE notificacao ADD COLUMN chave_idempotencia TEXT")
-    if not _coluna_existe(conn, 'solicitacao_descarte', 'despacho_esgotado_em'):
+    if not _coluna_existe(conn, "solicitacao_descarte", "despacho_esgotado_em"):
         conn.execute("ALTER TABLE solicitacao_descarte ADD COLUMN despacho_esgotado_em TEXT")
 
     conn.execute("""
@@ -38,7 +38,15 @@ def aplicar(conn) -> None:
             UNIQUE(solicitacao_id, prioridade)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_oferta_empresa_status ON oferta_coleta(empresa_id, status)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_oferta_solicitacao_status ON oferta_coleta(solicitacao_id, status)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_oferta_expiracao ON oferta_coleta(status, expira_em)")
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_notificacao_chave ON notificacao(chave_idempotencia) WHERE chave_idempotencia IS NOT NULL")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_oferta_empresa_status ON oferta_coleta(empresa_id, status)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_oferta_solicitacao_status ON oferta_coleta(solicitacao_id, status)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_oferta_expiracao ON oferta_coleta(status, expira_em)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_notificacao_chave ON notificacao(chave_idempotencia) WHERE chave_idempotencia IS NOT NULL"
+    )

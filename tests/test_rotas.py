@@ -7,19 +7,18 @@ Cobre:
 - POST /solicitacao/<id>/confirmar (não autenticado / cidadão / empresa confirma)
 """
 
-import sqlite3
 import os
+import sqlite3
 from datetime import datetime, timedelta
+
 import pytest
 
 from ecotech.infrastructure.web import formatar_data_br
 
-from ecotech.infrastructure.persistence.dados import Dados
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def app(tmp_path_factory, monkeypatch_module=None):
@@ -35,6 +34,7 @@ def app(tmp_path_factory, monkeypatch_module=None):
     # Monkeypatch em nível de módulo: não podemos usar o fixture monkeypatch
     # diretamente, então aplicamos manualmente via import.
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     _connect_orig = _dados_mod.sqlite3.connect
 
     class _PatchedConnect:
@@ -47,6 +47,7 @@ def app(tmp_path_factory, monkeypatch_module=None):
     os.environ.pop("WERKZEUG_RUN_MAIN", None)
 
     from ecotech.infrastructure.web import criar_app
+
     application = criar_app()
     application.config["TESTING"] = True
     application.config["SECRET_KEY"] = "test-secret"
@@ -82,14 +83,15 @@ def _set_session(client, user_id, nome, tipo):
 
 # IDs fixos definidos no seed de _inicializar_dados_exemplo
 _ID_ADMIN = "USR-ADM-001"
-_ID_EMPRESA_FREE = "user-2"   # Recicla Kariri (plano free por padrão)
-_ID_OUTRA_EMPRESA = "user-7"   # TechLixo Soluções
-_ID_CIDADAO = "user-1"        # João Silva
+_ID_EMPRESA_FREE = "user-2"  # Recicla Kariri (plano free por padrão)
+_ID_OUTRA_EMPRESA = "user-7"  # TechLixo Soluções
+_ID_CIDADAO = "user-1"  # João Silva
 
 
 # ---------------------------------------------------------------------------
 # /relatorios/exportar-csv
 # ---------------------------------------------------------------------------
+
 
 def test_exportar_csv_nao_autenticado_redireciona(client):
     """Sem sessão deve redirecionar para /login."""
@@ -127,6 +129,7 @@ def test_exportar_csv_conteudo_cabecalho(client):
 # POST /operacoes/<id>/avancar
 # ---------------------------------------------------------------------------
 
+
 def test_avancar_estado_nao_autenticado_retorna_401(client):
     resp = client.post("/operacoes/qualquer-id/avancar")
     assert resp.status_code == 401
@@ -142,8 +145,7 @@ def test_avancar_estado_cidadao_retorna_403(client):
 
 def test_avancar_estado_sol_inexistente_retorna_404(client):
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
-    resp = client.post("/operacoes/id-que-nao-existe/avancar",
-                       data={"metodo": "reciclagem"})
+    resp = client.post("/operacoes/id-que-nao-existe/avancar", data={"metodo": "reciclagem"})
     assert resp.status_code == 404
     assert resp.is_json
 
@@ -152,6 +154,7 @@ def test_avancar_estado_sol_ja_finalizada_retorna_400(client, app):
     """Tentar avançar uma solicitação em estado final retorna 400."""
     # Busca uma solicitação em estado final direto no banco para obter o ID
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     c = db.conn.cursor()
     c.execute(
@@ -163,8 +166,7 @@ def test_avancar_estado_sol_ja_finalizada_retorna_400(client, app):
         pytest.skip("Nenhuma solicitação finalizada no banco de seed")
 
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
-    resp = client.post(f"/operacoes/{row['id']}/avancar",
-                       data={"metodo": "reciclagem"})
+    resp = client.post(f"/operacoes/{row['id']}/avancar", data={"metodo": "reciclagem"})
     assert resp.status_code == 400
     assert resp.is_json
 
@@ -172,19 +174,16 @@ def test_avancar_estado_sol_ja_finalizada_retorna_400(client, app):
 def test_avancar_estado_avanca_solicitado_para_coletado(client, app):
     """Admin avança solicitação 'Solicitado' → resposta 200 com novo_estado."""
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     c = db.conn.cursor()
-    c.execute(
-        "SELECT id FROM solicitacao_descarte WHERE estado = 'SOLICITADO' LIMIT 1"
-    )
+    c.execute("SELECT id FROM solicitacao_descarte WHERE estado = 'SOLICITADO' LIMIT 1")
     row = c.fetchone()
     if row is None:
         pytest.skip("Nenhuma solicitação em estado SOLICITADO no banco de seed")
 
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
-    resp = client.post(
-        f"/operacoes/{row['id']}/avancar", data={'peso_aferido_kg': '2.35'}
-    )
+    resp = client.post(f"/operacoes/{row['id']}/avancar", data={"peso_aferido_kg": "2.35"})
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("novo_estado") == "Coletado"
@@ -193,6 +192,7 @@ def test_avancar_estado_avanca_solicitado_para_coletado(client, app):
 # ---------------------------------------------------------------------------
 # POST /solicitacao/<id>/confirmar
 # ---------------------------------------------------------------------------
+
 
 def test_confirmar_rota_nao_autenticado_retorna_401(client):
     resp = client.post("/solicitacao/qualquer-id/confirmar")
@@ -217,6 +217,7 @@ def test_confirmar_rota_sol_inexistente_retorna_404(client):
 def test_confirmar_rota_empresa_avanca_para_coletado(client, app):
     """Empresa confirma solicitação em estado 'Solicitado' → avança para Coletado."""
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     c = db.conn.cursor()
     # Busca uma solicitação ainda em SOLICITADO pertencente ao ponto da empresa Free
@@ -224,7 +225,7 @@ def test_confirmar_rota_empresa_avanca_para_coletado(client, app):
         "SELECT s.id FROM solicitacao_descarte s "
         "JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id "
         "WHERE s.estado = 'SOLICITADO' AND pc.id_empresa = ? LIMIT 1",
-        (_ID_EMPRESA_FREE,)
+        (_ID_EMPRESA_FREE,),
     )
     row = c.fetchone()
     if row is None:
@@ -240,12 +241,13 @@ def test_confirmar_rota_empresa_avanca_para_coletado(client, app):
 
 def _buscar_solicitacao_de_outra_empresa(id_empresa):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     return db.conn.execute(
         "SELECT s.id FROM solicitacao_descarte s "
         "JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id "
         "WHERE pc.id_empresa <> ? LIMIT 1",
-        (id_empresa,)
+        (id_empresa,),
     ).fetchone()
 
 
@@ -267,7 +269,7 @@ def test_avancar_rota_outra_empresa_retorna_403(client):
         pytest.skip("Sem solicitação de outra empresa no seed")
 
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
-    resp = client.post(f"/operacoes/{row['id']}/avancar", data={'peso_aferido_kg': '2.35'})
+    resp = client.post(f"/operacoes/{row['id']}/avancar", data={"peso_aferido_kg": "2.35"})
 
     assert resp.status_code == 403
     assert resp.is_json
@@ -275,13 +277,14 @@ def test_avancar_rota_outra_empresa_retorna_403(client):
 
 def test_mtr_outra_empresa_nao_e_gerado(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
-    db.atualizar_plano_empresa(_ID_EMPRESA_FREE, 'professional')
+    db.atualizar_plano_empresa(_ID_EMPRESA_FREE, "professional")
     row = db.conn.execute(
         "SELECT s.id FROM solicitacao_descarte s "
         "JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id "
         "WHERE pc.id_empresa <> ? LIMIT 1",
-        (_ID_EMPRESA_FREE,)
+        (_ID_EMPRESA_FREE,),
     ).fetchone()
     if row is None:
         pytest.skip("Sem solicitação de outra empresa no seed")
@@ -290,99 +293,103 @@ def test_mtr_outra_empresa_nao_e_gerado(client):
     resp = client.get(f"/solicitacao/{row['id']}/mtr", follow_redirects=False)
 
     assert resp.status_code in (301, 302)
-    assert '/operacoes' in resp.headers['Location']
+    assert "/operacoes" in resp.headers["Location"]
 
 
 def test_admin_gera_mtr_pdf_valido(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     row = db.conn.execute("SELECT id FROM solicitacao_descarte LIMIT 1").fetchone()
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
     resp = client.get(f"/solicitacao/{row['id']}/mtr")
     assert resp.status_code == 200
-    assert resp.mimetype == 'application/pdf'
-    assert resp.data.startswith(b'%PDF')
+    assert resp.mimetype == "application/pdf"
+    assert resp.data.startswith(b"%PDF")
 
 
 def test_saque_negado_para_empresa(client):
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
-    resp = client.get('/saque', follow_redirects=False)
+    resp = client.get("/saque", follow_redirects=False)
 
     assert resp.status_code in (301, 302)
-    assert '/dashboard' in resp.headers['Location']
+    assert "/dashboard" in resp.headers["Location"]
 
 
 def test_csrf_rejeita_post_sem_token_quando_habilitado(client, app):
     _set_session(client, _ID_ADMIN, "Admin Ecotech", "administrador")
-    app.config['TESTING'] = False
-    app.config['CSRF_ENABLED'] = True
+    app.config["TESTING"] = False
+    app.config["CSRF_ENABLED"] = True
     try:
-        resp = client.post('/usuarios/user-1/desativar')
+        resp = client.post("/usuarios/user-1/desativar")
     finally:
-        app.config['TESTING'] = True
+        app.config["TESTING"] = True
 
     assert resp.status_code == 400
     assert resp.is_json
 
 
 def test_csrf_protege_aceite_de_oferta(client, app):
-    _set_session(client, _ID_EMPRESA_FREE, 'Recicla Kariri', 'empresa')
-    app.config['TESTING'] = False
-    app.config['CSRF_ENABLED'] = True
+    _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
+    app.config["TESTING"] = False
+    app.config["CSRF_ENABLED"] = True
     try:
-        resp = client.post('/ofertas/oferta-inexistente/aceitar')
+        resp = client.post("/ofertas/oferta-inexistente/aceitar")
     finally:
-        app.config['TESTING'] = True
+        app.config["TESTING"] = True
     assert resp.status_code == 400
     assert resp.is_json
 
 
 def test_empresa_lista_suas_bases_operacionais(client):
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
-    resp = client.get('/empresa/bases')
+    resp = client.get("/empresa/bases")
 
     assert resp.status_code == 200
-    assert b'Bases operacionais' in resp.data
-    assert b'Recicla Kariri' in resp.data
+    assert b"Bases operacionais" in resp.data
+    assert b"Recicla Kariri" in resp.data
 
 
 def test_empresa_nao_edita_base_de_outra_empresa(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     row = db.conn.execute(
-        "SELECT id FROM base_operacional WHERE empresa_id <> ? LIMIT 1",
-        (_ID_EMPRESA_FREE,)
+        "SELECT id FROM base_operacional WHERE empresa_id <> ? LIMIT 1", (_ID_EMPRESA_FREE,)
     ).fetchone()
     if row is None:
-        pytest.skip('Sem base de outra empresa no seed')
+        pytest.skip("Sem base de outra empresa no seed")
 
     _set_session(client, _ID_EMPRESA_FREE, "Recicla Kariri", "empresa")
     resp = client.post(
         f"/empresa/bases/{row['id']}/editar",
         data={
-            'nome': 'Invasão', 'endereco': 'Rua X',
-            'latitude': '-7.2', 'longitude': '-39.3',
-            'raio_atendimento_km': '10', 'capacidade_kg': '100',
+            "nome": "Invasão",
+            "endereco": "Rua X",
+            "latitude": "-7.2",
+            "longitude": "-39.3",
+            "raio_atendimento_km": "10",
+            "capacidade_kg": "100",
         },
     )
     assert resp.status_code == 403
 
 
 def _dados_nova_coleta(**sobrescrever):
-    data_futura = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+    data_futura = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     dados = {
-        'tipo_dispositivo': 'celular',
-        'subcategoria': 'smartphone_medio',
-        'nome': 'Aparelho Localizado',
-        'peso_kg': '1.0',
-        'quantidade': '1',
-        'tipo_coleta': 'domiciliar',
-        'endereco_coleta': 'Rua da Localização, 10',
-        'latitude_coleta': '-7.2134',
-        'longitude_coleta': '-39.3153',
-        'nome_contato': 'João',
-        'data_coleta': data_futura,
-        'horario_coleta': '14:30',
+        "tipo_dispositivo": "celular",
+        "subcategoria": "smartphone_medio",
+        "nome": "Aparelho Localizado",
+        "peso_kg": "1.0",
+        "quantidade": "1",
+        "tipo_coleta": "domiciliar",
+        "endereco_coleta": "Rua da Localização, 10",
+        "latitude_coleta": "-7.2134",
+        "longitude_coleta": "-39.3153",
+        "nome_contato": "João",
+        "data_coleta": data_futura,
+        "horario_coleta": "14:30",
     }
     dados.update(sobrescrever)
     return dados
@@ -390,8 +397,9 @@ def _dados_nova_coleta(**sobrescrever):
 
 def test_coleta_domiciliar_persiste_coordenadas(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
-    resp = client.post('/nova-solicitacao', data=_dados_nova_coleta())
+    resp = client.post("/nova-solicitacao", data=_dados_nova_coleta())
     assert resp.status_code in (301, 302)
 
     db = _dados_mod.Dados()
@@ -401,44 +409,45 @@ def test_coleta_domiciliar_persiste_coordenadas(client):
         WHERE endereco_coleta = 'Rua da Localização, 10'
         ORDER BY rowid DESC LIMIT 1
     """).fetchone()
-    assert row['latitude_coleta'] == pytest.approx(-7.2134)
-    assert row['longitude_coleta'] == pytest.approx(-39.3153)
-    assert row['origem_localizacao'] == 'navegador_ou_formulario'
+    assert row["latitude_coleta"] == pytest.approx(-7.2134)
+    assert row["longitude_coleta"] == pytest.approx(-39.3153)
+    assert row["origem_localizacao"] == "navegador_ou_formulario"
     despacho = db.conn.execute("""
         SELECT estado FROM solicitacao_descarte
         WHERE endereco_coleta = 'Rua da Localização, 10'
         ORDER BY rowid DESC LIMIT 1
     """).fetchone()
-    assert despacho['estado'] == 'BUSCANDO_EMPRESA'
+    assert despacho["estado"] == "BUSCANDO_EMPRESA"
 
 
 def test_coleta_sem_peso_usa_estimativa_nao_confirmada(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
-    formulario = _dados_nova_coleta(
-        peso_kg='', endereco_coleta='Rua sem balança, 20'
-    )
-    resp = client.post('/nova-solicitacao', data=formulario)
+    formulario = _dados_nova_coleta(peso_kg="", endereco_coleta="Rua sem balança, 20")
+    resp = client.post("/nova-solicitacao", data=formulario)
     assert resp.status_code in (301, 302)
     db = _dados_mod.Dados()
     row = db.conn.execute("""SELECT peso_estimado_kg,peso_informado_cidadao,
         peso_confirmado_kg FROM solicitacao_descarte
         WHERE endereco_coleta='Rua sem balança, 20' ORDER BY rowid DESC LIMIT 1""").fetchone()
-    assert row['peso_estimado_kg'] == pytest.approx(0.2)
-    assert row['peso_informado_cidadao'] == 0
-    assert row['peso_confirmado_kg'] is None
+    assert row["peso_estimado_kg"] == pytest.approx(0.2)
+    assert row["peso_informado_cidadao"] == 0
+    assert row["peso_confirmado_kg"] is None
 
 
 def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
+
     db = _dados_mod.Dados()
     antes = db.contar_solicitacoes()
     _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
     resp = client.post(
-        '/nova-solicitacao',
+        "/nova-solicitacao",
         data=_dados_nova_coleta(
-            endereco_coleta='Rua Sem Coordenadas',
-            latitude_coleta='', longitude_coleta='',
+            endereco_coleta="Rua Sem Coordenadas",
+            latitude_coleta="",
+            longitude_coleta="",
         ),
     )
     assert resp.status_code == 200
@@ -447,27 +456,31 @@ def test_coleta_domiciliar_sem_coordenadas_nao_cria_solicitacao(client):
 
 def test_formulario_domiciliar_usa_endereco_sem_coordenadas_visiveis(client):
     _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
-    resp = client.get('/nova-solicitacao?tipo=domiciliar')
+    resp = client.get("/nova-solicitacao?tipo=domiciliar")
     assert resp.status_code == 200
-    assert b'CEP' in resp.data
-    assert b'latitude_manual' not in resp.data
-    assert b'longitude_manual' not in resp.data
+    assert b"CEP" in resp.data
+    assert b"latitude_manual" not in resp.data
+    assert b"longitude_manual" not in resp.data
 
 
 def test_comando_processar_ofertas_pode_ser_agendado(app):
     resultado = app.test_cli_runner().invoke(
-        args=['processar-ofertas', '--agora', '2026-09-10T14:36:00']
+        args=["processar-ofertas", "--agora", "2026-09-10T14:36:00"]
     )
     assert resultado.exit_code == 0
-    assert 'oferta(s) ativada(s)' in resultado.output
+    assert "oferta(s) ativada(s)" in resultado.output
 
 
 def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
-    _set_session(client, _ID_CIDADAO, 'João Silva', 'cidadao')
-    client.post('/nova-solicitacao', data=_dados_nova_coleta(
-        endereco_coleta='Rua Privada do Aceite, 77', nome_contato='Contato Secreto'
-    ))
+
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    client.post(
+        "/nova-solicitacao",
+        data=_dados_nova_coleta(
+            endereco_coleta="Rua Privada do Aceite, 77", nome_contato="Contato Secreto"
+        ),
+    )
     db = _dados_mod.Dados()
     ofertas = db.conn.execute("""
         SELECT * FROM oferta_coleta
@@ -481,72 +494,72 @@ def test_aceite_exige_login_e_libera_dados_apenas_a_vencedora(client):
 
     with client.session_transaction() as sess:
         sess.clear()
-    assert client.post(f'/ofertas/{ativa["id"]}/aceitar').status_code == 401
+    assert client.post(f"/ofertas/{ativa['id']}/aceitar").status_code == 401
 
-    _set_session(client, ativa['empresa_id'], 'Empresa Vencedora', 'empresa')
-    resumo = client.get('/api/empresa/ofertas').get_json()['ofertas'][0]
-    assert 'endereco_coleta' not in str(resumo)
-    resposta = client.post(f'/ofertas/{ativa["id"]}/aceitar')
+    _set_session(client, ativa["empresa_id"], "Empresa Vencedora", "empresa")
+    resumo = client.get("/api/empresa/ofertas").get_json()["ofertas"][0]
+    assert "endereco_coleta" not in str(resumo)
+    resposta = client.post(f"/ofertas/{ativa['id']}/aceitar")
     assert resposta.status_code == 200
-    assert resposta.get_json()['endereco_coleta'] == 'Rua Privada do Aceite, 77'
+    assert resposta.get_json()["endereco_coleta"] == "Rua Privada do Aceite, 77"
 
-    operacoes = client.get('/operacoes')
-    assert b'Rua Privada do Aceite, 77' in operacoes.data
-    agenda_ui = client.get(
-        f'/solicitacoes/{ativa["solicitacao_id"]}/agendamento'
-    )
+    operacoes = client.get("/operacoes")
+    assert b"Rua Privada do Aceite, 77" in operacoes.data
+    agenda_ui = client.get(f"/solicitacoes/{ativa['solicitacao_id']}/agendamento")
     assert agenda_ui.status_code == 200
-    assert b'_csrf_token' in agenda_ui.data
-    assert b'Abrir chat' in agenda_ui.data
+    assert b"_csrf_token" in agenda_ui.data
+    assert b"Abrir chat" in agenda_ui.data
     client.post(
-        f'/solicitacoes/{ativa["solicitacao_id"]}/chat',
-        data={'texto': '<script>alert(1)</script>'},
+        f"/solicitacoes/{ativa['solicitacao_id']}/chat",
+        data={"texto": "<script>alert(1)</script>"},
     )
-    pagina_chat = client.get(f'/solicitacoes/{ativa["solicitacao_id"]}/chat')
-    assert b'&lt;script&gt;alert(1)&lt;/script&gt;' in pagina_chat.data
-    assert b'<script>alert(1)</script>' not in pagina_chat.data
+    pagina_chat = client.get(f"/solicitacoes/{ativa['solicitacao_id']}/chat")
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in pagina_chat.data
+    assert b"<script>alert(1)</script>" not in pagina_chat.data
     nome_remetente = db.conn.execute(
-        'SELECT nome FROM usuario WHERE id=?', (ativa['empresa_id'],)
-    ).fetchone()['nome']
+        "SELECT nome FROM usuario WHERE id=?", (ativa["empresa_id"],)
+    ).fetchone()["nome"]
     assert nome_remetente.encode() in pagina_chat.data
-    assert b'2026-09-' not in pagina_chat.data
+    assert b"2026-09-" not in pagina_chat.data
 
-    perdedora = next(o for o in ofertas if o['empresa_id'] != ativa['empresa_id'])
-    _set_session(client, perdedora['empresa_id'], 'Empresa Perdedora', 'empresa')
-    conflito = client.post(f'/ofertas/{perdedora["id"]}/aceitar')
+    perdedora = next(o for o in ofertas if o["empresa_id"] != ativa["empresa_id"])
+    _set_session(client, perdedora["empresa_id"], "Empresa Perdedora", "empresa")
+    conflito = client.post(f"/ofertas/{perdedora['id']}/aceitar")
     assert conflito.status_code == 409
-    assert b'Rua Privada do Aceite, 77' not in client.get('/operacoes').data
-    assert client.get(
-        f'/solicitacoes/{ativa["solicitacao_id"]}/chat'
-    ).status_code == 403
+    assert b"Rua Privada do Aceite, 77" not in client.get("/operacoes").data
+    assert client.get(f"/solicitacoes/{ativa['solicitacao_id']}/chat").status_code == 403
 
 
 def test_interfaces_respeitam_papel_privacidade_e_csrf(client):
     import ecotech.infrastructure.persistence.dados as _dados_mod
-    _set_session(client, _ID_CIDADAO, 'João Silva', 'cidadao')
-    client.post('/nova-solicitacao', data=_dados_nova_coleta(
-        endereco_coleta='Rua Invisível Antes do Aceite, 9',
-        horario_fim='16:30',
-    ))
-    db=_dados_mod.Dados()
-    oferta=db.conn.execute("""SELECT * FROM oferta_coleta WHERE status='ATIVA'
+
+    _set_session(client, _ID_CIDADAO, "João Silva", "cidadao")
+    client.post(
+        "/nova-solicitacao",
+        data=_dados_nova_coleta(
+            endereco_coleta="Rua Invisível Antes do Aceite, 9",
+            horario_fim="16:30",
+        ),
+    )
+    db = _dados_mod.Dados()
+    oferta = db.conn.execute("""SELECT * FROM oferta_coleta WHERE status='ATIVA'
         AND solicitacao_id=(SELECT id FROM solicitacao_descarte
         WHERE endereco_coleta='Rua Invisível Antes do Aceite, 9' ORDER BY rowid DESC LIMIT 1)
         ORDER BY prioridade LIMIT 1""").fetchone()
-    assert client.get('/empresa/oportunidades').status_code in (301,302)
-    _set_session(client,oferta['empresa_id'],'Empresa','empresa')
-    pagina=client.get('/empresa/oportunidades?pagina=1')
-    assert pagina.status_code==200
-    assert b'_csrf_token' in pagina.data
-    assert b'score' not in pagina.data.lower()
-    assert 'Rua Invisível Antes do Aceite'.encode() not in pagina.data
-    _set_session(client,_ID_ADMIN,'Admin','administrador')
-    admin=client.get('/admin/despacho')
-    assert admin.status_code==200 and b'Painel somente leitura' in admin.data
+    assert client.get("/empresa/oportunidades").status_code in (301, 302)
+    _set_session(client, oferta["empresa_id"], "Empresa", "empresa")
+    pagina = client.get("/empresa/oportunidades?pagina=1")
+    assert pagina.status_code == 200
+    assert b"_csrf_token" in pagina.data
+    assert b"score" not in pagina.data.lower()
+    assert "Rua Invisível Antes do Aceite".encode() not in pagina.data
+    _set_session(client, _ID_ADMIN, "Admin", "administrador")
+    admin = client.get("/admin/despacho")
+    assert admin.status_code == 200 and b"Painel somente leitura" in admin.data
 
 
 def test_formatacao_brasileira_de_datas():
-    assert formatar_data_br('2026-09-02T11:13:51.192632') == '02/09/2026 11:13'
-    assert formatar_data_br('2026-09-02', 'data') == '02/09/2026'
-    assert formatar_data_br('2026-09-02', 'curta') == '02/09'
-    assert formatar_data_br('2026-09-02', 'mes_ano') == '09/26'
+    assert formatar_data_br("2026-09-02T11:13:51.192632") == "02/09/2026 11:13"
+    assert formatar_data_br("2026-09-02", "data") == "02/09/2026"
+    assert formatar_data_br("2026-09-02", "curta") == "02/09"
+    assert formatar_data_br("2026-09-02", "mes_ano") == "09/26"

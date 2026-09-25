@@ -7,15 +7,13 @@ def _coluna_existe(conn, tabela, coluna) -> bool:
 
 def aplicar(conn) -> None:
     for coluna, definicao in (
-        ('latitude_coleta', 'REAL'),
-        ('longitude_coleta', 'REAL'),
-        ('localizacao_obtida_em', 'TEXT'),
-        ('origem_localizacao', 'TEXT'),
+        ("latitude_coleta", "REAL"),
+        ("longitude_coleta", "REAL"),
+        ("localizacao_obtida_em", "TEXT"),
+        ("origem_localizacao", "TEXT"),
     ):
-        if not _coluna_existe(conn, 'solicitacao_descarte', coluna):
-            conn.execute(
-                f"ALTER TABLE solicitacao_descarte ADD COLUMN {coluna} {definicao}"
-            )
+        if not _coluna_existe(conn, "solicitacao_descarte", coluna):
+            conn.execute(f"ALTER TABLE solicitacao_descarte ADD COLUMN {coluna} {definicao}")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS base_operacional (
@@ -40,8 +38,7 @@ def aplicar(conn) -> None:
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_base_empresa_ativa "
-        "ON base_operacional(empresa_id, ativa)"
+        "CREATE INDEX IF NOT EXISTS idx_base_empresa_ativa ON base_operacional(empresa_id, ativa)"
     )
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_base_ponto "
