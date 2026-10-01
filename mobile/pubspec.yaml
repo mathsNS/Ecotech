@@ -69,11 +69,17 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/fonts/Lato-LICENSE.txt
 
   fonts:
-    - family: Inter
+    - family: Lato
       fonts:
-        - asset: assets/fonts/InterVariable.ttf
+        - asset: assets/fonts/Lato-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Lato-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Lato-Black.ttf
+          weight: 900
 
 flutter_launcher_icons:
   android: true

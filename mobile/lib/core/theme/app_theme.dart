@@ -27,7 +27,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'Inter',
+      fontFamily: 'Lato',
       fontFamilyFallback: const ['Roboto', 'Arial', 'sans-serif'],
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
