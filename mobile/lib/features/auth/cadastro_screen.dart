@@ -161,6 +161,9 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
                 hint: 'Mínimo de 6 caracteres',
                 password: true,
                 autofill: AutofillHints.newPassword,
+                validator: (valor) =>
+                    _obrigatorio(valor) ??
+                    (valor!.length < 6 ? 'Use pelo menos 6 caracteres' : null),
               ),
               _campo(
                 'Confirmar senha',
@@ -169,6 +172,11 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
                 password: true,
                 last: true,
                 autofill: AutofillHints.newPassword,
+                validator: (valor) =>
+                    _obrigatorio(valor) ??
+                    (valor != _senhaController.text
+                        ? 'As senhas não conferem'
+                        : null),
               ),
               const SizedBox(height: 8),
               ElevatedButton.icon(
@@ -197,6 +205,7 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
     TextInputType? keyboard,
     bool password = false,
     bool last = false,
+    FormFieldValidator<String>? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -214,7 +223,7 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
           autofillHints: autofill == null ? null : [autofill],
           textInputAction: last ? TextInputAction.done : TextInputAction.next,
           onFieldSubmitted: last ? (_) => _criarConta() : null,
-          validator: _obrigatorio,
+          validator: validator ?? _obrigatorio,
         ),
       ),
     );

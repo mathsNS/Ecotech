@@ -1,4 +1,5 @@
 import 'package:ecotech_mobile/data/models/usuario.dart';
+import 'package:ecotech_mobile/core/api/api_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +12,42 @@ Future<void> fillField(WidgetTester tester, String label, String value) async {
 }
 
 void main() {
+  testWidgets(
+    'cadastro valida senhas antes de enviar e conserva dados após erro',
+    (tester) async {
+      final repository = PendingAuthRepository();
+      await pumpAuth(tester, repository, route: '/cadastro');
+      await fillField(tester, 'Nome completo', 'Ana');
+      await fillField(tester, 'CPF', '12345678901');
+      await fillField(tester, 'E-mail', 'ana@example.com');
+      await fillField(tester, 'Senha', '123');
+      await fillField(tester, 'Confirmar senha', '456');
+      final submit = find.widgetWithText(ElevatedButton, 'Criar conta');
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Use pelo menos 6 caracteres'), findsOneWidget);
+      expect(find.text('As senhas não conferem'), findsOneWidget);
+      expect(repository.requests, isEmpty);
+      await fillField(tester, 'Senha', 'senha-segura');
+      await fillField(tester, 'Confirmar senha', 'senha-segura');
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pump();
+      repository.response.completeError(ApiException('E-mail já cadastrado'));
+      await tester.pumpAndSettle();
+      expect(find.text('E-mail já cadastrado'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('E-mail')))
+            .controller!
+            .text,
+        'ana@example.com',
+      );
+      expect(tester.widget<ElevatedButton>(submit).onPressed, isNotNull);
+    },
+  );
+
   testWidgets(
     'empresa preserva campos ao trocar perfil e envia apenas seu documento',
     (tester) async {
