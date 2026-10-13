@@ -52,8 +52,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Entrar no sistema'), findsOneWidget);
-    final context = tester.element(find.text('Entrar no sistema'));
+    expect(find.text('Que bom te ver'), findsOneWidget);
+    final context = tester.element(find.text('Que bom te ver'));
     expect(Theme.of(context).textTheme.bodyMedium?.fontFamily, 'Lato');
   });
 }

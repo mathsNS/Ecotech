@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import 'auth_controller.dart';
-
-enum _TipoConta { cidadao, empresa, administrador }
+import 'widgets/auth_field.dart';
+import 'widgets/auth_layout.dart';
+import 'widgets/auth_role_selector.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,13 +19,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _credencialController = TextEditingController();
   final _senhaController = TextEditingController();
-  _TipoConta _tipo = _TipoConta.cidadao;
+  AuthRole _tipo = AuthRole.cidadao;
   bool _carregando = false;
+  bool _mostrarSenha = false;
 
   static const _configPorTipo = {
-    _TipoConta.cidadao: (label: 'CPF', hint: '000.000.000-00'),
-    _TipoConta.empresa: (label: 'CNPJ', hint: '00.000.000/0000-00'),
-    _TipoConta.administrador: (label: 'E-mail', hint: 'admin@ecotech.com'),
+    AuthRole.cidadao: (label: 'CPF', hint: '000.000.000-00'),
+    AuthRole.empresa: (label: 'CNPJ', hint: '00.000.000/0000-00'),
+    AuthRole.administrador: (label: 'E-mail', hint: 'admin@ecotech.com'),
   };
 
   @override
@@ -35,10 +37,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _entrar() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_carregando || !_formKey.currentState!.validate()) return;
 
     setState(() => _carregando = true);
-    await ref.read(authControllerProvider.notifier).login(
+    await ref
+        .read(authControllerProvider.notifier)
+        .login(
           tipo: _tipo.name,
           credencial: _credencialController.text.trim(),
           senha: _senhaController.text,
@@ -53,7 +57,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
       error: (erro, _) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(erro.toString()), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text(erro.toString()),
+            backgroundColor: AppColors.error,
+          ),
         );
       },
     );
@@ -63,103 +70,99 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final config = _configPorTipo[_tipo]!;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Image.asset(
-                      'assets/images/Ecotech logo completa.png',
-                      height: 148,
-                    ),
-                    const SizedBox(height: 32),
-                    Text('Entrar no sistema', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Selecione o tipo de conta para acessar',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 24),
-                    _seletorDeTipo(),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _credencialController,
-                      decoration: InputDecoration(
-                        labelText: config.label,
-                        hintText: config.hint,
-                      ),
-                      keyboardType: _tipo == _TipoConta.administrador
-                          ? TextInputType.emailAddress
-                          : TextInputType.text,
-                      validator: (valor) =>
-                          (valor == null || valor.trim().isEmpty) ? 'Campo obrigatorio' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _senhaController,
-                      decoration: const InputDecoration(labelText: 'Senha'),
-                      obscureText: true,
-                      validator: (valor) =>
-                          (valor == null || valor.isEmpty) ? 'Campo obrigatorio' : null,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _carregando ? null : _entrar,
-                      child: _carregando
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Entrar'),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => context.go('/cadastro'),
-                        child: const Text('Não tem uma conta? Criar conta'),
-                      ),
-                    ),
-                  ],
+    return AuthLayout(
+      title: 'Que bom te ver',
+      subtitle: 'Entre para continuar reciclando com impacto.',
+      footer: TextButton(
+        onPressed: _carregando ? null : () => context.go('/cadastro'),
+        child: const Text('Não tem uma conta? Criar conta'),
+      ),
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthRoleSelector(
+                roles: AuthRole.values,
+                value: _tipo,
+                onChanged: _carregando
+                    ? null
+                    : (tipo) => setState(() {
+                        _tipo = tipo;
+                        _credencialController.clear();
+                        _formKey.currentState?.reset();
+                      }),
+              ),
+              const SizedBox(height: 20),
+              AuthField(
+                label: config.label,
+                child: TextFormField(
+                  controller: _credencialController,
+                  enabled: !_carregando,
+                  decoration: InputDecoration(hintText: config.hint),
+                  keyboardType: _tipo == AuthRole.administrador
+                      ? TextInputType.emailAddress
+                      : TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.username],
+                  autocorrect: false,
+                  validator: (valor) => (valor == null || valor.trim().isEmpty)
+                      ? 'Campo obrigatório'
+                      : null,
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+              AuthField(
+                label: 'Senha',
+                child: TextFormField(
+                  controller: _senhaController,
+                  enabled: !_carregando,
+                  decoration: InputDecoration(
+                    hintText: 'Sua senha',
+                    suffixIcon: IconButton(
+                      tooltip: _mostrarSenha
+                          ? 'Ocultar senha'
+                          : 'Mostrar senha',
+                      onPressed: _carregando
+                          ? null
+                          : () =>
+                                setState(() => _mostrarSenha = !_mostrarSenha),
+                      icon: Icon(
+                        _mostrarSenha
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  obscureText: !_mostrarSenha,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _entrar(),
+                  validator: (valor) => (valor == null || valor.isEmpty)
+                      ? 'Campo obrigatório'
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _carregando ? null : _entrar,
+                icon: _carregando
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.login, size: 18),
+                label: Text(_carregando ? 'Entrando...' : 'Entrar'),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-
-  Widget _seletorDeTipo() {
-    return Wrap(
-      spacing: 8,
-      children: _TipoConta.values.map((tipo) {
-        final selecionado = tipo == _tipo;
-        return ChoiceChip(
-          label: Text(_rotulo(tipo)),
-          selected: selecionado,
-          selectedColor: AppColors.secondary,
-          labelStyle: TextStyle(
-            color: selecionado ? AppColors.primaryDark : AppColors.textLight,
-            fontWeight: selecionado ? FontWeight.w600 : FontWeight.normal,
-          ),
-          onSelected: (_) => setState(() => _tipo = tipo),
-        );
-      }).toList(),
-    );
-  }
-
-  String _rotulo(_TipoConta tipo) => switch (tipo) {
-        _TipoConta.cidadao => 'Cidadão',
-        _TipoConta.empresa => 'Empresa',
-        _TipoConta.administrador => 'Administrador',
-      };
 }
