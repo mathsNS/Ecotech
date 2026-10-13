@@ -56,6 +56,21 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('ações ficam acessíveis e voltar retorna à etapa anterior', (
+    tester,
+  ) async {
+    await pumpCollection(tester);
+    expect(find.text('Próximo').hitTestable(), findsOneWidget);
+    await tester.enterText(field('Modelo ou nome'), 'Celular de teste');
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('Etapa 2 de 3 · Endereço'), findsOneWidget);
+    await tapVisible(tester, find.byTooltip('Voltar'));
+    expect(find.text('Etapa 1 de 3 · Dispositivo'), findsOneWidget);
+    expect(find.text('Celular de teste'), findsOneWidget);
+    await tapVisible(tester, find.text('Cancelar'));
+    expect(find.text('Início'), findsOneWidget);
+  });
+
   testWidgets('apresenta a etapa e mantém a validação do dispositivo', (
     tester,
   ) async {

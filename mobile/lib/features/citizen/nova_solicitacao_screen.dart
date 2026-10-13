@@ -7,7 +7,6 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_repository.dart';
-import '../../shared/widgets/app_back_button.dart';
 import '../dashboard/dashboard_controller.dart';
 import 'citizen_controller.dart';
 import 'widgets/collection_progress.dart';
@@ -29,6 +28,7 @@ class NovaSolicitacaoScreen extends ConsumerStatefulWidget {
 
 class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _scroll = ScrollController();
   final _nome = TextEditingController();
   final _peso = TextEditingController();
   final _observacoes = TextEditingController();
@@ -79,6 +79,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     for (final controller in [
       _nome,
       _peso,
@@ -101,9 +102,13 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      leading: const AppBackButton(),
+      leading: IconButton(
+        tooltip: 'Voltar',
+        onPressed: _enviando ? null : _voltar,
+        icon: const Icon(Icons.arrow_back),
+      ),
       backgroundColor: AppColors.surfaceSubtle,
-      toolbarHeight: 72,
+      toolbarHeight: 40 + MediaQuery.textScalerOf(context).scale(36),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -125,57 +130,95 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         ],
       ),
     ),
-    body: Form(
-      key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+    body: SafeArea(
+      child: Column(
         children: [
-          CollectionProgress(
-            step: _etapa,
-            atCollectionPoint: _tipoColeta == 'entrega_ponto',
-          ),
-          const SizedBox(height: 18),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: switch (_etapa) {
-              0 => _produto(),
-              1 => _entrega(),
-              _ => _agenda(),
-            },
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              if (_etapa > 0)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _enviando
-                        ? null
-                        : () => setState(() => _etapa--),
-                    child: const Text('Anterior'),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 576),
+                  child: AbsorbPointer(
+                    absorbing: _enviando,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          CollectionProgress(
+                            step: _etapa,
+                            atCollectionPoint: _tipoColeta == 'entrega_ponto',
+                          ),
+                          const SizedBox(height: 24),
+                          switch (_etapa) {
+                            0 => _produto(),
+                            1 => _entrega(),
+                            _ => _agenda(),
+                          },
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              if (_etapa > 0) const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _enviando
-                      ? null
-                      : (_etapa == 2 ? _enviar : _avancar),
-                  child: _enviando
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(_etapa == 2 ? 'Criar solicitação' : 'Próximo'),
-                ),
               ),
-            ],
+            ),
           ),
+          _acoes(),
         ],
+      ),
+    ),
+  );
+
+  Widget _acoes() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: AppColors.border)),
+    ),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 576),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked =
+                constraints.maxWidth < 360 &&
+                MediaQuery.textScalerOf(context).scale(14) > 18;
+            final back = OutlinedButton(
+              onPressed: _enviando ? null : _voltar,
+              child: Text(_etapa == 0 ? 'Cancelar' : 'Anterior'),
+            );
+            final next = ElevatedButton(
+              onPressed: _enviando ? null : (_etapa == 2 ? _enviar : _avancar),
+              child: _enviando
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      _etapa == 2 ? 'Criar solicitação' : 'Próximo',
+                      textAlign: TextAlign.center,
+                    ),
+            );
+            return stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [next, const SizedBox(height: 8), back],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: back),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: next),
+                    ],
+                  );
+          },
+        ),
       ),
     ),
   );
@@ -511,8 +554,26 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   );
 
   void _avancar() {
+    if (_enviando || _etapa >= 2) return;
     if (_formKey.currentState?.validate() != true) return;
-    setState(() => _etapa++);
+    _mudarEtapa(_etapa + 1);
+  }
+
+  void _mudarEtapa(int etapa) {
+    FocusScope.of(context).unfocus();
+    setState(() => _etapa = etapa);
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  void _voltar() {
+    if (_enviando) return;
+    if (_etapa > 0) {
+      _mudarEtapa(_etapa - 1);
+    } else if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
   }
 
   Future<void> _selecionarFotos() async {
