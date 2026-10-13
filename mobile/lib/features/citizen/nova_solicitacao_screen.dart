@@ -7,8 +7,10 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_repository.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../dashboard/dashboard_controller.dart';
 import 'citizen_controller.dart';
+import 'widgets/collection_progress.dart';
 
 class NovaSolicitacaoScreen extends ConsumerStatefulWidget {
   const NovaSolicitacaoScreen({
@@ -98,13 +100,40 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Nova solicitação')),
+    appBar: AppBar(
+      leading: const AppBackButton(),
+      backgroundColor: AppColors.surfaceSubtle,
+      toolbarHeight: 72,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _tipoColeta == 'domiciliar'
+                ? 'COLETA DOMICILIAR'
+                : 'ENTREGA NO PONTO',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.primary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Nova solicitação de descarte',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    ),
     body: Form(
       key: _formKey,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          _Stepper(etapa: _etapa),
+          CollectionProgress(
+            step: _etapa,
+            atCollectionPoint: _tipoColeta == 'entrega_ponto',
+          ),
           const SizedBox(height: 18),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
@@ -157,6 +186,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
     child: Column(
       children: [
         DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: _tipoDispositivo,
           decoration: const InputDecoration(labelText: 'Tipo de dispositivo'),
           items: const [
@@ -177,6 +207,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: _subcategoria,
           decoration: const InputDecoration(labelText: 'Categoria específica'),
           items: _subcategorias[_tipoDispositivo]!
@@ -195,6 +226,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
           children: [
             Expanded(
               child: DropdownButtonFormField<int>(
+                isExpanded: true,
                 initialValue: _ano,
                 decoration: const InputDecoration(labelText: 'Ano'),
                 items: [
@@ -309,6 +341,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         error: (error, _) =>
             Text('Não foi possível carregar os pontos: $error'),
         data: (pontos) => DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: pontos.any((p) => p.id == _pontoId) ? _pontoId : null,
           decoration: const InputDecoration(labelText: 'Ponto de coleta'),
           items: pontos
@@ -622,31 +655,6 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
       ),
     );
   }
-}
-
-class _Stepper extends StatelessWidget {
-  const _Stepper({required this.etapa});
-  final int etapa;
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      for (var i = 0; i < 3; i++) ...[
-        CircleAvatar(
-          radius: 17,
-          backgroundColor: i <= etapa ? AppColors.primary : AppColors.border,
-          foregroundColor: i <= etapa ? Colors.white : AppColors.textLight,
-          child: Text('${i + 1}'),
-        ),
-        if (i < 2)
-          Expanded(
-            child: Container(
-              height: 2,
-              color: i < etapa ? AppColors.primary : AppColors.border,
-            ),
-          ),
-      ],
-    ],
-  );
 }
 
 class _CardEtapa extends StatelessWidget {
