@@ -116,20 +116,25 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              _campo(
-                'Nome completo',
-                _nomeController,
-                hint: 'Seu nome',
-                autofill: AutofillHints.name,
-              ),
-              if (_isCidadao)
+              if (_isCidadao) ...[
+                _campo(
+                  'Nome completo',
+                  _nomeController,
+                  hint: 'Seu nome',
+                  autofill: AutofillHints.name,
+                ),
                 _campo(
                   'CPF',
                   _cpfController,
                   hint: '000.000.000-00',
                   keyboard: TextInputType.number,
-                )
-              else ...[
+                ),
+              ] else ...[
+                _campo(
+                  'Razão social',
+                  _razaoSocialController,
+                  hint: 'Nome jurídico da empresa',
+                ),
                 _campo(
                   'CNPJ',
                   _cnpjController,
@@ -137,15 +142,16 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
                   keyboard: TextInputType.number,
                 ),
                 _campo(
-                  'Razão social',
-                  _razaoSocialController,
-                  hint: 'Nome jurídico da empresa',
+                  'Nome da empresa',
+                  _nomeController,
+                  hint: 'Nome exibido no aplicativo',
+                  autofill: AutofillHints.organizationName,
                 ),
               ],
               _campo(
                 'E-mail',
                 _emailController,
-                hint: 'voce@exemplo.com',
+                hint: _isCidadao ? 'voce@exemplo.com' : 'contato@empresa.com',
                 keyboard: TextInputType.emailAddress,
                 autofill: AutofillHints.email,
               ),

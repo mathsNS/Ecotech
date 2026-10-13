@@ -11,6 +11,62 @@ Future<void> fillField(WidgetTester tester, String label, String value) async {
 }
 
 void main() {
+  testWidgets(
+    'empresa preserva campos ao trocar perfil e envia apenas seu documento',
+    (tester) async {
+      final repository = PendingAuthRepository();
+      await pumpAuth(tester, repository, route: '/cadastro');
+      await fillField(tester, 'CPF', '12345678901');
+      await tester.ensureVisible(find.text('Empresa'));
+      await tester.tap(find.text('Empresa'));
+      await tester.pumpAndSettle();
+      await fillField(tester, 'Razão social', '  Recicla LTDA  ');
+      await fillField(tester, 'CNPJ', '12345678000199');
+      await fillField(tester, 'Nome da empresa', 'Recicla');
+      await tester.ensureVisible(find.text('Cidadão'));
+      await tester.tap(find.text('Cidadão'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('CPF')))
+            .controller!
+            .text,
+        '12345678901',
+      );
+      await tester.tap(find.text('Empresa'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('CNPJ')))
+            .controller!
+            .text,
+        '12345678000199',
+      );
+      await fillField(tester, 'E-mail', 'contato@example.com');
+      await fillField(tester, 'Senha', 'senha-segura');
+      await fillField(tester, 'Confirmar senha', 'senha-segura');
+      final submit = find.widgetWithText(ElevatedButton, 'Criar conta');
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pump();
+      expect(repository.requests.single, {
+        'tipo': 'empresa',
+        'nome': 'Recicla',
+        'email': 'contato@example.com',
+        'senha': 'senha-segura',
+        'senha_confirmacao': 'senha-segura',
+        'cpf': null,
+        'cnpj': '12345678000199',
+        'razao_social': 'Recicla LTDA',
+      });
+      repository.response.complete(
+        const Usuario(id: '2', nome: 'Recicla', tipo: 'empresa'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Área autenticada'), findsOneWidget);
+    },
+  );
+
   testWidgets('cadastro cidadão preserva contrato e bloqueia envio duplicado', (
     tester,
   ) async {
