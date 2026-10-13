@@ -52,11 +52,16 @@ class AuthLayout extends StatelessWidget {
                         children: [
                           const Row(
                             children: [
-                              Text(
-                                'ECOTECH',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'ECOTECH',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
                                 ),
                               ),
                               SizedBox(width: 6),
