@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import 'auth_controller.dart';
+import 'widgets/auth_field.dart';
+import 'widgets/auth_layout.dart';
+import 'widgets/auth_role_selector.dart';
 
 class CadastroScreen extends ConsumerStatefulWidget {
   const CadastroScreen({super.key});
@@ -37,10 +40,12 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
   }
 
   Future<void> _criarConta() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_carregando || !_formKey.currentState!.validate()) return;
 
     setState(() => _carregando = true);
-    await ref.read(authControllerProvider.notifier).registrar(
+    await ref
+        .read(authControllerProvider.notifier)
+        .registrar(
           tipo: _isCidadao ? 'cidadao' : 'empresa',
           nome: _nomeController.text.trim(),
           email: _emailController.text.trim(),
@@ -60,7 +65,10 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
       },
       error: (erro, _) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(erro.toString()), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text(erro.toString()),
+            backgroundColor: AppColors.error,
+          ),
         );
       },
     );
@@ -68,134 +76,144 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Criar conta')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Selecione o tipo de conta para começar',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    _seletorDeTipo(),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _nomeController,
-                      decoration: const InputDecoration(labelText: 'Nome completo'),
-                      validator: _obrigatorio,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(labelText: 'E-mail'),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: _obrigatorio,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_isCidadao)
-                      TextFormField(
-                        controller: _cpfController,
-                        decoration: const InputDecoration(
-                          labelText: 'CPF',
-                          hintText: '000.000.000-00',
-                        ),
-                        validator: _obrigatorio,
-                      )
-                    else ...[
-                      TextFormField(
-                        controller: _cnpjController,
-                        decoration: const InputDecoration(
-                          labelText: 'CNPJ',
-                          hintText: '00.000.000/0000-00',
-                        ),
-                        validator: _obrigatorio,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _razaoSocialController,
-                        decoration: const InputDecoration(labelText: 'Razão social'),
-                        validator: _obrigatorio,
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _senhaController,
-                      decoration: const InputDecoration(
-                        labelText: 'Senha',
-                        helperText: 'Mínimo de 6 caracteres',
-                      ),
-                      obscureText: true,
-                      validator: _obrigatorio,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _senhaConfirmacaoController,
-                      decoration: const InputDecoration(labelText: 'Confirmar senha'),
-                      obscureText: true,
-                      validator: _obrigatorio,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _carregando ? null : _criarConta,
-                      child: _carregando
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Criar conta'),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => context.go('/login'),
-                        child: const Text('Já tem uma conta? Entrar'),
-                      ),
-                    ),
-                  ],
+    return AuthLayout(
+      title: 'Criar conta',
+      subtitle: 'Escolha como você quer fazer parte da EcoTech.',
+      footer: TextButton(
+        onPressed: _carregando ? null : () => context.go('/login'),
+        child: const Text('Já tem uma conta? Entrar'),
+      ),
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthRoleSelector(
+                roles: const [AuthRole.cidadao, AuthRole.empresa],
+                value: _isCidadao ? AuthRole.cidadao : AuthRole.empresa,
+                onChanged: _carregando
+                    ? null
+                    : (role) =>
+                          setState(() => _isCidadao = role == AuthRole.cidadao),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  _isCidadao
+                      ? 'Descarte eletrônicos com segurança e ganhe saldo e EcoPoints a cada entrega.'
+                      : 'Receba coletas na sua região, gerencie operações e emita relatórios ambientais.',
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+              _campo(
+                'Nome completo',
+                _nomeController,
+                hint: 'Seu nome',
+                autofill: AutofillHints.name,
+              ),
+              if (_isCidadao)
+                _campo(
+                  'CPF',
+                  _cpfController,
+                  hint: '000.000.000-00',
+                  keyboard: TextInputType.number,
+                )
+              else ...[
+                _campo(
+                  'CNPJ',
+                  _cnpjController,
+                  hint: '00.000.000/0000-00',
+                  keyboard: TextInputType.number,
+                ),
+                _campo(
+                  'Razão social',
+                  _razaoSocialController,
+                  hint: 'Nome jurídico da empresa',
+                ),
+              ],
+              _campo(
+                'E-mail',
+                _emailController,
+                hint: 'voce@exemplo.com',
+                keyboard: TextInputType.emailAddress,
+                autofill: AutofillHints.email,
+              ),
+              _campo(
+                'Senha',
+                _senhaController,
+                hint: 'Mínimo de 6 caracteres',
+                password: true,
+                autofill: AutofillHints.newPassword,
+              ),
+              _campo(
+                'Confirmar senha',
+                _senhaConfirmacaoController,
+                hint: 'Repita a senha',
+                password: true,
+                last: true,
+                autofill: AutofillHints.newPassword,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _carregando ? null : _criarConta,
+                icon: _carregando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add_alt_outlined, size: 18),
+                label: Text(_carregando ? 'Criando conta...' : 'Criar conta'),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _seletorDeTipo() {
-    return Row(
-      children: [
-        Expanded(
-          child: ChoiceChip(
-            label: const Text('Cidadão'),
-            selected: _isCidadao,
-            selectedColor: AppColors.secondary,
-            onSelected: (_) => setState(() => _isCidadao = true),
-          ),
+  Widget _campo(
+    String label,
+    TextEditingController controller, {
+    String? hint,
+    String? autofill,
+    TextInputType? keyboard,
+    bool password = false,
+    bool last = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: AuthField(
+        label: '$label *',
+        child: TextFormField(
+          key: ValueKey(label),
+          controller: controller,
+          enabled: !_carregando,
+          decoration: InputDecoration(hintText: hint),
+          keyboardType: keyboard,
+          obscureText: password,
+          autocorrect: !password,
+          enableSuggestions: !password,
+          autofillHints: autofill == null ? null : [autofill],
+          textInputAction: last ? TextInputAction.done : TextInputAction.next,
+          onFieldSubmitted: last ? (_) => _criarConta() : null,
+          validator: _obrigatorio,
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ChoiceChip(
-            label: const Text('Empresa'),
-            selected: !_isCidadao,
-            selectedColor: AppColors.secondary,
-            onSelected: (_) => setState(() => _isCidadao = false),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   String? _obrigatorio(String? valor) =>
-      (valor == null || valor.trim().isEmpty) ? 'Campo obrigatorio' : null;
+      (valor == null || valor.trim().isEmpty) ? 'Campo obrigatório' : null;
 }
