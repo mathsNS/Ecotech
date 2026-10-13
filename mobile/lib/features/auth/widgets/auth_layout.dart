@@ -50,27 +50,15 @@ class AuthLayout extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
-                            children: [
-                              Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    'ECOTECH',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(
-                                Icons.eco_outlined,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ],
+                          Image.asset(
+                            'assets/images/ecotech navbar.png',
+                            width: 160,
+                            height: 64,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.centerLeft,
+                            color: Colors.white,
+                            colorBlendMode: BlendMode.srcIn,
+                            semanticLabel: 'EcoTech',
                           ),
                           const SizedBox(height: 32),
                           Text(
