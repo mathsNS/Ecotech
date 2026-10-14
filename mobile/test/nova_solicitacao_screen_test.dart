@@ -1,5 +1,6 @@
 import 'package:ecotech_mobile/core/theme/app_theme.dart';
 import 'package:ecotech_mobile/features/citizen/nova_solicitacao_screen.dart';
+import 'package:ecotech_mobile/features/citizen/widgets/collection_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,8 +38,11 @@ Future<void> pumpCollection(WidgetTester tester, {double scale = 1}) async {
   await tester.pumpAndSettle();
 }
 
-Finder field(String label) => find.byWidgetPredicate(
-  (widget) => widget is TextField && widget.decoration?.labelText == label,
+Finder field(String label) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) => widget is CollectionField && widget.label == label,
+  ),
+  matching: find.byType(TextField),
 );
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
@@ -56,6 +60,25 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('quantidade e categoria acompanham a edição e o retorno', (
+    tester,
+  ) async {
+    await pumpCollection(tester);
+    await tester.enterText(field('Modelo ou nome'), 'Notebook de teste');
+    await tester.enterText(field('Quantidade'), '3');
+    await tapVisible(
+      tester,
+      find.byType(DropdownButtonFormField<String>).first,
+    );
+    await tapVisible(tester, find.text('Computador').last);
+    expect(find.text('Notebook'), findsOneWidget);
+    await tapVisible(tester, find.text('Próximo'));
+    await tapVisible(tester, find.text('Anterior'));
+    expect(tester.widget<TextField>(field('Quantidade')).controller!.text, '3');
+    expect(find.text('Notebook'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('ações ficam acessíveis e voltar retorna à etapa anterior', (
     tester,
   ) async {

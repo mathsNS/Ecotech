@@ -10,6 +10,7 @@ import '../../data/citizen/citizen_repository.dart';
 import '../dashboard/dashboard_controller.dart';
 import 'citizen_controller.dart';
 import 'widgets/collection_progress.dart';
+import 'widgets/collection_fields.dart';
 
 class NovaSolicitacaoScreen extends ConsumerStatefulWidget {
   const NovaSolicitacaoScreen({
@@ -30,6 +31,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _scroll = ScrollController();
   final _nome = TextEditingController();
+  final _quantidadeInput = TextEditingController(text: '1');
   final _peso = TextEditingController();
   final _observacoes = TextEditingController();
   final _cep = TextEditingController();
@@ -46,7 +48,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   String _tipoDispositivo = 'celular';
   String _subcategoria = 'Smartphone';
   int _ano = 2020;
-  int _quantidade = 1;
+  int get _quantidade => int.tryParse(_quantidadeInput.text) ?? 0;
   bool _pesoDesconhecido = true;
   late String _tipoColeta;
   String? _pontoId;
@@ -82,6 +84,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
     _scroll.dispose();
     for (final controller in [
       _nome,
+      _quantidadeInput,
       _peso,
       _observacoes,
       _cep,
@@ -226,74 +229,61 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   Widget _produto() => _CardEtapa(
     key: const ValueKey(0),
     titulo: 'Informações do dispositivo',
+    icon: Icons.phone_android_outlined,
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: _tipoDispositivo,
-          decoration: const InputDecoration(labelText: 'Tipo de dispositivo'),
-          items: const [
-            DropdownMenuItem(
-              value: 'celular',
-              child: Text('Celular / Smartphone'),
-            ),
-            DropdownMenuItem(value: 'computador', child: Text('Computador')),
-            DropdownMenuItem(
-              value: 'eletrodomestico',
-              child: Text('Eletrodoméstico'),
-            ),
-          ],
-          onChanged: (value) => setState(() {
-            _tipoDispositivo = value!;
-            _subcategoria = _subcategorias[value]!.first;
-          }),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: _subcategoria,
-          decoration: const InputDecoration(labelText: 'Categoria específica'),
-          items: _subcategorias[_tipoDispositivo]!
-              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-              .toList(),
-          onChanged: (value) => _subcategoria = value!,
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _nome,
-          decoration: const InputDecoration(labelText: 'Modelo ou nome'),
-          validator: _obrigatorio,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<int>(
-                isExpanded: true,
-                initialValue: _ano,
-                decoration: const InputDecoration(labelText: 'Ano'),
-                items: [
-                  for (var ano = DateTime.now().year; ano >= 1990; ano--)
-                    DropdownMenuItem(value: ano, child: Text('$ano')),
-                ],
-                onChanged: (value) => _ano = value!,
+        CollectionField(
+          'Tipo de dispositivo',
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: _tipoDispositivo,
+            items: const [
+              DropdownMenuItem(
+                value: 'celular',
+                child: Text('Celular / Smartphone'),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextFormField(
-                initialValue: '1',
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Quantidade'),
-                onChanged: (value) => _quantidade = int.tryParse(value) ?? 0,
-                validator: (_) => _quantidade < 1 ? 'Mínimo 1.' : null,
+              DropdownMenuItem(value: 'computador', child: Text('Computador')),
+              DropdownMenuItem(
+                value: 'eletrodomestico',
+                child: Text('Eletrodoméstico'),
               ),
-            ),
-          ],
+            ],
+            onChanged: (value) => setState(() {
+              _tipoDispositivo = value!;
+              _subcategoria = _subcategorias[value]!.first;
+            }),
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        CollectionField(
+          'Categoria específica',
+          child: DropdownButtonFormField<String>(
+            key: ValueKey(_tipoDispositivo),
+            isExpanded: true,
+            initialValue: _subcategoria,
+            items: _subcategorias[_tipoDispositivo]!
+                .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                .toList(),
+            onChanged: (value) => _subcategoria = value!,
+          ),
+        ),
+        const SizedBox(height: 16),
+        CollectionField(
+          'Modelo ou nome',
+          child: TextFormField(
+            controller: _nome,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText: 'Ex.: Samsung Galaxy S20',
+            ),
+            validator: _obrigatorio,
+          ),
+        ),
+        const SizedBox(height: 16),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
           value: _pesoDesconhecido,
           title: const Text('Não sei informar o peso'),
           subtitle: const Text('A empresa fará a pesagem no recebimento.'),
@@ -302,42 +292,78 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
             if (_pesoDesconhecido) _peso.clear();
           }),
         ),
-        if (!_pesoDesconhecido)
-          TextFormField(
-            controller: _peso,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Peso aproximado por unidade (kg)',
+        if (!_pesoDesconhecido) ...[
+          CollectionField(
+            'Peso aproximado por unidade (kg)',
+            child: TextFormField(
+              controller: _peso,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Ex.: 0,5',
+                suffixText: 'kg',
+              ),
+              validator: (value) {
+                final peso = double.tryParse(
+                  (value ?? '').replaceAll(',', '.'),
+                );
+                return peso == null || !peso.isFinite || peso <= 0
+                    ? 'Informe um peso válido.'
+                    : null;
+              },
             ),
-            validator: (value) {
-              final peso = double.tryParse((value ?? '').replaceAll(',', '.'));
-              return peso == null || peso <= 0
-                  ? 'Informe um peso válido.'
-                  : null;
-            },
           ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _observacoes,
-          maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Estado e observações do produto',
+          const SizedBox(height: 16),
+        ],
+        CollectionPair(
+          first: CollectionField(
+            'Ano de fabricação',
+            child: DropdownButtonFormField<int>(
+              isExpanded: true,
+              initialValue: _ano,
+              items: [
+                for (var ano = DateTime.now().year; ano >= 1990; ano--)
+                  DropdownMenuItem(value: ano, child: Text('$ano')),
+              ],
+              onChanged: (value) => _ano = value!,
+            ),
+          ),
+          second: CollectionField(
+            'Quantidade',
+            child: TextFormField(
+              controller: _quantidadeInput,
+              keyboardType: TextInputType.number,
+              validator: (value) =>
+                  (int.tryParse(value ?? '') ?? 0) < 1 ? 'Mínimo 1.' : null,
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
+        CollectionField(
+          'Estado e observações do produto (opcional)',
+          child: TextFormField(
+            controller: _observacoes,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Informe o estado do aparelho.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _selecionarFotos,
           icon: const Icon(Icons.add_photo_alternate_outlined),
           label: Text(
             _fotos.isEmpty
                 ? 'Adicionar fotos'
-                : '${_fotos.length} foto(s) selecionada(s)',
+                : 'Trocar fotos (${_fotos.length}/5)',
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Text(
-          'Até 5 fotos JPG, PNG ou WebP, com 5 MB cada.',
-          style: Theme.of(context).textTheme.bodyMedium,
+          'Opcional. Até 5 fotos JPG, PNG ou WebP, com 5 MB cada.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
     ),
@@ -719,19 +745,43 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 }
 
 class _CardEtapa extends StatelessWidget {
-  const _CardEtapa({required this.titulo, required this.child, super.key});
+  const _CardEtapa({
+    required this.titulo,
+    required this.child,
+    this.icon,
+    super.key,
+  });
   final String titulo;
   final Widget child;
+  final IconData? icon;
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(24),
+      side: const BorderSide(color: AppColors.border),
+    ),
     child: Padding(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(titulo, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 22, color: AppColors.primary),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           child,
         ],
       ),
