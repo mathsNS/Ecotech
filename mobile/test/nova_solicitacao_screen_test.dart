@@ -15,6 +15,9 @@ import 'package:ecotech_mobile/features/citizen/citizen_controller.dart';
 
 class CollectionRepository extends CitizenRepository {
   final address = Completer<EnderecoCepData>();
+  final points = Completer<List<PontoColetaData>>();
+  @override
+  Future<List<PontoColetaData>> listarPontos() => points.future;
   final submission = Completer<SolicitacaoDetalhesData>();
   final requests = <NovaSolicitacaoData>[];
   @override
@@ -31,6 +34,7 @@ Future<void> pumpCollection(
   WidgetTester tester, {
   double scale = 1,
   Size size = const Size(390, 844),
+  bool atPoint = false,
   CollectionRepository? repository,
 }) async {
   tester.view.physicalSize = size;
@@ -40,7 +44,13 @@ Future<void> pumpCollection(
   final router = GoRouter(
     initialLocation: '/nova',
     routes: [
-      GoRoute(path: '/nova', builder: (_, _) => const NovaSolicitacaoScreen()),
+      GoRoute(
+        path: '/nova',
+        builder: (_, _) => NovaSolicitacaoScreen(
+          tipoInicial: atPoint ? 'entrega_ponto' : 'domiciliar',
+          pontoIdInicial: atPoint ? 'ponto-1' : null,
+        ),
+      ),
       GoRoute(
         path: '/solicitacoes/:id',
         builder: (_, state) =>
@@ -122,6 +132,48 @@ Future<void> chooseSchedule(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('entrega no ponto aguarda um ponto válido antes de avançar', (
+    tester,
+  ) async {
+    final repository = CollectionRepository();
+    await pumpCollection(tester, repository: repository, atPoint: true);
+    await tester.enterText(field('Modelo ou nome'), 'Celular');
+    await tester.tap(find.text('Próximo'));
+    await tester.pump();
+    await tester.enterText(field('Nome para contato'), 'Maria');
+    await tester.tap(find.text('Próximo'));
+    await tester.pump();
+    expect(find.text('Etapa 2 de 3 · Ponto de coleta'), findsOneWidget);
+    repository.points.complete([
+      PontoColetaData.fromJson({'id': 'ponto-1', 'nome': 'Ponto Central'}),
+    ]);
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('Etapa 3 de 3 · Agendamento'), findsOneWidget);
+    await chooseSchedule(tester);
+    await tester.tap(find.text('Criar solicitação'));
+    await tester.pump();
+    expect(repository.requests.single.campos['ponto_id'], 'ponto-1');
+    expect(repository.requests.single.campos.containsKey('cep'), isFalse);
+    repository.submission.complete(
+      SolicitacaoDetalhesData.fromJson({'id': 'entrega-1'}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Solicitação entrega-1'), findsOneWidget);
+  });
+
+  testWidgets('retorno do sistema volta uma etapa sem descartar o formulário', (
+    tester,
+  ) async {
+    await pumpCollection(tester);
+    await tester.enterText(field('Modelo ou nome'), 'Celular');
+    await tapVisible(tester, find.text('Próximo'));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Etapa 1 de 3 · Dispositivo'), findsOneWidget);
+    expect(find.text('Celular'), findsOneWidget);
+  });
+
   testWidgets('etapas cabem em 320 px com fonte ampliada e teclado', (
     tester,
   ) async {

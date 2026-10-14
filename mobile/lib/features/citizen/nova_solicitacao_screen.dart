@@ -30,6 +30,7 @@ class NovaSolicitacaoScreen extends ConsumerStatefulWidget {
 
 class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _actionsKey = GlobalKey();
   final _scroll = ScrollController();
   final _nome = TextEditingController();
   final _quantidadeInput = TextEditingController(text: '1');
@@ -104,79 +105,89 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      leading: IconButton(
-        tooltip: 'Voltar',
-        onPressed: _enviando ? null : _voltar,
-        icon: const Icon(Icons.arrow_back),
-      ),
-      backgroundColor: AppColors.surfaceSubtle,
-      toolbarHeight: 40 + MediaQuery.textScalerOf(context).scale(36),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _tipoColeta == 'domiciliar'
-                ? 'COLETA DOMICILIAR'
-                : 'ENTREGA NO PONTO',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.primary,
-              fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) => PopScope(
+    canPop: _etapa == 0 && !_enviando,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop && !_enviando && _etapa > 0) _voltar();
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Voltar',
+          onPressed: _enviando ? null : _voltar,
+          icon: const Icon(Icons.arrow_back),
+        ),
+        backgroundColor: AppColors.surfaceSubtle,
+        toolbarHeight: 40 + MediaQuery.textScalerOf(context).scale(36),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _tipoColeta == 'domiciliar'
+                  ? 'COLETA DOMICILIAR'
+                  : 'ENTREGA NO PONTO',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Nova solicitação de descarte',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-          ),
-        ],
+            const SizedBox(height: 4),
+            const Text(
+              'Nova solicitação de descarte',
+              maxLines: 3,
+              softWrap: true,
+              overflow: TextOverflow.visible,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
       ),
-    ),
-    body: SafeArea(
-      child: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 576),
-                  child: AbsorbPointer(
-                    absorbing: _enviando,
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          CollectionProgress(
-                            step: _etapa,
-                            atCollectionPoint: _tipoColeta == 'entrega_ponto',
-                          ),
-                          const SizedBox(height: 24),
-                          switch (_etapa) {
-                            0 => _produto(),
-                            1 => _entrega(),
-                            _ => _agenda(),
-                          },
-                          const SizedBox(height: 20),
-                          const CollectionTips(),
-                        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 576),
+                    child: AbsorbPointer(
+                      absorbing: _enviando,
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            CollectionProgress(
+                              step: _etapa,
+                              atCollectionPoint: _tipoColeta == 'entrega_ponto',
+                            ),
+                            const SizedBox(height: 24),
+                            switch (_etapa) {
+                              0 => _produto(),
+                              1 => _entrega(),
+                              _ => _agenda(),
+                            },
+                            const SizedBox(height: 20),
+                            const CollectionTips(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          _acoes(),
-        ],
+            _acoes(),
+          ],
+        ),
       ),
     ),
   );
 
   Widget _acoes() => Container(
+    key: _actionsKey,
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: const BoxDecoration(
@@ -448,8 +459,15 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
       .watch(pontosColetaProvider)
       .when(
         loading: () => const CircularProgressIndicator(),
-        error: (error, _) =>
-            Text('Não foi possível carregar os pontos: $error'),
+        error: (error, _) => Column(
+          children: [
+            const Text('Não foi possível carregar os pontos.'),
+            TextButton(
+              onPressed: () => ref.invalidate(pontosColetaProvider),
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
         data: (pontos) => DropdownButtonFormField<String>(
           isExpanded: true,
           initialValue: pontos.any((p) => p.id == _pontoId) ? _pontoId : null,
@@ -648,6 +666,13 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   void _avancar() {
     if (_enviando || _etapa >= 2) return;
+    if (_etapa == 1 && _tipoColeta == 'entrega_ponto') {
+      final pontos = ref.read(pontosColetaProvider).valueOrNull;
+      if (pontos == null || !pontos.any((ponto) => ponto.id == _pontoId)) {
+        _mensagem('Selecione um ponto de coleta disponível.', erro: true);
+        return;
+      }
+    }
     if (_formKey.currentState?.validate() != true) return;
     _mudarEtapa(_etapa + 1);
   }
@@ -817,8 +842,17 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   void _mensagem(String texto, {bool erro = false}) {
     if (!mounted) return;
+    final actions =
+        _actionsKey.currentContext?.findRenderObject() as RenderBox?;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          (actions?.size.height ?? 80) + 8,
+        ),
         content: Text(texto),
         backgroundColor: erro ? AppColors.error : AppColors.success,
       ),
