@@ -371,7 +371,12 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   Widget _entrega() => _CardEtapa(
     key: const ValueKey(1),
-    titulo: 'Forma de entrega',
+    titulo: _tipoColeta == 'domiciliar'
+        ? 'Endereço da coleta'
+        : 'Local de entrega',
+    icon: _tipoColeta == 'domiciliar'
+        ? Icons.home_outlined
+        : Icons.location_on_outlined,
     child: Column(
       children: [
         SegmentedButton<String>(
@@ -394,10 +399,16 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         const SizedBox(height: 16),
         if (_tipoColeta == 'entrega_ponto') _selecaoPonto() else _endereco(),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _contato,
-          decoration: const InputDecoration(labelText: 'Nome para contato'),
-          validator: _obrigatorio,
+        CollectionField(
+          'Nome para contato',
+          child: TextFormField(
+            controller: _contato,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              hintText: 'Quem acompanhará a entrega ou coleta?',
+            ),
+            validator: _obrigatorio,
+          ),
         ),
       ],
     ),
@@ -427,98 +438,107 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
       );
 
   Widget _endereco() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: _cep,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'CEP'),
-              validator: (value) =>
-                  (value ?? '').replaceAll(RegExp(r'\D'), '').length != 8
-                  ? 'CEP inválido.'
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: IconButton.filledTonal(
-              tooltip: 'Buscar CEP',
-              onPressed: _consultandoCep ? null : _buscarCep,
-              icon: _consultandoCep
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.search),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      TextFormField(
-        controller: _logradouro,
-        decoration: const InputDecoration(labelText: 'Endereço'),
-        validator: _obrigatorio,
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: _numero,
-              decoration: const InputDecoration(labelText: 'Número'),
-              validator: _obrigatorio,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextFormField(
-              controller: _complemento,
-              decoration: const InputDecoration(labelText: 'Complemento'),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      TextFormField(
-        controller: _bairro,
-        decoration: const InputDecoration(labelText: 'Bairro'),
-        validator: _obrigatorio,
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: TextFormField(
-              controller: _cidade,
-              decoration: const InputDecoration(labelText: 'Cidade'),
-              validator: _obrigatorio,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextFormField(
-              controller: _uf,
-              maxLength: 2,
-              decoration: const InputDecoration(
-                labelText: 'UF',
-                counterText: '',
+      CollectionPair(
+        first: CollectionField(
+          'CEP',
+          child: TextFormField(
+            controller: _cep,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: '00000-000',
+              suffixIcon: IconButton(
+                tooltip: 'Buscar CEP',
+                onPressed: _consultandoCep ? null : _buscarCep,
+                icon: _consultandoCep
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.search),
               ),
-              validator: _obrigatorio,
             ),
+            validator: (value) =>
+                (value ?? '').replaceAll(RegExp(r'\D'), '').length != 8
+                ? 'CEP inválido.'
+                : null,
           ),
-        ],
+        ),
+        second: CollectionField(
+          'Número',
+          child: TextFormField(controller: _numero, validator: _obrigatorio),
+        ),
       ),
-      const SizedBox(height: 12),
-      TextFormField(
-        controller: _referencia,
-        decoration: const InputDecoration(labelText: 'Ponto de referência'),
+      const SizedBox(height: 8),
+      Text(
+        'Busque pelo CEP ou preencha o endereço manualmente.',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      const SizedBox(height: 16),
+      CollectionField(
+        'Endereço',
+        child: TextFormField(
+          controller: _logradouro,
+          validator: _obrigatorio,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Rua ou avenida'),
+        ),
+      ),
+      const SizedBox(height: 16),
+      CollectionField(
+        'Complemento (opcional)',
+        child: TextFormField(
+          controller: _complemento,
+          decoration: const InputDecoration(
+            hintText: 'Apartamento, bloco, casa…',
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      CollectionPair(
+        first: CollectionField(
+          'Bairro',
+          child: TextFormField(
+            controller: _bairro,
+            validator: _obrigatorio,
+            textCapitalization: TextCapitalization.words,
+          ),
+        ),
+        second: CollectionField(
+          'Cidade',
+          child: TextFormField(
+            controller: _cidade,
+            validator: _obrigatorio,
+            textCapitalization: TextCapitalization.words,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      CollectionField(
+        'UF',
+        child: TextFormField(
+          controller: _uf,
+          maxLength: 2,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'Ex.: CE',
+            counterText: '',
+          ),
+          validator: (value) =>
+              RegExp(r'^[a-zA-Z]{2}$').hasMatch((value ?? '').trim())
+              ? null
+              : 'Informe a sigla do estado.',
+        ),
+      ),
+      const SizedBox(height: 16),
+      CollectionField(
+        'Ponto de referência (opcional)',
+        child: TextFormField(
+          controller: _referencia,
+          decoration: const InputDecoration(hintText: 'Ex.: próximo à praça'),
+        ),
       ),
     ],
   );
@@ -619,6 +639,8 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   }
 
   Future<void> _buscarCep() async {
+    if (_consultandoCep) return;
+    final cepConsultado = _cep.text;
     if ((_cep.text.replaceAll(RegExp(r'\D'), '')).length != 8) {
       _mensagem('Informe um CEP válido.', erro: true);
       return;
@@ -627,7 +649,8 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
     try {
       final endereco = await ref
           .read(citizenRepositoryProvider)
-          .consultarCep(_cep.text);
+          .consultarCep(cepConsultado);
+      if (!mounted || _cep.text != cepConsultado) return;
       _logradouro.text = endereco.logradouro;
       _bairro.text = endereco.bairro;
       _cidade.text = endereco.cidade;
@@ -705,7 +728,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                   'complemento': _complemento.text,
                   'bairro': _bairro.text,
                   'cidade': _cidade.text,
-                  'uf': _uf.text,
+                  'uf': _uf.text.trim().toUpperCase(),
                   'referencia': _referencia.text,
                 },
                 'nome_contato': _contato.text,
@@ -735,6 +758,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
       value == null || value.trim().isEmpty ? 'Campo obrigatório.' : null;
 
   void _mensagem(String texto, {bool erro = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(texto),

@@ -6,7 +6,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-Future<void> pumpCollection(WidgetTester tester, {double scale = 1}) async {
+import 'dart:async';
+
+import 'package:ecotech_mobile/data/citizen/citizen_data.dart';
+import 'package:ecotech_mobile/data/citizen/citizen_repository.dart';
+import 'package:ecotech_mobile/features/citizen/citizen_controller.dart';
+
+class CollectionRepository extends CitizenRepository {
+  final address = Completer<EnderecoCepData>();
+  @override
+  Future<EnderecoCepData> consultarCep(String cep) => address.future;
+}
+
+Future<void> pumpCollection(
+  WidgetTester tester, {
+  double scale = 1,
+  CollectionRepository? repository,
+}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -24,6 +40,10 @@ Future<void> pumpCollection(WidgetTester tester, {double scale = 1}) async {
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        if (repository != null)
+          citizenRepositoryProvider.overrideWithValue(repository),
+      ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
         routerConfig: router,
@@ -60,6 +80,65 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('consulta CEP sem substituir um CEP editado durante a busca', (
+    tester,
+  ) async {
+    final repository = CollectionRepository();
+    await pumpCollection(tester, repository: repository);
+    await tester.enterText(field('Modelo ou nome'), 'Celular');
+    await tapVisible(tester, find.text('Próximo'));
+    await tester.enterText(field('CEP'), '63000000');
+    await tester.ensureVisible(find.byTooltip('Buscar CEP'));
+    await tester.tap(find.byTooltip('Buscar CEP'));
+    await tester.pump();
+    await tester.enterText(field('CEP'), '63100000');
+    repository.address.complete(
+      const EnderecoCepData(
+        cep: '63000000',
+        logradouro: 'Rua antiga',
+        bairro: 'Centro',
+        cidade: 'Crato',
+        uf: 'CE',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(field('Endereço')).controller!.text,
+      isEmpty,
+    );
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('Campo obrigatório.'), findsWidgets);
+    expect(find.text('Etapa 2 de 3 · Endereço'), findsOneWidget);
+  });
+
+  testWidgets('endereço manual e contato permanecem ao voltar', (tester) async {
+    await pumpCollection(tester);
+    await tester.enterText(field('Modelo ou nome'), 'Celular');
+    await tapVisible(tester, find.text('Próximo'));
+    for (final entry in {
+      'CEP': '63000000',
+      'Número': '12',
+      'Endereço': 'Rua Um',
+      'Bairro': 'Centro',
+      'Cidade': 'Crato',
+      'UF': 'CE',
+      'Nome para contato': 'Maria',
+    }.entries) {
+      await tester.enterText(field(entry.key), entry.value);
+    }
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('Etapa 3 de 3 · Agendamento'), findsOneWidget);
+    await tapVisible(tester, find.text('Anterior'));
+    expect(
+      tester.widget<TextField>(field('Endereço')).controller!.text,
+      'Rua Um',
+    );
+    expect(
+      tester.widget<TextField>(field('Nome para contato')).controller!.text,
+      'Maria',
+    );
+  });
+
   testWidgets('quantidade e categoria acompanham a edição e o retorno', (
     tester,
   ) async {
