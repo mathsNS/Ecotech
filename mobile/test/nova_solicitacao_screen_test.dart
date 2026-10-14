@@ -30,9 +30,10 @@ class CollectionRepository extends CitizenRepository {
 Future<void> pumpCollection(
   WidgetTester tester, {
   double scale = 1,
+  Size size = const Size(390, 844),
   CollectionRepository? repository,
 }) async {
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -121,6 +122,22 @@ Future<void> chooseSchedule(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('etapas cabem em 320 px com fonte ampliada e teclado', (
+    tester,
+  ) async {
+    await pumpCollection(tester, scale: 2, size: const Size(320, 800));
+    await fillAddress(tester);
+    expect(tester.takeException(), isNull);
+    await tapVisible(tester, find.text('Anterior'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 250);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(field('Nome para contato'));
+    await tester.pumpAndSettle();
+    expect(find.text('Próximo').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'envia uma única solicitação com os dados e abre o detalhe real',
     (tester) async {

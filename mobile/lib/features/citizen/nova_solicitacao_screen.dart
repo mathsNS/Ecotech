@@ -11,6 +11,7 @@ import '../dashboard/dashboard_controller.dart';
 import 'citizen_controller.dart';
 import 'widgets/collection_progress.dart';
 import 'widgets/collection_fields.dart';
+import 'widgets/collection_tips.dart';
 
 class NovaSolicitacaoScreen extends ConsumerStatefulWidget {
   const NovaSolicitacaoScreen({
@@ -159,6 +160,8 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                             1 => _entrega(),
                             _ => _agenda(),
                           },
+                          const SizedBox(height: 20),
+                          const CollectionTips(),
                         ],
                       ),
                     ),
@@ -353,6 +356,10 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _selecionarFotos,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.surfaceSubtle,
+            padding: const EdgeInsets.all(20),
+          ),
           icon: const Icon(Icons.add_photo_alternate_outlined),
           label: Text(
             _fotos.isEmpty
@@ -365,6 +372,29 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
           'Opcional. Até 5 fotos JPG, PNG ou WebP, com 5 MB cada.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        for (final foto in _fotos)
+          Row(
+            children: [
+              const Icon(
+                Icons.image_outlined,
+                size: 20,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  foto.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remover ${foto.name}',
+                onPressed: () => setState(() => _fotos.remove(foto)),
+                icon: const Icon(Icons.close, size: 20),
+              ),
+            ],
+          ),
       ],
     ),
   );
@@ -640,19 +670,26 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   }
 
   Future<void> _selecionarFotos() async {
-    final selecionadas = await ImagePicker().pickMultiImage(imageQuality: 85);
-    if (selecionadas.isEmpty) return;
-    if (selecionadas.length > 5) {
-      _mensagem('Selecione no máximo 5 fotos.', erro: true);
-      return;
-    }
-    for (final foto in selecionadas) {
-      if (await foto.length() > 5 * 1024 * 1024) {
-        _mensagem('Cada foto pode ter no máximo 5 MB.', erro: true);
+    try {
+      final selecionadas = await ImagePicker().pickMultiImage(imageQuality: 85);
+      if (!mounted || selecionadas.isEmpty) return;
+      if (selecionadas.length > 5) {
+        _mensagem('Selecione no máximo 5 fotos.', erro: true);
         return;
       }
+      for (final foto in selecionadas) {
+        if (await foto.length() > 5 * 1024 * 1024) {
+          _mensagem('Cada foto pode ter no máximo 5 MB.', erro: true);
+          return;
+        }
+      }
+      if (mounted) setState(() => _fotos = selecionadas);
+    } catch (_) {
+      _mensagem(
+        'Não foi possível abrir as fotos. Tente novamente.',
+        erro: true,
+      );
     }
-    setState(() => _fotos = selecionadas);
   }
 
   Future<void> _buscarCep() async {
