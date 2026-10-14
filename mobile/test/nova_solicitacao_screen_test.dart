@@ -1,4 +1,5 @@
 import 'package:ecotech_mobile/core/theme/app_theme.dart';
+import 'package:ecotech_mobile/core/api/api_exception.dart';
 import 'package:ecotech_mobile/features/citizen/nova_solicitacao_screen.dart';
 import 'package:ecotech_mobile/features/citizen/widgets/collection_fields.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,14 @@ import 'package:ecotech_mobile/features/citizen/citizen_controller.dart';
 
 class CollectionRepository extends CitizenRepository {
   final address = Completer<EnderecoCepData>();
+  final submission = Completer<SolicitacaoDetalhesData>();
+  final requests = <NovaSolicitacaoData>[];
+  @override
+  Future<SolicitacaoDetalhesData> criarSolicitacao(NovaSolicitacaoData data) {
+    requests.add(data);
+    return submission.future;
+  }
+
   @override
   Future<EnderecoCepData> consultarCep(String cep) => address.future;
 }
@@ -31,6 +40,11 @@ Future<void> pumpCollection(
     initialLocation: '/nova',
     routes: [
       GoRoute(path: '/nova', builder: (_, _) => const NovaSolicitacaoScreen()),
+      GoRoute(
+        path: '/solicitacoes/:id',
+        builder: (_, state) =>
+            Scaffold(body: Text('Solicitação ${state.pathParameters['id']}')),
+      ),
       GoRoute(
         path: '/home',
         builder: (_, _) => const Scaffold(body: Text('Início')),
@@ -79,7 +93,90 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> fillAddress(WidgetTester tester) async {
+  await tester.enterText(field('Modelo ou nome'), 'Celular');
+  await tester.enterText(field('Quantidade'), '3');
+  await tapVisible(tester, find.text('Próximo'));
+  for (final entry in {
+    'CEP': '63000000',
+    'Número': '12',
+    'Endereço': 'Rua Um',
+    'Bairro': 'Centro',
+    'Cidade': 'Crato',
+    'UF': 'ce',
+    'Nome para contato': 'Maria',
+  }.entries) {
+    await tester.enterText(field(entry.key), entry.value);
+  }
+  await tapVisible(tester, find.text('Próximo'));
+}
+
+Future<void> chooseSchedule(WidgetTester tester) async {
+  await tapVisible(tester, find.text('Selecione uma data'));
+  await tapVisible(tester, find.text('OK'));
+  await tapVisible(tester, find.text('Disponível a partir de'));
+  await tapVisible(tester, find.text('OK'));
+  await tapVisible(tester, find.text('Disponível até'));
+  await tapVisible(tester, find.text('OK'));
+}
+
 void main() {
+  testWidgets(
+    'envia uma única solicitação com os dados e abre o detalhe real',
+    (tester) async {
+      final repository = CollectionRepository();
+      await pumpCollection(tester, repository: repository);
+      await fillAddress(tester);
+      await tapVisible(tester, find.text('Criar solicitação'));
+      expect(repository.requests, isEmpty);
+      expect(
+        find.text('Selecione a data e a janela de horário.'),
+        findsOneWidget,
+      );
+      await chooseSchedule(tester);
+      await tester.tap(find.text('Criar solicitação'));
+      await tester.tap(find.text('Criar solicitação'));
+      await tester.pump();
+      expect(repository.requests, hasLength(1));
+      final data = repository.requests.single.campos;
+      expect(data['quantidade'], 3);
+      expect(data['logradouro'], 'Rua Um');
+      expect(data['nome_contato'], 'Maria');
+      expect(data['uf'], 'CE');
+      expect(data['peso_kg'], '');
+      expect(data['horario_inicio'], '09:00');
+      expect(data['horario_fim'], '11:00');
+      repository.submission.complete(
+        SolicitacaoDetalhesData.fromJson({'id': 'nova-123'}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Solicitação nova-123'), findsOneWidget);
+    },
+  );
+
+  testWidgets('falha no envio mantém a revisão e libera nova tentativa', (
+    tester,
+  ) async {
+    final repository = CollectionRepository();
+    await pumpCollection(tester, repository: repository);
+    await fillAddress(tester);
+    await chooseSchedule(tester);
+    await tester.tap(find.text('Criar solicitação'));
+    await tester.pump();
+    repository.submission.completeError(ApiException('Serviço indisponível.'));
+    await tester.pumpAndSettle();
+    expect(find.text('Serviço indisponível.'), findsOneWidget);
+    expect(find.text('3x Celular'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Criar solicitação'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
   testWidgets('consulta CEP sem substituir um CEP editado durante a busca', (
     tester,
   ) async {

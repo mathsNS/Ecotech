@@ -546,6 +546,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   Widget _agenda() => _CardEtapa(
     key: const ValueKey(2),
     titulo: 'Agendamento e revisão',
+    icon: Icons.calendar_month_outlined,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -559,24 +560,31 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: _selecionarData,
         ),
-        Row(
-          children: [
-            Expanded(
-              child: _Horario(
-                label: 'Disponível a partir de',
-                value: _inicio,
-                onTap: () => _selecionarHorario(true),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Horario(
-                label: 'Disponível até',
-                value: _fim,
-                onTap: () => _selecionarHorario(false),
-              ),
-            ),
-          ],
+        CollectionPair(
+          first: _Horario(
+            label: 'Disponível a partir de',
+            value: _inicio,
+            onTap: () => _selecionarHorario(true),
+          ),
+          second: _Horario(
+            label: 'Disponível até',
+            value: _fim,
+            onTap: () => _selecionarHorario(false),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceSubtle,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            _tipoColeta == 'domiciliar'
+                ? 'Esta é a sua disponibilidade. A coleta depende do aceite da empresa e da confirmação do agendamento.'
+                : 'Confira a disponibilidade do ponto. Acompanhe a confirmação do agendamento nos detalhes da solicitação.',
+            style: const TextStyle(color: AppColors.primaryDark),
+          ),
         ),
         const Divider(height: 30),
         Text('Resumo', style: Theme.of(context).textTheme.titleMedium),
@@ -595,6 +603,15 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               ? 'Coleta domiciliar'
               : 'Entrega em ponto',
         ),
+        if (_tipoColeta == 'domiciliar')
+          _ResumoLinha(
+            'Endereço',
+            '${_logradouro.text}, ${_numero.text}\n'
+                '${_bairro.text} · ${_cidade.text}/${_uf.text.toUpperCase()}',
+          ),
+        _ResumoLinha('Contato', _contato.text),
+        if (_fotos.isNotEmpty)
+          _ResumoLinha('Fotos', '${_fotos.length} anexada(s)'),
       ],
     ),
   );
@@ -668,29 +685,32 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   }
 
   Future<void> _selecionarData() async {
-    final hoje = DateTime.now();
+    final hoje = DateUtils.dateOnly(DateTime.now());
     final data = await showDatePicker(
       context: context,
-      initialDate: hoje.add(const Duration(days: 1)),
+      initialDate: _data != null && !_data!.isBefore(hoje)
+          ? _data!
+          : hoje.add(const Duration(days: 1)),
       firstDate: hoje,
       lastDate: DateTime(hoje.year + 1),
     );
-    if (data != null) setState(() => _data = data);
+    if (mounted && data != null) setState(() => _data = data);
   }
 
   Future<void> _selecionarHorario(bool inicio) async {
     final horario = await showTimePicker(
       context: context,
       initialTime: inicio
-          ? const TimeOfDay(hour: 9, minute: 0)
-          : const TimeOfDay(hour: 11, minute: 0),
+          ? _inicio ?? const TimeOfDay(hour: 9, minute: 0)
+          : _fim ?? const TimeOfDay(hour: 11, minute: 0),
     );
-    if (horario != null) {
+    if (mounted && horario != null) {
       setState(() => inicio ? _inicio = horario : _fim = horario);
     }
   }
 
   Future<void> _enviar() async {
+    if (_enviando) return;
     if (_data == null || _inicio == null || _fim == null) {
       _mensagem('Selecione a data e a janela de horário.', erro: true);
       return;
@@ -739,6 +759,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               fotos: _fotos,
             ),
           );
+      if (!mounted) return;
       ref.invalidate(solicitacoesProvider);
       ref.invalidate(dashboardControllerProvider);
       if (mounted) context.go('/solicitacoes/${detalhes.id}');
@@ -825,9 +846,15 @@ class _Horario extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    child: InputDecorator(
-      decoration: InputDecoration(labelText: label),
-      child: Text(value?.format(context) ?? 'Selecionar'),
+    borderRadius: BorderRadius.circular(12),
+    child: CollectionField(
+      label,
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          suffixIcon: Icon(Icons.schedule, size: 20),
+        ),
+        child: Text(value?.format(context) ?? 'Selecionar'),
+      ),
     ),
   );
 }
