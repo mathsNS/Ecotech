@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:ecotech_mobile/core/api/api_exception.dart';
 import 'package:ecotech_mobile/core/theme/app_theme.dart';
@@ -47,6 +47,7 @@ Future<void> pumpWithdrawal(
   PendingFinanceRepository repository, {
   bool wallet = false,
   double scale = 1,
+  bool open = true,
 }) async {
   tester.view.physicalSize = const Size(320, 800);
   tester.view.devicePixelRatio = 1;
@@ -86,6 +87,7 @@ Future<void> pumpWithdrawal(
     ),
   );
   await tester.pumpAndSettle();
+  if (!open) return;
   final button = find.text(wallet ? 'Solicitar saque' : 'Abrir saque');
   await tester.ensureVisible(button);
   await tester.tap(button);
@@ -102,6 +104,36 @@ const receipt = SaqueData(
 );
 
 void main() {
+  testWidgets('carteira desabilita saque sem saldo ou sem métodos', (
+    tester,
+  ) async {
+    for (final noMethods in [false, true]) {
+      final repository = PendingFinanceRepository();
+      repository.wallet = CarteiraData(
+        saldo: noMethods ? 140 : 0,
+        pontos: 0,
+        pontosPorReal: 100,
+        metodos: noMethods ? [] : walletFixture.metodos,
+        titular: walletFixture.titular,
+        saques: [],
+      );
+      await pumpWithdrawal(tester, repository, wallet: true, open: false);
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Solicitar saque'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        find.text('Nenhum saque solicitado até o momento.'),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
   testWidgets(
     'envio único registra protocolo e atualiza histórico da carteira',
     (tester) async {
@@ -134,6 +166,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('R\$ 105,03'), findsOneWidget);
       expect(find.text('R\$ 35,00'), findsOneWidget);
+      await tester.ensureVisible(find.text('Ver registro'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ver registro'));
+      await tester.pumpAndSettle();
+      expect(find.text('Protocolo: pedido-123'), findsOneWidget);
+      await tester.ensureVisible(find.text('Fechar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fechar'));
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -191,4 +232,3 @@ void main() {
     },
   );
 }
-

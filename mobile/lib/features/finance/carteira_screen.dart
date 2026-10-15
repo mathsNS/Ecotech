@@ -11,6 +11,7 @@ import '../company/widgets/company_states.dart';
 import 'finance_controller.dart';
 import 'saque_screen.dart';
 import 'widgets/wallet_balance_card.dart';
+import 'widgets/withdrawal_receipt.dart';
 
 class CarteiraScreen extends ConsumerWidget {
   const CarteiraScreen({super.key});
@@ -18,6 +19,10 @@ class CarteiraScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(carteiraProvider);
+    final horizontal = ((MediaQuery.sizeOf(context).width - 576) / 2).clamp(
+      16.0,
+      double.infinity,
+    );
     return Scaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
@@ -35,7 +40,7 @@ class CarteiraScreen extends ConsumerWidget {
           onRefresh: () => ref.refresh(carteiraProvider.future),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 32),
             children: [
               WalletBalanceCard(carteira),
               const SizedBox(height: 16),
@@ -88,20 +93,53 @@ class _SaqueTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 8),
-    child: ListTile(
-      leading: const CircleAvatar(
-        backgroundColor: AppColors.secondary,
-        child: Icon(Icons.south_west, color: AppColors.primary),
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                AppFormatters.moeda(saque.valor),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              _StatusSaque(saque.status),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            saque.metodo == 'Transferencia' ? 'Transferência' : saque.metodo,
+          ),
+          Text(AppFormatters.dataHoraTexto(saque.dataHora)),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('Ver registro'),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (dialogContext) => Dialog(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      WithdrawalReceipt(saque),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text('Fechar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      title: Text(
-        AppFormatters.moeda(saque.valor),
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-      subtitle: Text(
-        '${saque.metodo} · ${AppFormatters.dataHoraTexto(saque.dataHora)}',
-      ),
-      trailing: _StatusSaque(saque.status),
     ),
   );
 }
