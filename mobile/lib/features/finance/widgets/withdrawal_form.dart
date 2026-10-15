@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/formatters/app_formatters.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/finance/finance_data.dart';
 import 'wallet_balance_card.dart';
 
@@ -32,6 +33,7 @@ class WithdrawalForm extends StatefulWidget {
 
 class _WithdrawalFormState extends State<WithdrawalForm> {
   final _form = GlobalKey<FormState>();
+  final _scroll = ScrollController();
   late final TextEditingController _amount;
   late final TextEditingController _holder;
   String? _method;
@@ -65,6 +67,7 @@ class _WithdrawalFormState extends State<WithdrawalForm> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _amount.dispose();
     _holder.dispose();
     super.dispose();
@@ -88,6 +91,7 @@ class _WithdrawalFormState extends State<WithdrawalForm> {
       children: [
         Expanded(
           child: SingleChildScrollView(
+            controller: _scroll,
             padding: const EdgeInsets.all(16),
             child: Center(
               child: ConstrainedBox(
@@ -108,6 +112,7 @@ class _WithdrawalFormState extends State<WithdrawalForm> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _amount,
+                        style: Theme.of(context).textTheme.headlineSmall,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -127,20 +132,39 @@ class _WithdrawalFormState extends State<WithdrawalForm> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final percent in [25, 50, 75, 100])
-                            OutlinedButton(
-                              onPressed: () => _amount.text = _money(
-                                _balance * percent ~/ 100,
-                              ),
-                              child: Text(
-                                percent == 100 ? 'Tudo' : '$percent%',
-                              ),
-                            ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns =
+                              MediaQuery.textScalerOf(context).scale(14) > 20
+                              ? 2
+                              : 4;
+                          final width =
+                              (constraints.maxWidth - 8 * (columns - 1)) /
+                              columns;
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final percent in [25, 50, 75, 100])
+                                SizedBox(
+                                  width: width,
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                    ),
+                                    onPressed: () => _amount.text = _money(
+                                      _balance * percent ~/ 100,
+                                    ),
+                                    child: Text(
+                                      percent == 100 ? 'Tudo' : '$percent%',
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                     ]),
                     _card([
@@ -158,6 +182,15 @@ class _WithdrawalFormState extends State<WithdrawalForm> {
                           children: [
                             for (final method in widget.wallet.metodos)
                               ChoiceChip(
+                                avatar: Icon(
+                                  method.id == 'Pix'
+                                      ? Icons.pix
+                                      : Icons.account_balance_outlined,
+                                  size: 20,
+                                ),
+                                showCheckmark: false,
+                                selectedColor: AppColors.secondary,
+                                padding: const EdgeInsets.all(12),
                                 label: Text(method.nome),
                                 selected: method.id == _method,
                                 onSelected: (_) =>
