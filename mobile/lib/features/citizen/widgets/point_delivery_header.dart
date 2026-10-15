@@ -28,7 +28,8 @@ class PointDeliveryHeader extends StatelessWidget {
           ),
         ),
         child: DefaultTextStyle(
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: Theme.of(context).textTheme.bodyMedium!
+              .copyWith(color: Colors.white),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

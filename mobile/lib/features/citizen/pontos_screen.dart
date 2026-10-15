@@ -47,7 +47,13 @@ class _PontosScreenState extends ConsumerState<PontosScreen> {
       leading: widget.selectionMode
           ? const BackButton()
           : const AppBackButton(),
-      title: const Text('Pontos de coleta'),
+      toolbarHeight: 32 + MediaQuery.textScalerOf(context).scale(24),
+      title: const Text(
+        'Pontos de coleta',
+        maxLines: 2,
+        softWrap: true,
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+      ),
       backgroundColor: AppColors.surfaceSubtle,
     ),
     body: SafeArea(

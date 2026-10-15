@@ -253,9 +253,9 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                   )
                 : Row(
                     children: [
-                      Expanded(child: back),
+                      Expanded(flex: _entregaPresencial ? 10 : 1, child: back),
                       const SizedBox(width: 12),
-                      Expanded(flex: 2, child: next),
+                      Expanded(flex: _entregaPresencial ? 14 : 2, child: next),
                     ],
                   );
           },
