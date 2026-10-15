@@ -53,7 +53,7 @@ class CollectionPointCard extends StatelessWidget {
                 '${AppFormatters.numero(point.ocupacaoKg)} / ${AppFormatters.numero(point.capacidadeKg)} kg',
               ),
               Text(
-                '${AppFormatters.numero(point.disponibilidadePercentual.clamp(0, 100).toDouble())}% livre',
+                '${AppFormatters.numero(point.capacidadeKg > 0 ? point.disponibilidadePercentual.clamp(0, 100).toDouble() : 0)}% livre',
                 style: const TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w700,

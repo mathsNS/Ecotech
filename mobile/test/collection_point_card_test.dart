@@ -37,6 +37,7 @@ void main() {
       isNull,
     );
     expect(selected, isFalse);
+    expect(find.text('0,0% livre'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
