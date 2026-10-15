@@ -238,7 +238,11 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                       ),
                     )
                   : Text(
-                      _etapa == 2 ? 'Criar solicitação' : 'Próximo',
+                      _etapa == 2
+                          ? (_entregaPresencial
+                                ? 'Solicitar entrega'
+                                : 'Criar solicitação')
+                          : 'Próximo',
                       textAlign: TextAlign.center,
                     ),
             );
@@ -538,6 +542,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               .map(
                 (ponto) => DropdownMenuItem(
                   value: ponto.id,
+                  enabled: ponto.aceitaEntrega,
                   child: Text(ponto.nome, overflow: TextOverflow.ellipsis),
                 ),
               )
@@ -655,7 +660,9 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   Widget _agenda() => _CardEtapa(
     key: const ValueKey(2),
-    titulo: 'Agendamento e revisão',
+    titulo: _entregaPresencial
+        ? 'Horário e revisão da entrega'
+        : 'Agendamento e revisão',
     icon: Icons.calendar_month_outlined,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,7 +670,9 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.calendar_today_outlined),
-          title: const Text('Data da entrega ou coleta'),
+          title: Text(
+            _entregaPresencial ? 'Dia da visita' : 'Data da entrega ou coleta',
+          ),
           subtitle: Text(
             _data == null ? 'Selecione uma data' : AppFormatters.data(_data),
           ),
@@ -713,6 +722,11 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               ? 'Coleta domiciliar'
               : 'Entrega em ponto',
         ),
+        if (_tipoColeta == 'entrega_ponto' && _pontoSelecionado != null)
+          _ResumoLinha(
+            'Ponto',
+            '${_pontoSelecionado!.nome}\n${_pontoSelecionado!.endereco}',
+          ),
         if (_tipoColeta == 'domiciliar')
           _ResumoLinha(
             'Endereço',
@@ -834,6 +848,15 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   Future<void> _enviar() async {
     if (_enviando) return;
+    if (_tipoColeta == 'entrega_ponto' &&
+        _pontoSelecionado?.aceitaEntrega != true) {
+      _mensagem(
+        'O ponto não está disponível. Escolha outro antes de enviar.',
+        erro: true,
+      );
+      _mudarEtapa(_entregaPresencial ? 0 : 1);
+      return;
+    }
     if (_data == null || _inicio == null || _fim == null) {
       _mensagem('Selecione a data e a janela de horário.', erro: true);
       return;

@@ -16,8 +16,10 @@ import 'package:ecotech_mobile/features/citizen/citizen_controller.dart';
 class CollectionRepository extends CitizenRepository {
   final address = Completer<EnderecoCepData>();
   final points = Completer<List<PontoColetaData>>();
+  List<PontoColetaData>? updatedPoints;
   @override
-  Future<List<PontoColetaData>> listarPontos() => points.future;
+  Future<List<PontoColetaData>> listarPontos() =>
+      updatedPoints == null ? points.future : Future.value(updatedPoints);
   final submission = Completer<SolicitacaoDetalhesData>();
   final requests = <NovaSolicitacaoData>[];
   @override
@@ -136,6 +138,66 @@ Future<void> chooseSchedule(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'ponto removido durante a revisão bloqueia envio e preserva item',
+    (tester) async {
+      final repository = CollectionRepository();
+      repository.points.complete([
+        PontoColetaData.fromJson({
+          'id': 'ponto-1',
+          'nome': 'Ponto Central',
+          'capacidade_kg': 100,
+          'disponibilidade_percentual': 100,
+        }),
+      ]);
+      await pumpCollection(tester, repository: repository, atPoint: true);
+      await tester.enterText(field('Modelo ou nome'), 'Monitor');
+      await tester.enterText(field('Nome para contato'), 'Maria');
+      await tapVisible(tester, find.text('Próximo'));
+      await chooseSchedule(tester);
+      repository.updatedPoints = [];
+      ProviderScope.containerOf(
+        tester.element(find.byType(NovaSolicitacaoScreen)),
+      ).invalidate(pontosColetaProvider);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Solicitar entrega'));
+      expect(repository.requests, isEmpty);
+      expect(field('Modelo ou nome'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(field('Modelo ou nome')).controller!.text,
+        'Monitor',
+      );
+      expect(find.text('Trocar ponto'), findsOneWidget);
+    },
+  );
+
+  testWidgets('entrega presencial cabe em tela estreita com fonte ampliada', (
+    tester,
+  ) async {
+    final repository = CollectionRepository();
+    repository.points.complete([
+      PontoColetaData.fromJson({
+        'id': 'ponto-1',
+        'nome': 'Central de recebimento de equipamentos eletrônicos',
+        'endereco': 'Avenida Principal, 1234, Bairro Centro',
+        'capacidade_kg': 100,
+        'disponibilidade_percentual': 100,
+      }),
+    ]);
+    await pumpCollection(
+      tester,
+      repository: repository,
+      atPoint: true,
+      scale: 2,
+      size: const Size(320, 800),
+    );
+    await tester.enterText(field('Modelo ou nome'), 'Monitor');
+    await tester.enterText(field('Nome para contato'), 'Maria');
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('Solicitar entrega').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('troca e cancelamento de ponto preservam os dados do item', (
     tester,
   ) async {
@@ -198,7 +260,7 @@ void main() {
     await tapVisible(tester, find.text('Próximo'));
     expect(find.text('2 · Horário'), findsOneWidget);
     await chooseSchedule(tester);
-    await tester.tap(find.text('Criar solicitação'));
+    await tester.tap(find.text('Solicitar entrega'));
     await tester.pump();
     expect(repository.requests.single.campos['ponto_id'], 'ponto-1');
     expect(repository.requests.single.campos.containsKey('cep'), isFalse);
