@@ -30,6 +30,11 @@ class PontoColetaData {
   final double capacidadeKg;
   final double ocupacaoKg;
   final double disponibilidadePercentual;
+
+  bool get aceitaEntrega =>
+      capacidadeKg > 0 &&
+      ocupacaoKg < capacidadeKg &&
+      disponibilidadePercentual > 0;
 }
 
 class SolicitacaoData {
