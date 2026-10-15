@@ -11,6 +11,7 @@ import '../communication/communication_controller.dart';
 import '../communication/widgets/communication_actions.dart';
 import '../company/widgets/company_states.dart';
 import 'finance_controller.dart';
+import 'widgets/wallet_balance_card.dart';
 
 class CarteiraScreen extends ConsumerWidget {
   const CarteiraScreen({super.key});
@@ -22,6 +23,7 @@ class CarteiraScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: const AppBackButton(),
         title: const Text('Carteira'),
+        backgroundColor: AppColors.surfaceSubtle,
         actions: const [CommunicationActions()],
       ),
       body: state.when(
@@ -36,12 +38,16 @@ class CarteiraScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              _SaldoCard(carteira),
+              WalletBalanceCard(carteira),
+              const SizedBox(height: 16),
+              const Text(
+                'Modo demonstrativo: os pedidos são registrados, sem transferência real de dinheiro.',
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: carteira.saldo <= 0
+                  onPressed: carteira.saldo <= 0 || carteira.metodos.isEmpty
                       ? null
                       : () => _solicitarSaque(context, ref, carteira),
                   icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -137,46 +143,6 @@ class CarteiraScreen extends ConsumerWidget {
   static String _mensagemErro(Object error) => error is ApiException
       ? error.mensagem
       : 'Não foi possível solicitar o saque.';
-}
-
-class _SaldoCard extends StatelessWidget {
-  const _SaldoCard(this.carteira);
-
-  final CarteiraData carteira;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [AppColors.primaryDark, AppColors.primary],
-      ),
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.account_balance_wallet_outlined, color: Colors.white70),
-            SizedBox(width: 8),
-            Text('Saldo disponível', style: TextStyle(color: Colors.white70)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          AppFormatters.moeda(carteira.saldo),
-          style: Theme.of(context).textTheme.headlineMedium
-              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          '${carteira.pontos} pontos · ${carteira.pontosPorReal} pontos = R\$ 1,00',
-          style: const TextStyle(color: Colors.white70),
-        ),
-      ],
-    ),
-  );
 }
 
 class _SaqueTile extends StatelessWidget {
