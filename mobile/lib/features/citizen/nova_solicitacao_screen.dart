@@ -7,8 +7,12 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_repository.dart';
+import '../../data/citizen/citizen_data.dart';
 import '../dashboard/dashboard_controller.dart';
 import 'citizen_controller.dart';
+import 'pontos_screen.dart';
+import 'widgets/point_delivery_header.dart';
+import 'widgets/citizen_states.dart';
 import 'widgets/collection_progress.dart';
 import 'widgets/collection_fields.dart';
 import 'widgets/collection_tips.dart';
@@ -47,6 +51,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   final _contato = TextEditingController();
 
   int _etapa = 0;
+  bool get _entregaPresencial => widget.tipoInicial == 'entrega_ponto';
   String _tipoDispositivo = 'celular';
   String _subcategoria = 'Smartphone';
   int _ano = 2020;
@@ -133,8 +138,10 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Nova solicitação de descarte',
+            Text(
+              _entregaPresencial
+                  ? 'Descarte no ponto'
+                  : 'Nova solicitação de descarte',
               maxLines: 3,
               softWrap: true,
               overflow: TextOverflow.visible,
@@ -159,10 +166,14 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                         key: _formKey,
                         child: Column(
                           children: [
-                            CollectionProgress(
-                              step: _etapa,
-                              atCollectionPoint: _tipoColeta == 'entrega_ponto',
-                            ),
+                            if (_entregaPresencial)
+                              _resumoPonto()
+                            else
+                              CollectionProgress(
+                                step: _etapa,
+                                atCollectionPoint:
+                                    _tipoColeta == 'entrega_ponto',
+                              ),
                             const SizedBox(height: 24),
                             switch (_etapa) {
                               0 => _produto(),
@@ -203,8 +214,17 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
                 constraints.maxWidth < 360 &&
                 MediaQuery.textScalerOf(context).scale(14) > 18;
             final back = OutlinedButton(
-              onPressed: _enviando ? null : _voltar,
-              child: Text(_etapa == 0 ? 'Cancelar' : 'Anterior'),
+              onPressed: _enviando
+                  ? null
+                  : (_entregaPresencial && _etapa == 0
+                        ? _trocarPonto
+                        : _voltar),
+              child: Text(
+                _etapa == 0
+                    ? (_entregaPresencial ? 'Trocar ponto' : 'Cancelar')
+                    : 'Anterior',
+                textAlign: TextAlign.center,
+              ),
             );
             final next = ElevatedButton(
               onPressed: _enviando ? null : (_etapa == 2 ? _enviar : _avancar),
@@ -406,6 +426,10 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
               ),
             ],
           ),
+        if (_entregaPresencial) ...[
+          const SizedBox(height: 16),
+          _campoContato(),
+        ],
       ],
     ),
   );
@@ -440,20 +464,58 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         const SizedBox(height: 16),
         if (_tipoColeta == 'entrega_ponto') _selecaoPonto() else _endereco(),
         const SizedBox(height: 12),
-        CollectionField(
-          'Nome para contato',
-          child: TextFormField(
-            controller: _contato,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              hintText: 'Quem acompanhará a entrega ou coleta?',
-            ),
-            validator: _obrigatorio,
-          ),
-        ),
+        _campoContato(),
       ],
     ),
   );
+
+  Widget _campoContato() => CollectionField(
+    'Nome para contato',
+    child: TextFormField(
+      controller: _contato,
+      textCapitalization: TextCapitalization.words,
+      decoration: const InputDecoration(
+        hintText: 'Quem acompanhará a entrega ou coleta?',
+      ),
+      validator: _obrigatorio,
+    ),
+  );
+
+  PontoColetaData? get _pontoSelecionado => ref
+      .read(pontosColetaProvider)
+      .valueOrNull
+      ?.where((point) => point.id == _pontoId)
+      .firstOrNull;
+
+  Widget _resumoPonto() => ref
+      .watch(pontosColetaProvider)
+      .when(
+        loading: () => const LinearProgressIndicator(),
+        error: (error, _) => CitizenError(
+          error: error,
+          onRetry: () => ref.invalidate(pontosColetaProvider),
+        ),
+        data: (_) => _pontoSelecionado == null
+            ? const Text(
+                'Ponto não encontrado. Toque em Trocar ponto para escolher outro.',
+              )
+            : PointDeliveryHeader(
+                point: _pontoSelecionado!,
+                scheduling: _etapa == 2,
+              ),
+      );
+
+  Future<void> _trocarPonto() async {
+    FocusScope.of(context).unfocus();
+    final point = await Navigator.of(context).push<PontoColetaData>(
+      MaterialPageRoute(
+        builder: (_) => PontosScreen(selectionMode: true, selectedId: _pontoId),
+      ),
+    );
+    if (!mounted || point == null) return;
+    setState(() => _pontoId = point.id);
+    _mudarEtapa(0);
+  }
 
   Widget _selecaoPonto() => ref
       .watch(pontosColetaProvider)
@@ -666,15 +728,14 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
 
   void _avancar() {
     if (_enviando || _etapa >= 2) return;
-    if (_etapa == 1 && _tipoColeta == 'entrega_ponto') {
-      final pontos = ref.read(pontosColetaProvider).valueOrNull;
-      if (pontos == null || !pontos.any((ponto) => ponto.id == _pontoId)) {
+    if ((_entregaPresencial || _etapa == 1) && _tipoColeta == 'entrega_ponto') {
+      if (_pontoSelecionado?.aceitaEntrega != true) {
         _mensagem('Selecione um ponto de coleta disponível.', erro: true);
         return;
       }
     }
     if (_formKey.currentState?.validate() != true) return;
-    _mudarEtapa(_etapa + 1);
+    _mudarEtapa(_entregaPresencial ? 2 : _etapa + 1);
   }
 
   void _mudarEtapa(int etapa) {
@@ -686,7 +747,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   void _voltar() {
     if (_enviando) return;
     if (_etapa > 0) {
-      _mudarEtapa(_etapa - 1);
+      _mudarEtapa(_entregaPresencial ? 0 : _etapa - 1);
     } else if (context.canPop()) {
       context.pop();
     } else {

@@ -80,7 +80,11 @@ Future<void> pumpCollection(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (atPoint && repository?.points.isCompleted != true) {
+    await tester.pump();
+  } else {
+    await tester.pumpAndSettle();
+  }
 }
 
 Finder field(String label) => find.descendant(
@@ -132,6 +136,43 @@ Future<void> chooseSchedule(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('troca e cancelamento de ponto preservam os dados do item', (
+    tester,
+  ) async {
+    final repository = CollectionRepository();
+    repository.points.complete([
+      for (var i = 1; i <= 2; i++)
+        PontoColetaData.fromJson({
+          'id': 'ponto-$i',
+          'nome': 'Ponto $i',
+          'capacidade_kg': 100,
+          'disponibilidade_percentual': 100,
+        }),
+    ]);
+    await pumpCollection(tester, repository: repository, atPoint: true);
+    await tester.enterText(field('Modelo ou nome'), 'Monitor');
+    await tester.enterText(field('Quantidade'), '4');
+    await tester.enterText(field('Nome para contato'), 'Maria');
+    await tapVisible(tester, find.text('Trocar ponto'));
+    await tapVisible(tester, find.byType(BackButton));
+    expect(find.text('Ponto 1'), findsOneWidget);
+    await tapVisible(tester, find.text('Trocar ponto'));
+    await tester.enterText(find.byType(TextField), 'Ponto 2');
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Selecionar ponto'));
+    expect(find.text('Ponto 2'), findsOneWidget);
+    expect(tester.widget<TextField>(field('Quantidade')).controller!.text, '4');
+    expect(
+      tester.widget<TextField>(field('Modelo ou nome')).controller!.text,
+      'Monitor',
+    );
+    await tapVisible(tester, find.text('Próximo'));
+    expect(find.text('4x Monitor'), findsOneWidget);
+    await tapVisible(tester, find.text('Anterior'));
+    expect(field('Modelo ou nome'), findsOneWidget);
+    expect(find.text('Ponto 2'), findsOneWidget);
+  });
+
   testWidgets('entrega no ponto aguarda um ponto válido antes de avançar', (
     tester,
   ) async {
@@ -143,13 +184,19 @@ void main() {
     await tester.enterText(field('Nome para contato'), 'Maria');
     await tester.tap(find.text('Próximo'));
     await tester.pump();
-    expect(find.text('Etapa 2 de 3 · Ponto de coleta'), findsOneWidget);
+    expect(find.text('Descarte no ponto'), findsOneWidget);
+    expect(field('Modelo ou nome'), findsOneWidget);
     repository.points.complete([
-      PontoColetaData.fromJson({'id': 'ponto-1', 'nome': 'Ponto Central'}),
+      PontoColetaData.fromJson({
+        'id': 'ponto-1',
+        'nome': 'Ponto Central',
+        'capacidade_kg': 100,
+        'disponibilidade_percentual': 100,
+      }),
     ]);
     await tester.pumpAndSettle();
     await tapVisible(tester, find.text('Próximo'));
-    expect(find.text('Etapa 3 de 3 · Agendamento'), findsOneWidget);
+    expect(find.text('2 · Horário'), findsOneWidget);
     await chooseSchedule(tester);
     await tester.tap(find.text('Criar solicitação'));
     await tester.pump();
