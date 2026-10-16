@@ -46,7 +46,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 60 + MediaQuery.textScalerOf(context).scale(12),
           child: Row(
             children: [
               _NavigationItem(

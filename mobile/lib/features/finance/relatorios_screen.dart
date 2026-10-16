@@ -13,7 +13,7 @@ import '../dashboard/dashboard_header.dart';
 import '../operations/operations_widgets.dart';
 import 'finance_controller.dart';
 
-const _soft = Color(0xFFF3F7F4);
+const _soft = AppColors.surfaceSubtle;
 const _heading = TextStyle(
   fontSize: 19,
   fontWeight: FontWeight.w800,
@@ -435,7 +435,9 @@ class _MetricasRelatorio extends StatelessWidget {
         children: [
           for (var i = 0; i < itens.length; i++)
             SizedBox(
-              width: (constraints.maxWidth - 10) / 2,
+              width: MediaQuery.textScalerOf(context).scale(14) > 20
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 10) / 2,
               child: _ReportCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,13 +737,12 @@ class _ReportFooter extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'ECOTECH',
-          style: TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: AppColors.primary,
-          ),
+        Image.asset(
+          'assets/images/ecotech navbar.png',
+          width: 120,
+          color: Colors.white,
+          colorBlendMode: BlendMode.srcIn,
+          semanticLabel: 'EcoTech',
         ),
         const SizedBox(height: 16),
         const Text(

@@ -45,7 +45,7 @@ class _CitizenNavigationState extends ConsumerState<CitizenNavigation> {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 60 + MediaQuery.textScalerOf(context).scale(12),
           child: Row(
             children: [
               _CitizenNavItem(

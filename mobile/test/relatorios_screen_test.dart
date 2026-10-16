@@ -130,7 +130,7 @@ void main() {
   testWidgets('plano restrito e fonte ampliada não quebram o relatório', (
     tester,
   ) async {
-    await _mount(tester, available: false, width: 320, scale: 1.3);
+    await _mount(tester, available: false, width: 320, scale: 2);
     final export = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Exportar CSV'),
     );

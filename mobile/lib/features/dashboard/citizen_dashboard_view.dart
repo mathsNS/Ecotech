@@ -827,13 +827,12 @@ class _CitizenFooter extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'ECOTECH',
-          style: TextStyle(
-            color: Color(0xFF39A16D),
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+        Image.asset(
+          'assets/images/ecotech navbar.png',
+          width: 120,
+          color: Colors.white,
+          colorBlendMode: BlendMode.srcIn,
+          semanticLabel: 'EcoTech',
         ),
         const SizedBox(height: 18),
         const Text(

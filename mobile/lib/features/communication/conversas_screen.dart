@@ -204,13 +204,12 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'ECOTECH',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
+                            Image.asset(
+                              'assets/images/ecotech navbar.png',
+                              width: 120,
+                              color: Colors.white,
+                              colorBlendMode: BlendMode.srcIn,
+                              semanticLabel: 'EcoTech',
                             ),
                             const SizedBox(height: 18),
                             Text(
