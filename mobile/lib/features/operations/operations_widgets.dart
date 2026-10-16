@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
-const operationsBackground = Color(0xFFF7F8F9);
-const operationsBorder = Color(0xFFE5E9E7);
-const operationsMuted = Color(0xFF606870);
-const operationsDark = Color(0xFF111315);
-const operationsSoftGreen = Color(0xFFE2F2E8);
-const operationsDeepGreen = Color(0xFF1F603E);
+import '../../core/theme/app_colors.dart';
+
+const operationsBackground = AppColors.backgroundAlt;
+const operationsBorder = AppColors.border;
+const operationsMuted = AppColors.textLight;
+const operationsDark = AppColors.textDark;
+const operationsSoftGreen = AppColors.secondary;
+const operationsDeepGreen = AppColors.primaryDark;
 
 class OperationsMetric extends StatelessWidget {
   const OperationsMetric({
@@ -21,7 +23,7 @@ class OperationsMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 133,
+    constraints: const BoxConstraints(minHeight: 133),
     padding: const EdgeInsets.fromLTRB(16, 17, 12, 15),
     decoration: BoxDecoration(
       color: Colors.white,
@@ -47,7 +49,7 @@ class OperationsMetric extends StatelessWidget {
           ),
           child: Icon(icon, size: 21, color: operationsDeepGreen),
         ),
-        const Spacer(),
+        const SizedBox(height: 12),
         Text(
           '$value',
           style: const TextStyle(
@@ -60,8 +62,6 @@ class OperationsMetric extends StatelessWidget {
         const SizedBox(height: 7),
         Text(
           label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 10.5, color: operationsMuted),
         ),
       ],
@@ -98,19 +98,21 @@ class OperationsFilters extends StatelessWidget {
         children: [
           Icon(Icons.filter_alt_outlined, size: 19, color: operationsMuted),
           SizedBox(width: 7),
-          Text(
-            'Filtrar por estado',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: operationsDark,
+          Expanded(
+            child: Text(
+              'Filtrar por estado',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: operationsDark,
+              ),
             ),
           ),
         ],
       ),
       const SizedBox(height: 10),
       SizedBox(
-        height: 34,
+        height: 34 + (MediaQuery.textScalerOf(context).scale(10.5) - 10.5),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: filters.length,
@@ -127,7 +129,7 @@ class OperationsFilters extends StatelessWidget {
                 color: active ? operationsDeepGreen : operationsBorder,
               ),
               backgroundColor: Colors.white,
-              selectedColor: const Color(0xFF327B58),
+              selectedColor: AppColors.primary,
               labelStyle: TextStyle(
                 color: active ? Colors.white : operationsMuted,
                 fontSize: 10.5,

@@ -49,8 +49,8 @@ class _EcoTechDashboardHeaderState
         : widget.name.trim().substring(0, 1).toUpperCase();
     return AppBar(
       toolbarHeight: 60,
-      backgroundColor: const Color(0xFFF2F6F3),
-      shape: const Border(bottom: BorderSide(color: Color(0xFFDDE4E0))),
+      backgroundColor: AppColors.surfaceSubtle,
+      shape: const Border(bottom: BorderSide(color: AppColors.border)),
       titleSpacing: 16,
       title: Image.asset(
         'assets/images/ecotech navbar.png',
@@ -77,7 +77,7 @@ class _EcoTechDashboardHeaderState
             onTap: () => context.go('/perfil'),
             child: CircleAvatar(
               radius: 21,
-              backgroundColor: const Color(0xFFDFF2E7),
+              backgroundColor: AppColors.secondary,
               child: Text(
                 initial,
                 style: const TextStyle(

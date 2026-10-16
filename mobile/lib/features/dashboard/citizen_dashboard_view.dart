@@ -1,17 +1,20 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
 import '../../data/dashboard/dashboard_data.dart';
 
-const _background = Color(0xFFF7F9FA);
-const _green = Color(0xFF2B7654);
-const _darkGreen = Color(0xFF195638);
-const _softGreen = Color(0xFFE2F2E8);
-const _border = Color(0xFFDFE5E2);
-const _muted = Color(0xFF5E6670);
+const _background = AppColors.backgroundAlt;
+const _green = AppColors.primary;
+const _darkGreen = AppColors.primaryDark;
+const _softGreen = AppColors.secondary;
+const _border = AppColors.border;
+const _muted = AppColors.textLight;
 const _gold = Color(0xFFFFD574);
 const _goldSoft = Color(0xFFFFF5D6);
 const _goldText = Color(0xFF6B4A00);
