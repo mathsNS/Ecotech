@@ -265,7 +265,7 @@ class _OportunidadeCardState extends ConsumerState<_OportunidadeCard> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                context.push('/solicitacoes/${aceite.solicitacaoId}');
+                context.push('/empresa/operacoes/${aceite.solicitacaoId}');
               },
               child: const Text('Ver solicitação'),
             ),
