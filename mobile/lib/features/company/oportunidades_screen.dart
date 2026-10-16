@@ -13,6 +13,7 @@ import '../operations/operations_widgets.dart';
 import 'company_controller.dart';
 import 'widgets/company_navigation.dart';
 import 'widgets/company_states.dart';
+import 'widgets/opportunities_header.dart';
 
 class OportunidadesEmpresaScreen extends ConsumerWidget {
   const OportunidadesEmpresaScreen({super.key});
@@ -35,8 +36,9 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
           child: oportunidades.isEmpty
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
                   children: [
-                    const SizedBox(height: 110),
+                    const OpportunitiesHeader(),
                     CompanyEmpty(
                       message: 'Nenhuma oportunidade ativa agora. Verifique se suas bases estão ativas e atualize novamente em instantes.',
                       action: OutlinedButton.icon(
@@ -51,6 +53,7 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                   children: [
+                    const OpportunitiesHeader(),
                     ...oportunidades.map(
                       (item) => _OportunidadeCard(oportunidade: item),
                     ),
@@ -247,6 +250,7 @@ class _OportunidadeCardState extends ConsumerState<_OportunidadeCard> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
+          scrollable: true,
           title: const Text('Coleta aceita'),
           content: Text(
             'Contato: ${aceite.nomeContato}\n'
@@ -281,6 +285,7 @@ class _OportunidadeCardState extends ConsumerState<_OportunidadeCard> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Recusar oportunidade'),
         content: TextField(
           controller: controller,
