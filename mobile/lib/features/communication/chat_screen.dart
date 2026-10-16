@@ -68,7 +68,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       backgroundColor: operationsBackground,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F6F3),
+        backgroundColor: AppColors.surfaceSubtle,
+        toolbarHeight: 32 + MediaQuery.textScalerOf(context).scale(25),
         shape: const Border(bottom: BorderSide(color: operationsBorder)),
         leading: const AppBackButton(fallbackRoute: '/conversas'),
         leadingWidth: 48,
@@ -363,7 +364,7 @@ class _ContextoConversa extends StatelessWidget {
     children: [
       Container(
         width: double.infinity,
-        color: const Color(0xFFECF6F0),
+        color: AppColors.secondary,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -419,7 +420,7 @@ class _BolhaMensagem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.fromLTRB(14, 11, 14, 10),
       decoration: BoxDecoration(
-        color: mensagem.propria ? const Color(0xFF205C3D) : Colors.white,
+        color: mensagem.propria ? AppColors.primaryDark : Colors.white,
         boxShadow: const [
           BoxShadow(
             color: Color(0x14000000),
@@ -551,7 +552,7 @@ class _CampoMensagem extends StatelessWidget {
               enabled: !enviando,
               maxLength: 2000,
               minLines: 1,
-              maxLines: 5,
+              maxLines: MediaQuery.textScalerOf(context).scale(14) > 20 ? 2 : 5,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: 'Escreva uma mensagem...',
@@ -560,7 +561,7 @@ class _CampoMensagem extends StatelessWidget {
                   color: operationsMuted,
                 ),
                 counterText: '',
-                fillColor: const Color(0xFFEDF7F1),
+                fillColor: AppColors.surfaceSubtle,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,

@@ -88,9 +88,11 @@ class _Repository extends CommunicationRepository {
 Future<void> _mount(
   WidgetTester tester,
   Widget screen,
-  _Repository repo,
-) async {
-  tester.view.physicalSize = const Size(390, 844);
+  _Repository repo, {
+  double scale = 1,
+  double width = 390,
+}) async {
+  tester.view.physicalSize = Size(width, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -106,13 +108,40 @@ Future<void> _mount(
               const BadgesData(notificacoes: 4, mensagens: 1, oportunidades: 0),
         ),
       ],
-      child: MaterialApp(theme: AppTheme.light(), home: screen),
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: screen,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  testWidgets('chat acomoda fonte ampliada e teclado em tela estreita', (
+    tester,
+  ) async {
+    await _mount(
+      tester,
+      const ChatScreen(solicitacaoId: 'abc'),
+      _Repository(),
+      scale: 2,
+      width: 320,
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 250);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.enterText(find.byType(TextField), 'Mensagem para a empresa');
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Enviar').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('central filtra nome e coleta sem perder contagem de não lidas', (
     tester,
   ) async {
