@@ -59,11 +59,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# SQLite databases (includes ecotech.db)
+# SQLite databases (includes ecotech.db and WAL sidecars)
 *.db
-
-# Controle interno de pendências
-PENDENCIAS.txt
+*.db-wal
+*.db-shm
 
 # Flask stuff:
 instance/
@@ -98,10 +97,23 @@ poetry.lock
 # pdm
 .pdm.toml
 
-# Documentacao de apoio ao port Flutter, contexto local entre sessoes
-FLUTTER_PORT_PLAN.md
-FLUTTER_PORT_PROGRESS.md
-docs/mobile/
+# Documentacao interna de apoio, contexto, analises, mapeamentos, QA e credenciais locais
+# (mantem README.md, INSTALL.md, LICENSE e mobile/README.md versionados)
+/ANALISE_*.md
+/CODEX_*.md
+/ECOTECH_CODEX_*.md
+/FLUTTER_PORT_*.md
+/MAPA_*.md
+/PLANO_*.md
+/REGRAS_NEGOCIO*.md
+/ETAPA_*.md
+/PENDENCIAS*.txt
+/PENDENCIAS*.md
+/CREDENCIAIS*.txt
+/CREDENCIAIS*.md
+/conclusoes_*
+/docs/
+/.tmp/
 
 # a regra "lib/" acima e para empacotamento Python, nao deve pegar o app Flutter
 !mobile/lib/
