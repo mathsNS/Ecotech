@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict
 from datetime import datetime, time
+import unicodedata
 import uuid
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -255,16 +256,131 @@ class ServicoDescarte:
             estado = solicitacao.estado.obter_nome().upper().replace(' ', '_')
             self._dados.atualizar_solicitacao(solicitacao.id, estado)
 
-    def listar_solicitacoes(self) -> List[SolicitacaoDescarte]:
-        """Retorna todas as solicitações, carregando do banco se necessário."""
-        if not self._solicitacoes and self._servico_usuario and self._servico_ponto:
+    def _sincronizar_solicitacoes_com_banco(self) -> None:
+        """Sincroniza novas solicitacoes e mudancas externas do banco para o cache."""
+        if not (self._dados and self._servico_usuario and self._servico_ponto):
+            return
+        if not hasattr(self._dados, 'buscar_todas_solicitacoes'):
+            return
+        from .factories import EstadoFactory
+
+        rows = self._dados.buscar_todas_solicitacoes()
+        faltantes = False
+        for row in rows:
+            sol = self._solicitacoes.get(row['id'])
+            if sol is None:
+                faltantes = True
+                continue
+            chaves = set(row.keys())
+            estado_db = EstadoFactory.criar_do_banco(row['estado'])
+            if sol.estado.obter_nome() != estado_db.obter_nome():
+                sol._estado = estado_db
+            if 'empresa_responsavel_id' in chaves:
+                sol._empresa_responsavel_id = row['empresa_responsavel_id']
+                sol._base_operacional_id = row['base_operacional_id']
+                if row['atribuida_em']:
+                    try:
+                        sol._atribuida_em = datetime.fromisoformat(row['atribuida_em'])
+                    except (ValueError, TypeError):
+                        pass
+                if row['endereco_coleta'] is not None:
+                    sol._endereco_coleta = row['endereco_coleta']
+                if row['nome_contato'] is not None:
+                    sol._nome_contato = row['nome_contato']
+                if 'peso_confirmado_kg' in chaves and row['peso_confirmado_kg'] is not None:
+                    sol._peso_confirmado_kg = float(row['peso_confirmado_kg'])
+            if 'id_usuario' in chaves:
+                usuario_cache = self._servico_usuario.buscar_usuario(row['id_usuario'])
+                if usuario_cache is not None:
+                    sol._usuario = usuario_cache
+        if faltantes:
             self._carregar_solicitacoes_do_banco()
-        
+
+    def listar_solicitacoes(self) -> List[SolicitacaoDescarte]:
+        """Retorna todas as solicitações, sincronizando com o banco quando configurado."""
+        if self._dados and self._servico_usuario and self._servico_ponto:
+            if not self._solicitacoes:
+                self._carregar_solicitacoes_do_banco()
+            else:
+                self._sincronizar_solicitacoes_com_banco()
         return list(self._solicitacoes.values())
 
     def obter_solicitacao(self, id: str) -> Optional[SolicitacaoDescarte]:
-        """Busca uma solicitação pelo ID."""
+        """Busca uma solicitação pelo ID, sincronizando mudanças do banco."""
+        if self._dados and self._servico_usuario and self._servico_ponto:
+            self._sincronizar_solicitacoes_com_banco()
         return self._solicitacoes.get(id)
+
+    _MAPA_SUBCATEGORIAS = {
+        'smartphone_basico': 'smartphone_basico',
+        'smartphone basico': 'smartphone_basico',
+        'celular basico': 'smartphone_basico',
+        'smartphone_medio': 'smartphone_medio',
+        'smartphone medio': 'smartphone_medio',
+        'smartphone intermediario': 'smartphone_medio',
+        'smartphone': 'smartphone_medio',
+        'celular': 'smartphone_medio',
+        'telefone': 'smartphone_medio',
+        'smartphone_premium': 'smartphone_premium',
+        'smartphone premium': 'smartphone_premium',
+        'iphone': 'iphone',
+        'notebook_basico': 'notebook_basico',
+        'notebook basico': 'notebook_basico',
+        'notebook': 'notebook_basico',
+        'laptop': 'notebook_basico',
+        'tablet': 'notebook_basico',
+        'notebook_gamer': 'notebook_gamer',
+        'notebook gamer': 'notebook_gamer',
+        'desktop': 'desktop',
+        'computador': 'desktop',
+        'pc': 'desktop',
+        'geladeira': 'geladeira',
+        'refrigerador': 'geladeira',
+        'freezer': 'geladeira',
+        'lavadora': 'lavadora',
+        'maquina de lavar': 'lavadora',
+        'ar_condicionado': 'ar_condicionado',
+        'ar condicionado': 'ar_condicionado',
+        'ar-condicionado': 'ar_condicionado',
+        'micro_ondas': 'micro_ondas',
+        'micro-ondas': 'micro_ondas',
+        'microondas': 'micro_ondas',
+        'tv': 'tv',
+        'televisor': 'tv',
+        'televisao': 'tv',
+        'monitor': 'tv',
+    }
+    _SUBCATEGORIA_PADRAO_POR_TIPO = {
+        'celular': 'smartphone_medio',
+        'computador': 'notebook_basico',
+        'eletrodomestico': 'geladeira',
+    }
+
+    @classmethod
+    def normalizar_subcategoria(
+        cls, subcategoria: str, tipo_dispositivo: str = ''
+    ) -> str:
+        """Normaliza rotulos humanos/mobile para chaves canonicas de tabela_precos."""
+        bruto = str(subcategoria or '').strip()
+        if not bruto:
+            return cls._SUBCATEGORIA_PADRAO_POR_TIPO.get(
+                str(tipo_dispositivo or '').strip().lower(), ''
+            )
+        sem_acento = ''.join(
+            ch for ch in unicodedata.normalize('NFKD', bruto)
+            if not unicodedata.combining(ch)
+        ).lower().strip()
+        chave_espaco = ' '.join(sem_acento.replace('_', ' ').split())
+        if sem_acento in cls._MAPA_SUBCATEGORIAS:
+            return cls._MAPA_SUBCATEGORIAS[sem_acento]
+        if chave_espaco in cls._MAPA_SUBCATEGORIAS:
+            return cls._MAPA_SUBCATEGORIAS[chave_espaco]
+        return bruto
+
+    @staticmethod
+    def calcular_co2_evitado(solicitacoes: List[SolicitacaoDescarte]) -> float:
+        """Formula unica de CO2 evitado (kg) alinhada ao dominio e relatorios."""
+        return round(sum(s.calcular_impacto_total() for s in solicitacoes), 2)
 
     @staticmethod
     def calcular_metricas(solicitacoes: List[SolicitacaoDescarte]) -> dict:
@@ -432,9 +548,10 @@ class ServicoSaque:
         metodo: str,
         saldo_disponivel: float,
         chave_idempotencia: Optional[str] = None,
+        titular: str = '',
     ) -> Dict:
         """
-        Registra uma solicitação de saque.
+        Registra uma solicitação de saque de forma atomica quando ha banco configurado.
 
         Raises:
             ValueError: Se o valor for inválido ou exceder o saldo disponível.
@@ -443,10 +560,33 @@ class ServicoSaque:
         if len(chave) > 100:
             raise ValueError("A chave de idempotencia deve ter no maximo 100 caracteres.")
 
+        if valor <= 0:
+            raise ValueError("O valor do saque deve ser positivo.")
+
         id_saque = (
             str(uuid.uuid5(uuid.NAMESPACE_URL, f'ecotech:saque:{id_usuario}:{chave}'))[:12]
             if chave else str(uuid.uuid4())[:12]
         )
+        agora = datetime.now()
+        data = agora.strftime('%d %b %Y')
+        hora = agora.strftime('%H:%M')
+        criado_em = agora.isoformat(timespec='seconds')
+
+        if self._dados and hasattr(self._dados, 'registrar_saque_atomico'):
+            return self._dados.registrar_saque_atomico(
+                id_saque=id_saque,
+                id_usuario=id_usuario,
+                valor=valor,
+                metodo=metodo,
+                data=data,
+                hora=hora,
+                status='pendente',
+                taxa_reais_por_ponto=self.TAXA_REAIS_POR_PONTO,
+                titular=titular,
+                criado_em=criado_em,
+                saldo_disponivel_externo=saldo_disponivel,
+            )
+
         if chave and self._dados:
             existente = next(
                 (
@@ -466,16 +606,10 @@ class ServicoSaque:
                 existente['repetido'] = True
                 return existente
 
-        if valor <= 0:
-            raise ValueError("O valor do saque deve ser positivo.")
         if valor > saldo_disponivel:
             raise ValueError(
                 f"Saldo insuficiente. Disponível: R$ {saldo_disponivel:.2f}"
             )
-
-        agora = datetime.now()
-        data = agora.strftime('%d %b %Y')
-        hora = agora.strftime('%H:%M')
 
         if self._dados:
             self._dados.salvar_saque(
@@ -489,6 +623,8 @@ class ServicoSaque:
             'data': data,
             'hora': hora,
             'status': 'pendente',
+            'titular': titular,
+            'criado_em': criado_em,
         }
 
     def listar_saques(self, id_usuario: str) -> List[Dict]:
@@ -496,7 +632,20 @@ class ServicoSaque:
         if not self._dados:
             return []
         rows = self._dados.buscar_saques_usuario(id_usuario)
-        return [dict(r) for r in rows]
+        resultado = []
+        for r in rows:
+            chaves = set(r.keys()) if hasattr(r, 'keys') else set()
+            resultado.append({
+                'id': r['id'],
+                'valor': r['valor'],
+                'metodo': r['metodo'],
+                'data': r['data'],
+                'hora': r['hora'],
+                'status': r['status'],
+                'titular': r['titular'] if 'titular' in chaves else '',
+                'criado_em': r['criado_em'] if 'criado_em' in chaves else None,
+            })
+        return resultado
 
 
 class ServicoAutenticacao:
@@ -790,6 +939,8 @@ class ServicoUsuario:
                             dados_cidadao['email'],
                             dados_cidadao['cpf']
                         )
+                        if not u['ativo']:
+                            usuario.desativar()
                         self._usuarios[u['id']] = usuario
                 elif u['tipo'] == 'empresa':
                     dados_empresa = self._dados.buscar_empresa(u['id'])
@@ -801,6 +952,8 @@ class ServicoUsuario:
                             dados_empresa['cnpj'],
                             dados_empresa['razao_social']
                         )
+                        if not u['ativo']:
+                            usuario.desativar()
                         self._usuarios[u['id']] = usuario
                 elif u['tipo'] == 'administrador':
                     usuario = Administrador(
@@ -808,6 +961,8 @@ class ServicoUsuario:
                         u['nome'],
                         u['email']
                     )
+                    if not u['ativo']:
+                        usuario.desativar()
                     self._usuarios[u['id']] = usuario
             except (ValueError, KeyError):
                 pass
@@ -845,8 +1000,57 @@ class ServicoUsuario:
         
         return usuario
     
+    def sincronizar_usuario(self, id: str) -> Optional[Usuario]:
+        """Atualiza ou carrega um usuario do banco para manter o cache coerente."""
+        if not self._dados:
+            return self._usuarios.get(id)
+        row = self._dados.buscar_usuario(id)
+        if not row:
+            self._usuarios.pop(id, None)
+            return None
+        existente = self._usuarios.get(id)
+        if existente is not None:
+            existente._nome = row['nome']
+            existente._email = row['email']
+            existente._ativo = bool(row['ativo'])
+            return existente
+        try:
+            if row['tipo'] == 'cidadao':
+                det = self._dados.buscar_cidadao(id)
+                if det:
+                    usuario = Cidadao(det['id'], det['nome'], det['email'], det['cpf'])
+                    if not row['ativo']:
+                        usuario.desativar()
+                    self._usuarios[id] = usuario
+            elif row['tipo'] == 'empresa':
+                det = self._dados.buscar_empresa(id)
+                if det:
+                    usuario = Empresa(
+                        det['id'], det['nome'], det['email'],
+                        det['cnpj'], det['razao_social'],
+                    )
+                    if not row['ativo']:
+                        usuario.desativar()
+                    self._usuarios[id] = usuario
+            elif row['tipo'] == 'administrador':
+                usuario = Administrador(row['id'], row['nome'], row['email'])
+                if not row['ativo']:
+                    usuario.desativar()
+                self._usuarios[id] = usuario
+        except (ValueError, KeyError):
+            pass
+        return self._usuarios.get(id)
+
+    def desativar_no_cache(self, id: str) -> None:
+        """Reflete desativacao imediata no cache em memoria."""
+        usuario = self._usuarios.get(id)
+        if usuario is not None:
+            usuario.desativar()
+
     def buscar_usuario(self, id: str) -> Optional[Usuario]:
         """Busca um usuário pelo ID."""
+        if id not in self._usuarios and self._dados:
+            return self.sincronizar_usuario(id)
         return self._usuarios.get(id)
 
     def autenticar(self, tipo: str, credencial: str, senha: str) -> Optional[Usuario]:

@@ -159,10 +159,38 @@ def criar_app() -> Flask:
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _inicializar_dados_exemplo(servico_usuario, servico_ponto, servico_descarte, dados)
     
+    def _parse_data_entrega(texto):
+        if not texto:
+            return datetime.min, ''
+        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S'):
+            try:
+                dt = datetime.strptime(str(texto).strip(), fmt)
+                return dt, dt.strftime('%d/%m/%Y')
+            except (ValueError, TypeError):
+                continue
+        return datetime.min, str(texto)
+
+    def _empresa_id_solicitacao(solicitacao_id):
+        raw = dados.buscar_solicitacao(solicitacao_id)
+        if not raw:
+            return None
+        empresa_id = raw['empresa_responsavel_id']
+        if not empresa_id and raw['id_ponto_coleta']:
+            ponto = dados.buscar_ponto_coleta(raw['id_ponto_coleta'])
+            empresa_id = ponto['id_empresa'] if ponto else None
+        return empresa_id
+
     # verifica login
     def usuario_logado():
-        """Retorna True se tem usuário na sessão."""
-        return 'user_id' in session
+        """Retorna True se tem usuário ativo na sessão."""
+        user_id = session.get('user_id')
+        if not user_id:
+            return False
+        row = dados.buscar_usuario(user_id)
+        if row is None or not row['ativo']:
+            session.clear()
+            return False
+        return True
     
     def dados_usuario():
         """Retorna dados básicos do usuário da sessão."""
@@ -405,7 +433,7 @@ def criar_app() -> Flask:
             sols_finais = [s for s in solicitacoes_usuario if s.estado.obter_nome() in _ESTADOS_FINAIS]
             sols_reciclados = [s for s in solicitacoes_usuario if s.estado.obter_nome() == 'Reciclado']
             peso_processado = round(sum(s.calcular_peso_total() for s in sols_finais), 2)
-            co2_evitado = round(peso_processado * 3.0, 1)
+            co2_evitado = ServicoDescarte.calcular_co2_evitado(sols_finais)
             taxa_reciclagem = round((len(sols_reciclados) / len(sols_finais) * 100), 1) if sols_finais else 0.0
 
             # tonelagem por categoria de dispositivo
@@ -468,12 +496,7 @@ def criar_app() -> Flask:
 
         entregas = []
         for e in entregas_db:
-            try:
-                dt = datetime.strptime(e['data'], '%Y-%m-%d')
-                data_formatada = dt.strftime('%d/%m/%Y')
-            except (ValueError, TypeError):
-                data_formatada = e['data']
-                dt = datetime.min
+            dt, data_formatada = _parse_data_entrega(e['data'])
             entregas.append({
                 'valor': e['valor'],
                 'empresa': e['empresa'],
@@ -552,8 +575,14 @@ def criar_app() -> Flask:
                 if len(fotos_recebidas) > 5:
                     raise ValueError('Envie no máximo 5 fotos por solicitação.')
                 tipo_dispositivo  = request.form.get('tipo_dispositivo', 'celular')
-                subcategoria      = request.form.get('subcategoria', '').strip()
+                subcategoria      = ServicoDescarte.normalizar_subcategoria(
+                    request.form.get('subcategoria', '').strip(), tipo_dispositivo
+                )
                 nome_dispositivo  = request.form.get('nome', '').strip()
+                ano_digitado      = request.form.get('ano_fabricacao', '').strip()
+                ano_fabricacao    = int(ano_digitado) if ano_digitado else None
+                if ano_fabricacao is not None and (ano_fabricacao < 1950 or ano_fabricacao > datetime.now().year):
+                    raise ValueError('Informe um ano de fabricação válido.')
                 peso_digitado     = request.form.get('peso_kg', '').strip()
                 peso_informado    = bool(peso_digitado)
                 pesos_estimados   = {'celular': 0.2, 'computador': 5.0, 'eletrodomestico': 15.0}
@@ -583,6 +612,8 @@ def criar_app() -> Flask:
                 # para domiciliar, ponto fica None (empresa é atribuída depois)
 
                 coordenadas = None
+                agendada_para = None
+                janela_fim = None
                 if tipo_coleta == 'domiciliar':
                     try:
                         coordenadas = geolocalizador.localizar(
@@ -595,13 +626,24 @@ def criar_app() -> Flask:
                             detalhes={'origem': 'nova_solicitacao'},
                         )
                         raise
-
-                solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
+                    agendada_para = datetime.strptime(
+                        data_agendamento, '%Y-%m-%d %H:%M'
+                    ) if data_agendamento else datetime.now()
+                    fim_informado = request.form.get('horario_fim', '').strip()
+                    janela_fim = (
+                        datetime.strptime(f'{data_coleta} {fim_informado}', '%Y-%m-%d %H:%M')
+                        if data_coleta and fim_informado else agendada_para + timedelta(hours=2)
+                    )
+                    servico_agendamento.validar(agendada_para, janela_fim)
 
                 dispositivo = DispositivoFactory.criar_dispositivo(
                     tipo_dispositivo,
                     {'id': str(__import__('uuid').uuid4()), 'nome': nome_dispositivo, 'peso_kg': peso_kg, 'subcategoria': subcategoria}
                 )
+                if ano_fabricacao is not None:
+                    dispositivo.ano_fabricacao = ano_fabricacao
+
+                solicitacao = servico_descarte.criar_solicitacao(usuario_obj, ponto)
                 servico_descarte.adicionar_item_solicitacao(solicitacao, dispositivo, quantidade, observacoes)
 
                 dados.atualizar_detalhes_coleta(
@@ -621,17 +663,12 @@ def criar_app() -> Flask:
                         solicitacao.id, coordenadas.latitude,
                         coordenadas.longitude, 'navegador_ou_formulario'
                     )
-                    agendada_para = datetime.strptime(
-                        data_agendamento, '%Y-%m-%d %H:%M'
-                    ) if data_agendamento else datetime.now()
-                    fim_informado = request.form.get('horario_fim', '').strip()
-                    janela_fim = (
-                        datetime.strptime(f'{data_coleta} {fim_informado}', '%Y-%m-%d %H:%M')
-                        if data_coleta and fim_informado else agendada_para + timedelta(hours=2)
-                    )
                     servico_agendamento.solicitar(
                         solicitacao.id, usuario['id'], agendada_para, janela_fim
                     )
+                    cidade_reg = request.form.get('cidade_coleta', '').strip()
+                    uf_reg = request.form.get('uf_coleta', '').strip().upper()
+                    regiao_web = f'{cidade_reg}/{uf_reg}'.strip('/')
                     servico_despacho.criar_ofertas(
                         solicitacao.id,
                         DemandaColeta(
@@ -641,22 +678,28 @@ def criar_app() -> Flask:
                             categorias=frozenset({tipo_dispositivo.lower()}),
                             peso_kg=peso_kg * quantidade,
                             agendada_para=agendada_para,
+                            regiao=regiao_web,
                         ),
                     )
                     solicitacao._estado = BuscandoEmpresa()
 
                 dados.salvar_notificacao(
                     usuario['id'],
-                    f'Sua solicitação de descarte do {nome_dispositivo} foi recebida e aguarda coleta.'
+                    f'Sua solicitação de descarte do {nome_dispositivo} foi recebida e aguarda coleta.',
+                    chave_idempotencia=f'solicitacao:{solicitacao.id}:criada',
                 )
 
                 # notificar empresa(s)
-                if tipo_coleta == 'entrega_ponto' and ponto_id:
-                    ponto_raw = dados.buscar_ponto_coleta(ponto_id)
+                if tipo_coleta == 'entrega_ponto' and ponto:
+                    ponto_raw = dados.buscar_ponto_coleta(ponto.id)
                     if ponto_raw and ponto_raw['id_empresa']:
+                        peso_total = round(peso_kg * quantidade, 2)
+                        janela_txt = f' para {formatar_data_br(data_agendamento)}' if data_agendamento else ''
                         dados.salvar_notificacao(
                             ponto_raw['id_empresa'],
-                            f'Nova solicitação de entrega recebida de {usuario["nome"]} para {nome_dispositivo}. Acesse o sistema para confirmar.'
+                            f'Nova entrega no ponto "{ponto.nome}" de {usuario["nome"]}: '
+                            f'{nome_dispositivo} ({peso_total:g} kg){janela_txt}.',
+                            chave_idempotencia=f'ponto_entrega:{solicitacao.id}',
                         )
                 flash('Solicitação criada com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
@@ -862,6 +905,26 @@ def criar_app() -> Flask:
 
         if sol.estado.obter_nome() != 'Solicitado':
             return jsonify({'erro': 'Esta solicitação não está mais aguardando confirmação'}), 400
+
+        payload_json = request.get_json(silent=True) or {}
+        peso_raw = (
+            request.form.get('peso_aferido_kg')
+            or request.form.get('peso_kg')
+            or payload_json.get('peso_aferido_kg')
+            or payload_json.get('peso_kg')
+            or ''
+        )
+        peso_str = str(peso_raw).strip().replace(',', '.')
+        if peso_str:
+            try:
+                peso_confirmado = dados.confirmar_peso_solicitacao(
+                    sol.id, peso_str, usuario['id'], datetime.now().isoformat(timespec='seconds')
+                )
+                sol.confirmar_peso(peso_confirmado)
+            except (ValueError, TypeError) as exc:
+                return jsonify({'erro': str(exc)}), 400
+
+        dados.confirmar_solicitacao(sol.id, 'empresa')
 
         # avança para Coletado
         servico_descarte.avancar_estado_solicitacao(sol)
@@ -1124,12 +1187,7 @@ def criar_app() -> Flask:
 
         entregas = []
         for e in entregas_db:
-            try:
-                dt = datetime.strptime(e['data'], '%Y-%m-%d')
-                data_formatada = dt.strftime('%d/%m/%Y')
-            except (ValueError, TypeError):
-                data_formatada = e['data']
-                dt = datetime.min
+            dt, data_formatada = _parse_data_entrega(e['data'])
             entregas.append({
                 'valor': e['valor'],
                 'empresa': e['empresa'],
@@ -1216,7 +1274,7 @@ def criar_app() -> Flask:
                 metodo = request.form.get('metodo', 'Pix')
 
                 resultado = servico_saque.solicitar_saque(
-                    usuario['id'], valor, metodo, saldo
+                    usuario['id'], valor, metodo, saldo, titular=usuario['nome']
                 )
 
                 flash(
@@ -1251,14 +1309,19 @@ def criar_app() -> Flask:
             s for s in todas_solicitacoes if s.usuario.id == usuario['id']
         ]
         metricas = servico_descarte.calcular_metricas(solicitacoes_usuario)
-        tier_info = servico_descarte.calcular_info_tier(metricas['pontos'])
+        if usuario['tipo'] == 'cidadao':
+            cidadao_row = dados.buscar_cidadao(usuario['id'])
+            pontos_perfil = int(cidadao_row['pontos'] or 0) if cidadao_row else 0
+        else:
+            pontos_perfil = metricas['pontos']
+        tier_info = servico_descarte.calcular_info_tier(pontos_perfil)
 
-        # rank: quantos usuários têm mais pontos que o usuário atual
+        # rank: quantos cidadãos têm mais pontos persistidos que o usuário atual
         rank = 1
         for u in servico_usuario.listar_usuarios():
             if u.id != usuario['id']:
-                sols_u = [s for s in todas_solicitacoes if s.usuario.id == u.id]
-                if servico_descarte.calcular_metricas(sols_u)['pontos'] > metricas['pontos']:
+                outro_cid = dados.buscar_cidadao(u.id)
+                if outro_cid and int(outro_cid['pontos'] or 0) > pontos_perfil:
                     rank += 1
 
         # conquistas baseadas no total de solicitações do usuário
@@ -1277,7 +1340,7 @@ def criar_app() -> Flask:
             usuario=usuario,
             email_usuario=email_usuario,
             total_solicitacoes=len(solicitacoes_usuario),
-            pontos=metricas['pontos'],
+            pontos=pontos_perfil,
             tier_info=tier_info,
             rank=rank,
             conquistas=conquistas,
@@ -1322,6 +1385,7 @@ def criar_app() -> Flask:
             password_hash = generate_password_hash(nova_senha)
 
         dados.atualizar_usuario(usuario['id'], nome, email, password_hash)
+        servico_usuario.sincronizar_usuario(usuario['id'])
 
         # atualiza a sessão com o novo nome
         session['user_nome'] = nome
@@ -1417,7 +1481,7 @@ def criar_app() -> Flask:
                 )
                 processadas_mes = sum(
                     1 for s in solicitacoes_empresa
-                    if s.estado.obter_nome() not in ('Solicitado', 'Cancelado')
+                    if s.estado.obter_nome() not in ('Solicitado', 'Buscando Empresa', 'Cancelado')
                     and s._data_criacao.month == mes_atual
                     and s._data_criacao.year == ano_atual
                 )
@@ -1464,7 +1528,14 @@ def criar_app() -> Flask:
             valor_proposto = float(valor_proposto_str) if valor_proposto_str else None
 
             # calcula valor total avaliado somando todos os itens
+            try:
+                estado_enum = EstadoProduto(estado_produto)
+            except ValueError:
+                return jsonify({'erro': 'Estado do produto inválido'}), 400
+
             valor_total_avaliado = 0.0
+            status_override = 'nenhum'
+            prioridade_status = {'nenhum': 0, 'aprovado': 1, 'pendente_doc': 2, 'invalido': 3}
             for item in sol.itens:
                 subcategoria = item.dispositivo.subcategoria or 'smartphone_medio'
                 preco_row = dados.buscar_preco_subcategoria(subcategoria)
@@ -1476,72 +1547,97 @@ def criar_app() -> Flask:
                 if valor_proposto is not None:
                     resultado_override = ServicoDescarte.validar_override(valor_proposto, vb, vm)
                     valor_item = resultado_override['valor_aplicado']
-                    status_override = resultado_override['status']
+                    status_item = resultado_override['status']
                 else:
                     valor_item = item.dispositivo.calcular_valor_avaliado(
-                        EstadoProduto(estado_produto), vb, vm
+                        estado_enum, vb, vm
                     )
-                    status_override = 'nenhum'
+                    status_item = 'nenhum'
                 valor_total_avaliado += valor_item * item.quantidade
+                if prioridade_status[status_item] > prioridade_status[status_override]:
+                    status_override = status_item
+
+            if status_override in ('pendente_doc', 'invalido') and not justificativa:
+                return jsonify({'erro': 'Informe a justificativa para o valor proposto.'}), 400
 
             dados.atualizar_avaliacao_solicitacao(
-                sol.id, estado_produto, valor_total_avaliado, justificativa, status_override
+                sol.id, estado_produto, round(valor_total_avaliado, 2), justificativa, status_override
             )
 
-        servico_descarte.avancar_estado_solicitacao(sol)
-
-        novo_estado = sol.estado.obter_nome()
-
-        # feature flag Enterprise: cidadão recebe 50% de bônus nos pontos
-        # quando uma empresa Enterprise finaliza a solicitação
         _estados_finais_set = {'Reciclado', 'Reutilizado', 'Descartado'}
         notificacao_msg = ''
         bonus_msg = ''
-        if novo_estado in _estados_finais_set:
-            if sol.usuario.obter_tipo() == 'Cidadão':
-                # usa valor avaliado gravado no banco se disponível, senão fallback legacy
-                avaliacao_row = dados.buscar_avaliacao_solicitacao(sol.id)
-                if avaliacao_row and avaliacao_row['valor_proposto']:
-                    valor_revenda_total = float(avaliacao_row['valor_proposto'])
-                else:
-                    valor_revenda_total = sum(
-                        item.dispositivo.calcular_valor_revenda() * item.quantidade
-                        for item in sol.itens
-                    )
-                credito = round(valor_revenda_total * 0.1, 2)
-                nome_empresa = usuario['nome'] if usuario['tipo'] == 'empresa' else 'EcoTech'
-                dados.salvar_entrega_para_solicitacao(sol.id, sol.usuario.id, credito, nome_empresa)
-                # pontos = valor_final × 10% em R$ ÷ TAXA_REAIS_POR_PONTO
-                pontos_credito = int(credito / servico_saque.TAXA_REAIS_POR_PONTO)
-                dados.atualizar_pontos_cidadao(sol.usuario.id, pontos_credito)
-                sol.usuario.adicionar_pontos(pontos_credito)
-                notificacao_msg = f'+{pontos_credito} pontos creditados!'
-                if credito > 0:
-                    notificacao_msg += f' Crédito de R$ {credito:.2f} liberado na carteira!'
 
-                # parcelas EcoTech e empresa
-                plano_empresa = dados.buscar_plano_empresa(usuario['id']) if usuario['tipo'] == 'empresa' else 'free'
+        if estado_atual == 'Em Processamento':
+            estado_previo = sol._estado
+            try:
+                sol.avancar_estado()
+                novo_estado = sol.estado.obter_nome()
+                estado_db = novo_estado.upper().replace(' ', '_')
+                is_cidadao = 'cidad' in sol.usuario.obter_tipo().lower()
+                empresa_id = _empresa_id_solicitacao(sol.id)
+                if not empresa_id and usuario['tipo'] == 'empresa':
+                    empresa_id = usuario['id']
+                empresa_row = dados.buscar_usuario(empresa_id) if empresa_id else None
+                nome_empresa = empresa_row['nome'] if empresa_row else 'EcoTech'
+                plano_empresa = dados.buscar_plano_empresa(empresa_id) if empresa_id else 'free'
                 taxa_ecotech = ServicoDescarte.TAXAS_ECOTECH.get(plano_empresa, 0.08)
-                valor_ecotech = round(valor_revenda_total * taxa_ecotech, 2)
-                valor_empresa = round(valor_revenda_total * (1.0 - 0.10 - taxa_ecotech), 2)
-                if usuario['tipo'] == 'empresa':
-                    dados.atualizar_saldo_empresa(usuario['id'], valor_empresa)
-                dados.registrar_receita_ecotech(sol.id, valor_ecotech)
 
-            # bônus Enterprise para o cidadão que submeteu
-            if usuario['tipo'] == 'empresa':
-                plano_atual = dados.buscar_plano_empresa(usuario['id'])
-                if plano_atual == 'enterprise' and sol.usuario.obter_tipo() == 'Cidadão':
-                    peso = sol.calcular_peso_total()
-                    bonus = int(peso * 10 * 0.5)  # 50% extra
+                credito = 0.0
+                pontos_credito = 0
+                bonus = 0
+                valor_empresa = 0.0
+                valor_ecotech = 0.0
+                if is_cidadao:
+                    avaliacao_row = dados.buscar_avaliacao_solicitacao(sol.id)
+                    if avaliacao_row and avaliacao_row['valor_proposto'] is not None:
+                        valor_revenda_total = float(avaliacao_row['valor_proposto'])
+                    else:
+                        valor_revenda_total = sum(
+                            item.dispositivo.calcular_valor_revenda() * item.quantidade
+                            for item in sol.itens
+                        )
+                    credito = round(valor_revenda_total * 0.1, 2)
+                    pontos_credito = int(credito / servico_saque.TAXA_REAIS_POR_PONTO) if credito > 0 else 0
+                    valor_ecotech = round(valor_revenda_total * taxa_ecotech, 2)
+                    if empresa_id:
+                        valor_empresa = round(valor_revenda_total * (1.0 - 0.10 - taxa_ecotech), 2)
+                        if plano_empresa == 'enterprise':
+                            bonus = int(sol.calcular_peso_total() * 10 * 0.5)
+
+                entrega_criada = dados.registrar_finalizacao_atomica(
+                    id_sol=sol.id,
+                    estado_db=estado_db,
+                    id_usuario_cidadao=sol.usuario.id if is_cidadao else None,
+                    credito=credito,
+                    nome_empresa=nome_empresa,
+                    pontos_credito=pontos_credito,
+                    empresa_id=empresa_id,
+                    valor_empresa=valor_empresa,
+                    valor_ecotech=valor_ecotech,
+                    bonus_pontos=bonus,
+                    mensagem_historico=f'Operacao avancou de {estado_atual} para {novo_estado}',
+                )
+                if entrega_criada and is_cidadao:
+                    if (pontos_credito + bonus) > 0:
+                        sol.usuario.adicionar_pontos(pontos_credito + bonus)
+                    notificacao_msg = f'+{pontos_credito} pontos creditados!'
+                    if credito > 0:
+                        notificacao_msg += f' Crédito de R$ {credito:.2f} liberado na carteira!'
                     if bonus > 0:
-                        dados.atualizar_pontos_cidadao(sol.usuario.id, bonus)
                         bonus_msg = f' Bônus Enterprise: +{bonus} pontos extras!'
                         notificacao_msg += bonus_msg
+            except Exception:
+                sol._estado = estado_previo
+                raise
+        else:
+            servico_descarte.avancar_estado_solicitacao(sol)
+            novo_estado = sol.estado.obter_nome()
 
         dados.salvar_notificacao(
             sol.usuario.id,
-            f'Sua solicitação foi atualizada para: {novo_estado}.{bonus_msg}'
+            f'Sua solicitação foi atualizada para: {novo_estado}.{bonus_msg}',
+            chave_idempotencia=f'estado:{sol.id}:{novo_estado}',
         )
 
         return jsonify({
@@ -1557,24 +1653,20 @@ def criar_app() -> Flask:
             return redirect(url_for('login'))
 
         usuario = dados_usuario()
-        
+        if usuario['tipo'] not in ('empresa', 'administrador'):
+            flash('Relatórios estão disponíveis apenas para empresas e administradores.', 'error')
+            return redirect(url_for('dashboard'))
+
         # busca todas as solicitacoes
         todas_solicitacoes = servico_descarte.listar_solicitacoes()
-        
-        """Administrador vê tudo; empresa usa o escopo operacional."""
+
         if usuario['tipo'] == 'administrador':
             solicitacoes_para_relatorio = todas_solicitacoes
             titulo_relatorio = "Relatório Geral do Sistema"
-        elif usuario['tipo'] == 'empresa':
+        else:
             solicitacoes_para_relatorio = listar_solicitacoes_visiveis_empresa(
                 usuario['id'], todas_solicitacoes, dados
             )
-            titulo_relatorio = f"Relatório de {usuario['nome']}"
-        else:
-            solicitacoes_para_relatorio = [
-                s for s in todas_solicitacoes 
-                if s.usuario.id == usuario['id']
-            ]
             titulo_relatorio = f"Relatório de {usuario['nome']}"
         
         # lê filtro de período (GET params)
@@ -1644,10 +1736,28 @@ def criar_app() -> Flask:
                 usuario['id'], todas_solicitacoes, dados
             )
 
+        data_inicio_str = request.args.get('data_inicio', '').strip()
+        data_fim_str    = request.args.get('data_fim', '').strip()
+        data_inicio_dt  = None
+        data_fim_dt     = None
+        try:
+            if data_inicio_str:
+                data_inicio_dt = datetime.strptime(data_inicio_str, '%Y-%m-%d')
+            if data_fim_str:
+                data_fim_dt = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        except ValueError:
+            pass
+
         estados_finais = {'Reciclado', 'Reutilizado', 'Descartado'}
-        finalizadas = [s for s in solicitacoes if s.estado.obter_nome() in estados_finais]
+        finalizadas = [
+            s for s in solicitacoes
+            if s.estado.obter_nome() in estados_finais
+            and (data_inicio_dt is None or s._data_criacao >= data_inicio_dt)
+            and (data_fim_dt is None or s._data_criacao <= data_fim_dt)
+        ]
 
         output = io.StringIO()
+        output.write('\ufeff')
         writer = csv.writer(output)
         writer.writerow(['ID', 'Usuario', 'Peso (kg)', 'Impacto CO2 (kg)', 'Metodo', 'Estado', 'Data'])
         for s in finalizadas:
@@ -1664,7 +1774,7 @@ def criar_app() -> Flask:
         output.seek(0)
         return Response(
             output.getvalue(),
-            mimetype='text/csv',
+            mimetype='text/csv; charset=utf-8',
             headers={'Content-Disposition': 'attachment; filename=relatorio_ecotech.csv'}
         )
 
@@ -1819,6 +1929,7 @@ def criar_app() -> Flask:
             return jsonify({'error': 'Acesso negado'}), 403
 
         dados.desativar_usuario(id_usuario)
+        servico_usuario.desativar_no_cache(id_usuario)
         return jsonify({'ok': True})
 
     @app.route('/admin/overrides')
@@ -1913,14 +2024,25 @@ def criar_app() -> Flask:
                 estado_enum = EstadoProduto(estado_produto_str)
             except ValueError:
                 estado_enum = EstadoProduto.FUNCIONANDO
-            # cria dispositivo temporário para usar calcular_valor_avaliado
-            from ..domain.dispositivos import Celular
-            tmp = Celular(id='tmp', nome='tmp', peso_kg=0.0)
-            valor_item = tmp.calcular_valor_avaliado(estado_enum, vb, vm)
+            valor_item = ServicoDescarte.calcular_valor_avaliado(
+                estado_enum.value, vb, vm
+            )
             quantidade = item['quantidade'] if 'quantidade' in item.keys() else 1
             valor_recalculado += valor_item * quantidade
 
-        dados.rejeitar_override(id_sol, valor_recalculado)
+        valor_recalculado = round(valor_recalculado, 2)
+        alterado = dados.rejeitar_override(id_sol, valor_recalculado)
+        if alterado:
+            empresa_id = _empresa_id_solicitacao(id_sol)
+            plano = dados.buscar_plano_empresa(empresa_id) if empresa_id else 'free'
+            taxa = ServicoDescarte.TAXAS_ECOTECH.get(plano, 0.08)
+            dados.reconciliar_override_financeiro(
+                id_sol,
+                valor_recalculado,
+                taxa,
+                servico_saque.TAXA_REAIS_POR_PONTO,
+                empresa_id,
+            )
         flash('Override rejeitado. Valor revertido ao cálculo automático.', 'success')
         return redirect(url_for('admin_overrides'))
 

@@ -24,7 +24,9 @@
             <div class="navbar-menu">
                 <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
                 <a href="{{ url_for('operacoes') }}" class="nav-item {% if request.endpoint == 'operacoes' %}active{% endif %}">Operações</a>
+                {% if usuario.tipo in ('empresa', 'administrador') %}
                 <a href="{{ url_for('relatorios') }}" class="nav-item {% if request.endpoint == 'relatorios' %}active{% endif %}">Relatórios</a>
+                {% endif %}
                 {% if usuario.tipo == 'administrador' %}
                 <a href="{{ url_for('admin_despacho') }}" class="nav-item {% if request.endpoint == 'admin_despacho' %}active{% endif %}">Despacho</a>
                 <a href="{{ url_for('usuarios') }}" class="nav-item {% if request.endpoint == 'usuarios' %}active{% endif %}">Usuários</a>

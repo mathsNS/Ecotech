@@ -116,6 +116,16 @@ def criar_blueprint_api_v1(
     bp = Blueprint('api_v1', __name__, url_prefix='/api/v1')
     estados_finais = {'Reciclado', 'Reutilizado', 'Descartado'}
 
+    @bp.before_request
+    def _verificar_usuario_ativo_api():
+        payload = usuario_autenticado_por_token()
+        if payload is None:
+            return None
+        row = dados.buscar_usuario(payload.get('sub'))
+        if row is None or not row['ativo']:
+            return jsonify({'erro': 'Usuario inativo ou nao autenticado'}), 401
+        return None
+
     def _solicitacoes_do_usuario(usuario_id: str, tipo: str):
         solicitacoes = servico_descarte.listar_solicitacoes()
         if tipo == 'administrador':
@@ -198,7 +208,6 @@ def criar_blueprint_api_v1(
             }
             for entrega in dados.buscar_entregas_usuario(usuario_id)
         ]
-        entregas.reverse()
         return {
             'metricas': {
                 'saldo': saldo,
@@ -288,7 +297,7 @@ def criar_blueprint_api_v1(
                 'ativas': len(ativas),
                 'peso_processado_kg': peso_processado,
                 'saldo': round(dados.buscar_saldo_empresa(usuario_id), 2),
-                'co2_evitado_kg': round(peso_processado * 3.0, 1),
+                'co2_evitado_kg': ServicoDescarte.calcular_co2_evitado(finais),
                 'taxa_reciclagem_percentual': (
                     round(len(recicladas) / len(finais) * 100, 1)
                     if finais else 0.0
@@ -602,10 +611,16 @@ def criar_blueprint_api_v1(
         if chave.startswith('agenda:'):
             solicitacao_id = chave.split(':', 2)[1]
             return f'/solicitacoes/{solicitacao_id}/agenda'
-        if chave.startswith('estado:') or chave.startswith('mtr:'):
+        if chave.startswith('coleta:') or chave.startswith('estado:') or chave.startswith('mtr:'):
             solicitacao_id = chave.split(':', 2)[1]
             prefixo = '/empresa/operacoes' if usuario_tipo == 'empresa' else '/solicitacoes'
             return f'{prefixo}/{solicitacao_id}'
+        if chave.startswith('ponto_entrega:'):
+            solicitacao_id = chave.split(':', 1)[1]
+            return f'/empresa/operacoes/{solicitacao_id}'
+        if chave.startswith('solicitacao:'):
+            solicitacao_id = chave.split(':', 2)[1]
+            return f'/solicitacoes/{solicitacao_id}'
         if chave.startswith('override:'):
             solicitacao_id = chave.split(':', 2)[1]
             return f'/empresa/operacoes/{solicitacao_id}'
@@ -676,6 +691,8 @@ def criar_blueprint_api_v1(
             0.0,
         )
         def data_hora_iso(item):
+            if item.get('criado_em'):
+                return item['criado_em']
             try:
                 return datetime.strptime(
                     f'{item["data"]} {item["hora"]}', '%d %b %Y %H:%M'
@@ -710,6 +727,7 @@ def criar_blueprint_api_v1(
                     'hora': item['hora'],
                     'data_hora': data_hora_iso(item),
                     'status': item['status'],
+                    'titular': item.get('titular') or '',
                 }
                 for item in saques
             ],
@@ -915,42 +933,59 @@ def criar_blueprint_api_v1(
             justificativa, status_override,
         )
 
-    def _creditar_finalizacao(solicitacao, operador):
-        if 'cidad' not in solicitacao.usuario.obter_tipo().lower():
-            return
-        avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao.id)
-        valor_total = (
-            float(avaliacao['valor_proposto'])
-            if avaliacao and avaliacao['valor_proposto'] is not None
-            else sum(
-                item.dispositivo.calcular_valor_revenda() * item.quantidade
-                for item in solicitacao.itens
-            )
-        )
-        credito = round(valor_total * 0.1, 2)
-        nome_empresa = operador['nome'] if operador['tipo'] == 'empresa' else 'EcoTech'
-        dados.salvar_entrega_para_solicitacao(
-            solicitacao.id, solicitacao.usuario.id, credito, nome_empresa
-        )
-        pontos = int(credito / servico_saque.TAXA_REAIS_POR_PONTO)
-        dados.atualizar_pontos_cidadao(solicitacao.usuario.id, pontos)
-        solicitacao.usuario.adicionar_pontos(pontos)
-        plano = (
-            dados.buscar_plano_empresa(operador['id'])
-            if operador['tipo'] == 'empresa' else 'free'
-        )
+    def _finalizar_solicitacao_atomica(solicitacao, operador, estado_anterior):
+        novo_estado = solicitacao.estado.obter_nome()
+        estado_db = novo_estado.upper().replace(' ', '_')
+        mensagem_historico = f'Operacao avancou de {estado_anterior} para {novo_estado}'
+
+        is_cidadao = 'cidad' in solicitacao.usuario.obter_tipo().lower()
+        empresa_id = _empresa_id_solicitacao(solicitacao.id)
+        if not empresa_id and operador['tipo'] == 'empresa':
+            empresa_id = operador['id']
+        empresa_row = dados.buscar_usuario(empresa_id) if empresa_id else None
+        nome_empresa = empresa_row['nome'] if empresa_row else 'EcoTech'
+        plano = dados.buscar_plano_empresa(empresa_id) if empresa_id else 'free'
         taxa = ServicoDescarte.TAXAS_ECOTECH.get(plano, 0.08)
-        if operador['tipo'] == 'empresa':
-            dados.atualizar_saldo_empresa(
-                operador['id'], round(valor_total * (1 - 0.10 - taxa), 2)
+
+        credito = 0.0
+        pontos = 0
+        bonus = 0
+        valor_empresa = 0.0
+        valor_ecotech = 0.0
+        if is_cidadao:
+            avaliacao = dados.buscar_avaliacao_solicitacao(solicitacao.id)
+            valor_total = (
+                float(avaliacao['valor_proposto'])
+                if avaliacao and avaliacao['valor_proposto'] is not None
+                else sum(
+                    item.dispositivo.calcular_valor_revenda() * item.quantidade
+                    for item in solicitacao.itens
+                )
             )
-            if plano == 'enterprise':
-                bonus = int(solicitacao.calcular_peso_total() * 10 * 0.5)
-                if bonus:
-                    dados.atualizar_pontos_cidadao(solicitacao.usuario.id, bonus)
-        dados.registrar_receita_ecotech(
-            solicitacao.id, round(valor_total * taxa, 2)
+            credito = round(valor_total * 0.1, 2)
+            pontos = int(credito / servico_saque.TAXA_REAIS_POR_PONTO) if credito > 0 else 0
+            if empresa_id:
+                valor_empresa = round(valor_total * (1 - 0.10 - taxa), 2)
+                if plano == 'enterprise':
+                    bonus = int(solicitacao.calcular_peso_total() * 10 * 0.5)
+            valor_ecotech = round(valor_total * taxa, 2)
+
+        entrega_criada = dados.registrar_finalizacao_atomica(
+            id_sol=solicitacao.id,
+            estado_db=estado_db,
+            id_usuario_cidadao=solicitacao.usuario.id if is_cidadao else None,
+            credito=credito,
+            nome_empresa=nome_empresa,
+            pontos_credito=pontos,
+            empresa_id=empresa_id,
+            valor_empresa=valor_empresa,
+            valor_ecotech=valor_ecotech,
+            bonus_pontos=bonus,
+            mensagem_historico=mensagem_historico,
         )
+        if entrega_criada and is_cidadao and (pontos + bonus) > 0:
+            solicitacao.usuario.adicionar_pontos(pontos + bonus)
+        return empresa_id, plano
 
     def _validar_fotos(arquivos):
         fotos = []
@@ -1063,7 +1098,7 @@ def criar_blueprint_api_v1(
     @requer_autenticacao_api
     def perfil_api():
         payload = request.usuario_token
-        usuario = servico_usuario.buscar_usuario(payload['sub'])
+        usuario = servico_usuario.sincronizar_usuario(payload['sub'])
         if usuario is None:
             return jsonify({'erro': 'Usuario nao encontrado'}), 404
 
@@ -1131,6 +1166,7 @@ def criar_blueprint_api_v1(
                 password_hash = generate_password_hash(nova_senha)
 
             dados.atualizar_usuario(usuario_id, nome, email, password_hash)
+            servico_usuario.sincronizar_usuario(usuario_id)
             perfil = _perfil_completo(usuario_id, tipo)
 
         solicitacoes = _solicitacoes_do_usuario(usuario_id, tipo)
@@ -1248,7 +1284,9 @@ def criar_blueprint_api_v1(
             if tipo not in {'celular', 'computador', 'eletrodomestico'}:
                 raise ValueError('Selecione um tipo de dispositivo valido')
             nome = form.get('nome', '').strip()
-            subcategoria = form.get('subcategoria', '').strip()
+            subcategoria = ServicoDescarte.normalizar_subcategoria(
+                form.get('subcategoria', '').strip(), tipo
+            )
             if not nome or not subcategoria:
                 raise ValueError('Informe a categoria e o modelo do produto')
             quantidade = int(form.get('quantidade', '1'))
@@ -1288,6 +1326,9 @@ def criar_blueprint_api_v1(
                 coordenadas = Coordenadas(
                     dados_cep['latitude'], dados_cep['longitude']
                 )
+                cidade_reg = form.get('cidade', '').strip() or dados_cep.get('cidade', '')
+                uf_reg = form.get('estado', '').strip().upper() or dados_cep.get('uf', '')
+                regiao = f'{cidade_reg}/{uf_reg}'.strip('/')
 
             data_coleta = form.get('data_coleta', '').strip()
             hora_inicio = form.get('horario_inicio', '').strip()
@@ -1357,6 +1398,7 @@ def criar_blueprint_api_v1(
                         categorias=frozenset({tipo}),
                         peso_kg=peso_unitario * quantidade,
                         agendada_para=inicio,
+                        regiao=regiao,
                     ),
                 )
                 solicitacao._estado = BuscandoEmpresa()
@@ -1366,13 +1408,17 @@ def criar_blueprint_api_v1(
             else:
                 ponto_raw = dados.buscar_ponto_coleta(ponto.id)
                 if ponto_raw and ponto_raw['id_empresa']:
+                    peso_total = round(peso_unitario * quantidade, 2)
                     dados.salvar_notificacao(
                         ponto_raw['id_empresa'],
-                        f'Nova entrega de {usuario.nome}: {nome}.',
+                        f'Nova entrega no ponto "{ponto.nome}" de {usuario.nome}: '
+                        f'{nome} ({peso_total:g} kg) para {inicio.strftime("%d/%m/%Y %H:%M")}.',
+                        chave_idempotencia=f'ponto_entrega:{solicitacao.id}',
                     )
             dados.salvar_notificacao(
                 payload['sub'],
                 f'Sua solicitacao de descarte do {nome} foi recebida.',
+                chave_idempotencia=f'solicitacao:{solicitacao.id}:criada',
             )
             return jsonify(_detalhes_operacao(solicitacao)), 201
         except (ValueError, TypeError) as exc:
@@ -1418,7 +1464,6 @@ def criar_blueprint_api_v1(
             dict(entrega)
             for entrega in dados.buscar_entregas_usuario(request.usuario_token['sub'])
         ]
-        entregas.reverse()
         return jsonify({'entregas': entregas})
 
     def _ponto_empresa_json(row):
@@ -2055,6 +2100,7 @@ def criar_blueprint_api_v1(
                 metodo,
                 carteira['saldo'],
                 chave_idempotencia=payload.get('id_cliente'),
+                titular=titular,
             )
             if not resultado.get('repetido'):
                 dados.salvar_notificacao(
@@ -2062,6 +2108,7 @@ def criar_blueprint_api_v1(
                     f'Saque de R$ {valor:.2f} solicitado com sucesso.',
                     chave_idempotencia=f'saque:{resultado["id"]}',
                 )
+            carteira_atual = _carteira_json(request.usuario_token['sub'])
             return jsonify({
                 'saque': {
                     'id': resultado['id'],
@@ -2071,13 +2118,11 @@ def criar_blueprint_api_v1(
                     'hora': resultado['hora'],
                     'data_hora': next(
                         item['data_hora']
-                        for item in _carteira_json(
-                            request.usuario_token['sub']
-                        )['saques']
+                        for item in carteira_atual['saques']
                         if item['id'] == resultado['id']
                     ),
                     'status': resultado['status'],
-                    'titular': titular,
+                    'titular': resultado.get('titular') or titular,
                 },
                 'repetido': bool(resultado.get('repetido')),
                 'carteira': _carteira_json(request.usuario_token['sub']),
@@ -2264,18 +2309,39 @@ def criar_blueprint_api_v1(
             return jsonify({'erro': 'Paginacao invalida'}), 400
         cidadaos = [dict(item) for item in dados.buscar_todos_cidadaos_admin()]
         empresas = [dict(item) for item in dados.buscar_todos_empresas_admin()]
+        busca_digitos = ''.join(c for c in busca if c.isdigit())
+        busca_parece_documento = bool(busca_digitos) and all(
+            c.isdigit() or c in '.-/ ' for c in busca
+        )
+
+        def _combina_busca(raw_item, tipo_item):
+            if not busca:
+                return True
+            doc_raw = str(raw_item.get('cpf' if tipo_item == 'cidadao' else 'cnpj') or '')
+            doc_digitos = ''.join(c for c in doc_raw if c.isdigit())
+            campos = (
+                str(raw_item.get('nome') or '').lower(),
+                str(raw_item.get('email') or '').lower(),
+                str(raw_item.get('razao_social') or '').lower(),
+                doc_raw.lower(),
+            )
+            if any(busca in campo for campo in campos):
+                return True
+            if busca_parece_documento and busca_digitos in doc_digitos:
+                return True
+            return False
+
         itens = []
         if tipo in ('todos', 'cidadao'):
-            itens.extend(_usuario_admin_json(item, 'cidadao') for item in cidadaos)
+            itens.extend(
+                _usuario_admin_json(item, 'cidadao')
+                for item in cidadaos if _combina_busca(item, 'cidadao')
+            )
         if tipo in ('todos', 'empresa'):
-            itens.extend(_usuario_admin_json(item, 'empresa') for item in empresas)
-        if busca:
-            itens = [
-                item for item in itens
-                if busca in item['nome'].lower()
-                or busca in item['email'].lower()
-                or busca in item['documento'].lower()
-            ]
+            itens.extend(
+                _usuario_admin_json(item, 'empresa')
+                for item in empresas if _combina_busca(item, 'empresa')
+            )
         itens.sort(key=lambda item: (not item['ativo'], item['nome'].lower()))
         total = len(itens)
         inicio = (pagina - 1) * por_pagina
@@ -2314,6 +2380,7 @@ def criar_blueprint_api_v1(
         if usuario['tipo'] == 'administrador':
             return jsonify({'erro': 'Administradores nao podem ser desativados aqui'}), 403
         alterado = dados.desativar_usuario(usuario_id)
+        servico_usuario.desativar_no_cache(usuario_id)
         return jsonify({
             'ok': True,
             'ativo': False,
@@ -2410,6 +2477,16 @@ def criar_blueprint_api_v1(
         if not alterado:
             return jsonify({'erro': 'Override foi decidido por outro administrador'}), 409
         empresa_id = _empresa_id_solicitacao(solicitacao_id)
+        if decisao == 'rejeitar':
+            plano = dados.buscar_plano_empresa(empresa_id) if empresa_id else 'free'
+            taxa = ServicoDescarte.TAXAS_ECOTECH.get(plano, 0.08)
+            dados.reconciliar_override_financeiro(
+                solicitacao_id,
+                valor,
+                taxa,
+                servico_saque.TAXA_REAIS_POR_PONTO,
+                empresa_id,
+            )
         if empresa_id:
             dados.salvar_notificacao(
                 empresa_id,
@@ -2614,7 +2691,7 @@ def criar_blueprint_api_v1(
                 1 for item in _solicitacoes_do_usuario(
                     operador['id'], operador['tipo']
                 )
-                if item.estado.obter_nome() not in ('Solicitado', 'Cancelado')
+                if item.estado.obter_nome() not in ('Solicitado', 'Buscando Empresa', 'Cancelado')
                 and item.data_criacao.year == agora.year
                 and item.data_criacao.month == agora.month
             )
@@ -2638,30 +2715,39 @@ def criar_blueprint_api_v1(
                 )
             if estado_anterior == 'Em Processamento':
                 _registrar_avaliacao(solicitacao, payload)
-            servico_descarte.avancar_estado_solicitacao(solicitacao)
+            if estado_anterior == 'Em Processamento':
+                estado_previo = solicitacao._estado
+                try:
+                    solicitacao.avancar_estado()
+                    empresa_id, plano_emp = _finalizar_solicitacao_atomica(
+                        solicitacao, operador, estado_anterior
+                    )
+                except Exception:
+                    solicitacao._estado = estado_previo
+                    raise
+            else:
+                servico_descarte.avancar_estado_solicitacao(solicitacao)
+                empresa_id, plano_emp = None, None
         except (TypeError, ValueError) as exc:
             return jsonify({'erro': str(exc)}), 400
 
         novo_estado = solicitacao.estado.obter_nome()
-        dados.salvar_historico_rastreamento(
-            solicitacao.id,
-            f'Operacao avancou de {estado_anterior} para {novo_estado}',
-        )
-        if novo_estado in estados_finais:
-            _creditar_finalizacao(solicitacao, operador)
+        if estado_anterior != 'Em Processamento':
+            dados.salvar_historico_rastreamento(
+                solicitacao.id,
+                f'Operacao avancou de {estado_anterior} para {novo_estado}',
+            )
         dados.salvar_notificacao(
             solicitacao.usuario.id,
             f'Sua solicitacao foi atualizada para: {novo_estado}.',
             chave_idempotencia=f'estado:{solicitacao.id}:{novo_estado}',
         )
-        if novo_estado in estados_finais and operador['tipo'] == 'empresa':
-            plano = dados.buscar_plano_empresa(operador['id'])
-            if plano in ('professional', 'enterprise'):
-                dados.salvar_notificacao(
-                    operador['id'],
-                    f'MTR disponivel para a operacao {solicitacao.id[:8]}.',
-                    chave_idempotencia=f'mtr:{solicitacao.id}:disponivel',
-                )
+        if novo_estado in estados_finais and empresa_id and plano_emp in ('professional', 'enterprise'):
+            dados.salvar_notificacao(
+                empresa_id,
+                f'MTR disponivel para a operacao {solicitacao.id[:8]}.',
+                chave_idempotencia=f'mtr:{solicitacao.id}:disponivel',
+            )
         return jsonify({
             'novo_estado': novo_estado,
             'pode_avancar': solicitacao.estado.pode_avancar(),
