@@ -17,7 +17,26 @@ class Dados(RepositorioBase):
         self.conn = sqlite3.connect('ecotech.db', check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("PRAGMA busy_timeout = 5000")
+        try:
+            self.conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
         self.criar_tabelas()
+
+    @staticmethod
+    def _expr_iso_data(coluna: str) -> str:
+        """Normaliza datas legadas DD/MM/YYYY[ HH:MM[:SS]] para ISO em SQL."""
+        return (
+            f"CASE "
+            f"WHEN {coluna} LIKE '__/__/____ __:__:__' THEN "
+            f"substr({coluna},7,4)||'-'||substr({coluna},4,2)||'-'||substr({coluna},1,2)||' '||substr({coluna},12) "
+            f"WHEN {coluna} LIKE '__/__/____ __:__' THEN "
+            f"substr({coluna},7,4)||'-'||substr({coluna},4,2)||'-'||substr({coluna},1,2)||' '||substr({coluna},12)||':00' "
+            f"WHEN {coluna} LIKE '__/__/____' THEN "
+            f"substr({coluna},7,4)||'-'||substr({coluna},4,2)||'-'||substr({coluna},1,2) "
+            f"ELSE {coluna} END"
+        )
 
     def _coluna_existe(self, tabela: str, coluna: str) -> bool:
         return any(
@@ -390,18 +409,116 @@ class Dados(RepositorioBase):
             """, (id_entrega, id_usuario, valor, empresa, data, hora, status))
 
     def salvar_saque(self, id_saque: str, id_usuario: str, valor: float,
-                     metodo: str, data: str, hora: str, status: str) -> None:
+                     metodo: str, data: str, hora: str, status: str,
+                     titular: str = '', criado_em: str = None) -> None:
         """Registra uma solicitação de saque."""
+        criado = criado_em or datetime.now().isoformat(timespec='seconds')
         with self.conn:
             self.conn.execute("""
-            INSERT OR IGNORE INTO saque (id, id_usuario, valor, metodo, data, hora, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (id_saque, id_usuario, valor, metodo, data, hora, status))
+            INSERT OR IGNORE INTO saque
+                (id, id_usuario, valor, metodo, data, hora, status, titular, criado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (id_saque, id_usuario, valor, metodo, data, hora, status, titular, criado))
+
+    def registrar_saque_atomico(
+        self,
+        id_saque: str,
+        id_usuario: str,
+        valor: float,
+        metodo: str,
+        data: str,
+        hora: str,
+        status: str,
+        taxa_reais_por_ponto: float,
+        titular: str = '',
+        criado_em: str = None,
+        saldo_disponivel_externo: float = None,
+    ) -> dict:
+        """Valida saldo/idempotencia e registra saque em transacao BEGIN IMMEDIATE."""
+        criado = criado_em or datetime.now().isoformat(timespec='seconds')
+        valor_arredondado = round(float(valor), 2)
+        self.conn.commit()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            existente = self.conn.execute(
+                "SELECT * FROM saque WHERE id = ? AND id_usuario = ?",
+                (id_saque, id_usuario),
+            ).fetchone()
+            if existente:
+                if (
+                    round(float(existente['valor']), 2) != valor_arredondado
+                    or existente['metodo'] != metodo
+                ):
+                    raise ValueError(
+                        "A chave de idempotencia ja foi usada com outros dados."
+                    )
+                self.conn.commit()
+                item = dict(existente)
+                item['repetido'] = True
+                return item
+
+            cidadao = self.conn.execute(
+                "SELECT pontos FROM cidadao WHERE id_usuario = ?",
+                (id_usuario,),
+            ).fetchone()
+            if cidadao is not None:
+                pontos = int(cidadao['pontos'] or 0)
+                total_sacado = float(
+                    self.conn.execute(
+                        "SELECT COALESCE(SUM(valor), 0.0) AS total FROM saque "
+                        "WHERE id_usuario = ? AND status != 'cancelado'",
+                        (id_usuario,),
+                    ).fetchone()['total']
+                )
+                saldo_disponivel = max(
+                    0.0,
+                    round(pontos * taxa_reais_por_ponto - total_sacado, 2),
+                )
+            elif saldo_disponivel_externo is not None:
+                saldo_disponivel = float(saldo_disponivel_externo)
+            else:
+                saldo_disponivel = 0.0
+
+            if valor_arredondado > saldo_disponivel:
+                raise ValueError(
+                    f"Saldo insuficiente. Disponível: R$ {saldo_disponivel:.2f}"
+                )
+
+            self.conn.execute("""
+                INSERT INTO saque
+                    (id, id_usuario, valor, metodo, data, hora, status, titular, criado_em)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                id_saque, id_usuario, valor_arredondado, metodo,
+                data, hora, status, titular, criado,
+            ))
+            self.conn.commit()
+            return {
+                'id': id_saque,
+                'id_usuario': id_usuario,
+                'valor': valor_arredondado,
+                'metodo': metodo,
+                'data': data,
+                'hora': hora,
+                'status': status,
+                'titular': titular,
+                'criado_em': criado,
+                'repetido': False,
+            }
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def buscar_saques_usuario(self, id_usuario: str):
-        """Retorna todos os saques de um usuário."""
+        """Retorna todos os saques de um usuário em ordem cronológica reversa."""
         c = self.conn.cursor()
-        c.execute("SELECT * FROM saque WHERE id_usuario = ? ORDER BY data DESC", (id_usuario,))
+        iso_data = self._expr_iso_data('data')
+        c.execute(
+            f"SELECT * FROM saque WHERE id_usuario = ? "
+            f"ORDER BY COALESCE(criado_em, {iso_data}) DESC, rowid DESC",
+            (id_usuario,),
+        )
         return c.fetchall()
 
     def buscar_total_sacado_usuario(self, id_usuario: str) -> float:
@@ -586,7 +703,7 @@ class Dados(RepositorioBase):
                 LEFT JOIN item_descarte i ON i.id_solicitacao = sd.id
                 LEFT JOIN dispositivo d ON d.id = i.id_dispositivo
                 WHERE sd.base_operacional_id IS NOT NULL
-                  AND sd.estado NOT IN ('RECICLADO', 'REUTILIZADO', 'CANCELADO')
+                  AND sd.estado NOT IN ('RECICLADO', 'REUTILIZADO', 'DESCARTADO', 'CANCELADO')
                 GROUP BY sd.base_operacional_id
             )
             SELECT b.*, u.ativo AS empresa_ativa,
@@ -753,15 +870,17 @@ class Dados(RepositorioBase):
             return [] if ativa else self._ativar_proxima_rodada(oferta['solicitacao_id'],agora,proxima_expiracao)
 
     def buscar_diagnostico_despacho(self):
+        iso_criacao = self._expr_iso_data('data_criacao')
+        iso_sd_criacao = self._expr_iso_data('sd.data_criacao')
         resumo=self.conn.execute("""SELECT status,COUNT(*) total FROM oferta_coleta GROUP BY status ORDER BY status""").fetchall()
-        pendentes=self.conn.execute("""SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY data_criacao DESC LIMIT 100""").fetchall()
+        pendentes=self.conn.execute(f"""SELECT id,data_criacao,despacho_esgotado_em FROM solicitacao_descarte WHERE estado='BUSCANDO_EMPRESA' ORDER BY {iso_criacao} DESC, rowid DESC LIMIT 100""").fetchall()
         atribuicoes=self.conn.execute("""SELECT sd.id,sd.empresa_responsavel_id,sd.atribuida_em,COUNT(o.id) total_ofertas,MAX(o.rodada) rodadas FROM solicitacao_descarte sd LEFT JOIN oferta_coleta o ON o.solicitacao_id=sd.id WHERE sd.empresa_responsavel_id IS NOT NULL GROUP BY sd.id ORDER BY sd.atribuida_em DESC LIMIT 100""").fetchall()
-        metricas=self.conn.execute("""SELECT
+        metricas=self.conn.execute(f"""SELECT
           COUNT(DISTINCT CASE WHEN o.status='ACEITA' THEN o.solicitacao_id END) aceitas,
           COUNT(DISTINCT o.solicitacao_id) solicitacoes_ofertadas,
           AVG(CASE WHEN o.status='ACEITA' THEN (julianday(o.respondida_em)-julianday(o.criada_em))*1440 END) minutos_ate_aceite,
           AVG(o.rodada) media_rodadas,
-          AVG((julianday(primeira.criada_em)-julianday(sd.data_criacao))*1440) minutos_ate_primeira_oferta,
+          AVG((julianday(primeira.criada_em)-julianday({iso_sd_criacao}))*1440) minutos_ate_primeira_oferta,
           100.0*SUM(CASE WHEN o.status='ACEITA' THEN 1 ELSE 0 END)/NULLIF(SUM(CASE WHEN o.status IN ('ACEITA','RECUSADA') THEN 1 ELSE 0 END),0) taxa_aceite,
           100.0*SUM(CASE WHEN o.status='RECUSADA' THEN 1 ELSE 0 END)/NULLIF(SUM(CASE WHEN o.status IN ('ACEITA','RECUSADA') THEN 1 ELSE 0 END),0) taxa_recusa
           FROM oferta_coleta o
@@ -1254,21 +1373,24 @@ class Dados(RepositorioBase):
         return c.fetchall()
 
     def buscar_entregas_usuario(self, id_usuario):
-        """Retorna todas as entregas de um usuário."""
+        """Retorna todas as entregas de um usuário em ordem cronológica reversa."""
         c = self.conn.cursor()
-        c.execute("""
+        iso_data = self._expr_iso_data('data')
+        c.execute(f"""
             SELECT * FROM entrega 
             WHERE id_usuario = ?
+            ORDER BY {iso_data} DESC, hora DESC, rowid DESC
         """, (id_usuario,))
         return c.fetchall()
 
     def buscar_notificacoes_usuario(self, id_usuario):
-        """Retorna todas as notificações de um usuário."""
+        """Retorna todas as notificações de um usuário em ordem cronológica reversa."""
         c = self.conn.cursor()
-        c.execute("""
+        iso_ts = self._expr_iso_data('timestamp')
+        c.execute(f"""
             SELECT * FROM notificacao 
             WHERE id_usuario = ? 
-            ORDER BY timestamp DESC
+            ORDER BY {iso_ts} DESC, id DESC
         """, (id_usuario,))
         return c.fetchall()
 
@@ -1419,12 +1541,13 @@ class Dados(RepositorioBase):
     def buscar_solicitacoes_ponto(self, id_ponto: str):
         """Retorna todas as solicitações de um ponto, com nome do usuário."""
         c = self.conn.cursor()
-        c.execute("""
+        iso_criacao = self._expr_iso_data('s.data_criacao')
+        c.execute(f"""
             SELECT s.*, u.nome AS nome_usuario
             FROM solicitacao_descarte s
             JOIN usuario u ON s.id_usuario = u.id
             WHERE s.id_ponto_coleta = ?
-            ORDER BY s.data_criacao DESC
+            ORDER BY {iso_criacao} DESC, s.rowid DESC
         """, (id_ponto,))
         return [dict(row) for row in c.fetchall()]
 
@@ -1455,12 +1578,13 @@ class Dados(RepositorioBase):
         """Retorna todas as solicitações não finalizadas de um cidadão."""
         ESTADOS_FINAIS = ('RECICLADO', 'REUTILIZADO', 'DESCARTADO', 'CANCELADO')
         c = self.conn.cursor()
-        c.execute("""
+        iso_criacao = self._expr_iso_data('s.data_criacao')
+        c.execute(f"""
             SELECT s.*, pc.nome AS nome_ponto
             FROM solicitacao_descarte s
             LEFT JOIN ponto_coleta pc ON s.id_ponto_coleta = pc.id
             WHERE s.id_usuario = ?
-            ORDER BY s.data_criacao DESC
+            ORDER BY {iso_criacao} DESC, s.rowid DESC
         """, (id_usuario,))
         rows = [dict(r) for r in c.fetchall()]
         return [r for r in rows if r['estado'] not in ESTADOS_FINAIS]
@@ -1528,13 +1652,14 @@ class Dados(RepositorioBase):
     def buscar_overrides_pendentes(self):
         """Retorna solicitações aguardando aprovação de override de valor."""
         c = self.conn.cursor()
-        c.execute("""
+        iso_criacao = self._expr_iso_data('sd.data_criacao')
+        c.execute(f"""
             SELECT sd.id, sd.data_criacao, sd.estado_produto, sd.valor_proposto,
                    sd.justificativa_valor, u.nome as nome_usuario, u.tipo as tipo_usuario
             FROM solicitacao_descarte sd
             JOIN usuario u ON sd.id_usuario = u.id
             WHERE sd.status_override = 'pendente_doc'
-            ORDER BY sd.data_criacao DESC
+            ORDER BY {iso_criacao} DESC, sd.rowid DESC
         """)
         return c.fetchall()
 
@@ -1591,6 +1716,151 @@ class Dados(RepositorioBase):
         )
         self.conn.commit()
         return c.rowcount == 1
+
+    def registrar_finalizacao_atomica(
+        self,
+        id_sol: str,
+        estado_db: str,
+        id_usuario_cidadao: str = None,
+        credito: float = 0.0,
+        nome_empresa: str = 'EcoTech',
+        pontos_credito: int = 0,
+        empresa_id: str = None,
+        valor_empresa: float = 0.0,
+        valor_ecotech: float = 0.0,
+        bonus_pontos: int = 0,
+        mensagem_historico: str = None,
+    ) -> bool:
+        """Persiste estado final, entrega, pontos, saldo e receita em uma unica transacao."""
+        agora = datetime.now()
+        self.conn.commit()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            self.conn.execute(
+                "UPDATE solicitacao_descarte SET estado = ? WHERE id = ?",
+                (estado_db, id_sol),
+            )
+            if mensagem_historico:
+                self.conn.execute(
+                    "INSERT INTO historico_rastreamento (id_solicitacao, timestamp, mensagem) "
+                    "VALUES (?, ?, ?)",
+                    (id_sol, agora.strftime('%d/%m/%Y %H:%M:%S'), mensagem_historico),
+                )
+            entrega_criada = False
+            if id_usuario_cidadao:
+                cur = self.conn.execute("""
+                    INSERT OR IGNORE INTO entrega
+                        (id, id_solicitacao, id_usuario, valor, empresa, data, hora, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'finalizado')
+                """, (
+                    str(uuid.uuid4()),
+                    id_sol,
+                    id_usuario_cidadao,
+                    round(float(credito), 2),
+                    nome_empresa,
+                    agora.strftime('%d/%m/%Y'),
+                    agora.strftime('%H:%M'),
+                ))
+                entrega_criada = cur.rowcount == 1
+                if entrega_criada:
+                    total_pontos = int(pontos_credito or 0) + int(bonus_pontos or 0)
+                    if total_pontos > 0:
+                        self.conn.execute(
+                            "UPDATE cidadao SET pontos = COALESCE(pontos, 0) + ? WHERE id_usuario = ?",
+                            (total_pontos, id_usuario_cidadao),
+                        )
+                    if empresa_id and valor_empresa:
+                        self.conn.execute(
+                            "UPDATE empresa SET saldo = COALESCE(saldo, 0.0) + ? WHERE id_usuario = ?",
+                            (round(float(valor_empresa), 2), empresa_id),
+                        )
+                    self.conn.execute(
+                        "INSERT OR IGNORE INTO receita_ecotech "
+                        "(id, id_solicitacao, valor, data) VALUES (?, ?, ?, ?)",
+                        (
+                            str(uuid.uuid4()),
+                            id_sol,
+                            round(float(valor_ecotech), 2),
+                            agora.strftime('%Y-%m-%d %H:%M:%S'),
+                        ),
+                    )
+            self.conn.commit()
+            return entrega_criada
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+
+    def reconciliar_override_financeiro(
+        self,
+        id_sol: str,
+        novo_valor_total: float,
+        taxa_ecotech: float,
+        taxa_reais_por_ponto: float,
+        empresa_id: str = None,
+    ) -> dict:
+        """Reconcilia entrega, pontos, saldo da empresa e receita apos decisao de override."""
+        self.conn.commit()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            entrega = self.conn.execute(
+                "SELECT id, id_usuario, valor FROM entrega WHERE id_solicitacao = ?",
+                (id_sol,),
+            ).fetchone()
+            receita = self.conn.execute(
+                "SELECT id, valor FROM receita_ecotech WHERE id_solicitacao = ?",
+                (id_sol,),
+            ).fetchone()
+            if not entrega and not receita:
+                self.conn.commit()
+                return {'reconciliado': False, 'pontos_delta': 0}
+
+            novo_valor = max(0.0, round(float(novo_valor_total), 2))
+            novo_credito = round(novo_valor * 0.1, 2)
+            antigo_credito = round(float(entrega['valor'] or 0.0), 2) if entrega else 0.0
+            pontos_antigos = int(antigo_credito / taxa_reais_por_ponto) if antigo_credito > 0 else 0
+            pontos_novos = int(novo_credito / taxa_reais_por_ponto) if novo_credito > 0 else 0
+            pontos_delta = pontos_novos - pontos_antigos
+
+            nova_receita = round(novo_valor * taxa_ecotech, 2)
+            valor_total_antigo = round(antigo_credito / 0.1, 2) if antigo_credito > 0 else 0.0
+            antigo_empresa = round(valor_total_antigo * (1.0 - 0.10 - taxa_ecotech), 2)
+            novo_empresa = round(novo_valor * (1.0 - 0.10 - taxa_ecotech), 2)
+            delta_empresa = round(novo_empresa - antigo_empresa, 2)
+
+            if entrega:
+                self.conn.execute(
+                    "UPDATE entrega SET valor = ? WHERE id = ?",
+                    (novo_credito, entrega['id']),
+                )
+                if pontos_delta != 0:
+                    self.conn.execute(
+                        "UPDATE cidadao SET pontos = MAX(0, COALESCE(pontos, 0) + ?) "
+                        "WHERE id_usuario = ?",
+                        (pontos_delta, entrega['id_usuario']),
+                    )
+            if receita:
+                self.conn.execute(
+                    "UPDATE receita_ecotech SET valor = ? WHERE id = ?",
+                    (nova_receita, receita['id']),
+                )
+            if empresa_id and delta_empresa != 0:
+                self.conn.execute(
+                    "UPDATE empresa SET saldo = COALESCE(saldo, 0.0) + ? WHERE id_usuario = ?",
+                    (delta_empresa, empresa_id),
+                )
+            self.conn.commit()
+            return {
+                'reconciliado': True,
+                'pontos_delta': pontos_delta,
+                'novo_credito': novo_credito,
+                'nova_receita': nova_receita,
+                'delta_empresa': delta_empresa,
+            }
+        except Exception:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def buscar_receita_total_ecotech(self) -> float:
         """Retorna a receita total acumulada da EcoTech."""
