@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/profile/perfil_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_controller.dart';
 import '../citizen/widgets/citizen_navigation.dart';
@@ -42,15 +43,12 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   @override
   Widget build(BuildContext context) {
     final estado = ref.watch(perfilControllerProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Meu perfil'),
-        leading: IconButton(
-          tooltip: 'Voltar',
-          onPressed: () => context.go('/home'),
-          icon: const Icon(Icons.arrow_back),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Meu perfil'),
+          leading: const AppBackButton(),
         ),
-      ),
       body: estado.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (erro, _) => _ErroPerfil(
@@ -142,6 +140,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           ],
         ),
       },
+      ),
     );
   }
 

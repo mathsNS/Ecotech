@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/admin/admin_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../communication/widgets/communication_actions.dart';
 import '../company/widgets/company_states.dart';
 import 'admin_controller.dart';
@@ -15,11 +16,12 @@ class DespachoAdminScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(despachoAdminProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Diagnóstico de despacho'),
-        actions: const [CommunicationActions()],
-      ),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Diagnóstico de despacho'),
+          actions: const [CommunicationActions()],
+        ),
       bottomNavigationBar: const AdminNavigation(selectedIndex: 2),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -47,6 +49,7 @@ class DespachoAdminScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

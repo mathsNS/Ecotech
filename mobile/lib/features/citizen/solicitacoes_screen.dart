@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_header.dart';
 import '../operations/operations_widgets.dart';
@@ -24,9 +25,10 @@ class _SolicitacoesScreenState extends ConsumerState<SolicitacoesScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(solicitacoesProvider(_estado));
     final name = ref.watch(authControllerProvider).valueOrNull?.nome ?? 'EcoTech';
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: EcoTechDashboardHeader(name: name),
+    return AppBackScope(
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: EcoTechDashboardHeader(name: name),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CitizenError(
@@ -103,6 +105,7 @@ class _SolicitacoesScreenState extends ConsumerState<SolicitacoesScreen> {
         label: const Text('Nova solicitação'),
       ),
       bottomNavigationBar: const CitizenNavigation(selectedIndex: 1),
+      ),
     );
   }
 

@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/company/company_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_controller.dart';
 import '../dashboard/dashboard_header.dart';
@@ -22,9 +23,13 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(oportunidadesEmpresaProvider);
     final usuario = ref.watch(authControllerProvider).valueOrNull;
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: EcoTechDashboardHeader(name: usuario?.nome ?? 'EcoTech'),
+    return AppBackScope(
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: EcoTechDashboardHeader(
+          name: usuario?.nome ?? 'EcoTech',
+          showBackButton: true,
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -42,7 +47,7 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
                     CompanyEmpty(
                       message: 'Nenhuma oportunidade ativa agora. Verifique se suas bases estão ativas e atualize novamente em instantes.',
                       action: OutlinedButton.icon(
-                        onPressed: () => context.go('/empresa/bases'),
+                        onPressed: () => context.push('/empresa/bases'),
                         icon: const Icon(Icons.warehouse_outlined),
                         label: const Text('Revisar bases'),
                       ),
@@ -62,6 +67,7 @@ class OportunidadesEmpresaScreen extends ConsumerWidget {
         ),
       ),
       bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
+      ),
     );
   }
 }

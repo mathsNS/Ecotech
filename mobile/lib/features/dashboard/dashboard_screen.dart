@@ -39,7 +39,7 @@ class DashboardScreen extends ConsumerWidget {
                 const CommunicationActions(),
                 IconButton(
                   tooltip: 'Perfil',
-                  onPressed: () => context.go('/perfil'),
+                  onPressed: () => context.push('/perfil'),
                   icon: const Icon(Icons.account_circle_outlined),
                 ),
               ],
@@ -471,13 +471,24 @@ class _DashboardAdmin extends StatelessWidget {
     final m = dados.metricas;
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => context.go('/relatorios'),
-            icon: const Icon(Icons.bar_chart_outlined),
-            label: const Text('Relatórios do sistema'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.push('/empresa/operacoes'),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Operações'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/relatorios'),
+                icon: const Icon(Icons.bar_chart_outlined),
+                label: const Text('Relatórios'),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         _MetricGrid(
@@ -512,7 +523,14 @@ class _DashboardAdmin extends StatelessWidget {
               ? const EmptySection('Nenhuma solicitação cadastrada.')
               : Column(
                   children: dados.solicitacoesRecentes
-                      .map(_SolicitacaoTile.new)
+                      .map(
+                        (solicitacao) => _SolicitacaoTile(
+                          solicitacao,
+                          onTap: () => context.push(
+                            '/empresa/operacoes/${solicitacao.id}',
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
         ),
@@ -692,11 +710,13 @@ class _Categorias extends StatelessWidget {
 }
 
 class _SolicitacaoTile extends StatelessWidget {
-  const _SolicitacaoTile(this.solicitacao);
+  const _SolicitacaoTile(this.solicitacao, {this.onTap});
   final SolicitacaoResumo solicitacao;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.zero,
+    onTap: onTap,
     leading: CircleAvatar(
       backgroundColor: AppColors.secondary,
       child: Image.asset('assets/images/pacote.png', width: 25),

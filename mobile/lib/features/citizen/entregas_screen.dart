@@ -16,11 +16,12 @@ class EntregasScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(entregasProvider);
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Histórico de incentivos'),
-      ),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Histórico de incentivos'),
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CitizenError(
@@ -47,6 +48,7 @@ class EntregasScreen extends ConsumerWidget {
         ),
       ),
       bottomNavigationBar: const CitizenNavigation(selectedIndex: -1),
+      ),
     );
   }
 }

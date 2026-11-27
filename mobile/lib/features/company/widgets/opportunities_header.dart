@@ -18,7 +18,7 @@ class OpportunitiesHeader extends StatelessWidget {
       const Text('Aceite coletas dentro da área atendida pelas suas bases.'),
       const SizedBox(height: 16),
       OutlinedButton.icon(
-        onPressed: () => context.go('/empresa/bases'),
+        onPressed: () => context.push('/empresa/bases'),
         icon: const Icon(Icons.warehouse_outlined),
         label: const Text('Gerenciar bases'),
       ),

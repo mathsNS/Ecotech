@@ -5,13 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../communication/communication_controller.dart';
 
 class EcoTechDashboardHeader extends ConsumerStatefulWidget
     implements PreferredSizeWidget {
-  const EcoTechDashboardHeader({required this.name, super.key});
+  const EcoTechDashboardHeader({
+    required this.name,
+    this.showBackButton = false,
+    this.fallbackRoute = '/home',
+    super.key,
+  });
 
   final String name;
+  final bool showBackButton;
+  final String fallbackRoute;
 
   @override
   Size get preferredSize => const Size.fromHeight(60);
@@ -48,10 +56,14 @@ class _EcoTechDashboardHeaderState
         ? 'E'
         : widget.name.trim().substring(0, 1).toUpperCase();
     return AppBar(
+      automaticallyImplyLeading: false,
+      leading: widget.showBackButton
+          ? AppBackButton(fallbackRoute: widget.fallbackRoute)
+          : null,
       toolbarHeight: 60,
       backgroundColor: AppColors.surfaceSubtle,
       shape: const Border(bottom: BorderSide(color: AppColors.border)),
-      titleSpacing: 16,
+      titleSpacing: widget.showBackButton ? 0 : 16,
       title: Image.asset(
         'assets/images/ecotech navbar.png',
         width: 104,
@@ -74,7 +86,7 @@ class _EcoTechDashboardHeaderState
           label: 'Abrir perfil',
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: () => context.go('/perfil'),
+            onTap: () => context.push('/perfil'),
             child: CircleAvatar(
               radius: 21,
               backgroundColor: AppColors.secondary,

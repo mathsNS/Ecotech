@@ -7,6 +7,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/admin/admin_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../communication/widgets/communication_actions.dart';
 import '../company/widgets/company_states.dart';
 import 'admin_controller.dart';
@@ -42,11 +43,12 @@ class _UsuariosAdminScreenState extends ConsumerState<UsuariosAdminScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(usuariosAdminProvider(_filtro));
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestão de usuários'),
-        actions: const [CommunicationActions()],
-      ),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Gestão de usuários'),
+          actions: const [CommunicationActions()],
+        ),
       bottomNavigationBar: const AdminNavigation(selectedIndex: 1),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _cadastrar,
@@ -126,6 +128,7 @@ class _UsuariosAdminScreenState extends ConsumerState<UsuariosAdminScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

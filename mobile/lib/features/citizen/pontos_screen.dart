@@ -42,11 +42,12 @@ class _PontosScreenState extends ConsumerState<PontosScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      leading: widget.selectionMode
-          ? const BackButton()
-          : const AppBackButton(),
+  Widget build(BuildContext context) {
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        leading: widget.selectionMode
+            ? const BackButton()
+            : const AppBackButton(),
       toolbarHeight: 32 + MediaQuery.textScalerOf(context).scale(24),
       title: const Text(
         'Pontos de coleta',
@@ -144,5 +145,7 @@ class _PontosScreenState extends ConsumerState<PontosScreen> {
     bottomNavigationBar: widget.selectionMode
         ? null
         : const CitizenNavigation(selectedIndex: -1),
-  );
+    );
+    return widget.selectionMode ? scaffold : AppBackScope(child: scaffold);
+  }
 }

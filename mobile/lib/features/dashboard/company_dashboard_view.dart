@@ -636,7 +636,7 @@ class _ProcessingSection extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => context.go('/empresa/operacoes'),
+            onPressed: () => context.push('/empresa/operacoes'),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -869,7 +869,7 @@ class _QuickAction extends StatelessWidget {
           width: double.infinity,
           height: 34,
           child: ElevatedButton(
-            onPressed: () => context.go(route),
+            onPressed: () => context.push(route),
             style: ElevatedButton.styleFrom(
               padding: EdgeInsets.zero,
               backgroundColor: _deepGreen,

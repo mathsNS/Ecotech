@@ -219,7 +219,7 @@ class _MoreItem extends StatelessWidget {
     onTap: () {
       final router = GoRouter.of(context);
       Navigator.pop(context);
-      router.go(route);
+      router.push(route);
     },
   );
 }

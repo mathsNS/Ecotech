@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/citizen/citizen_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../../shared/widgets/dashboard_widgets.dart';
 import '../communication/widgets/communication_actions.dart';
 import 'citizen_controller.dart';
@@ -19,11 +20,15 @@ class SolicitacaoDetalhesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(solicitacaoDetalhesProvider(id));
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Solicitação #${id.substring(0, 8)}'),
-        actions: const [CommunicationActions()],
-      ),
+    final shortId = id.length > 8 ? id.substring(0, 8) : id;
+    return AppBackScope(
+      fallbackRoute: '/solicitacoes',
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(fallbackRoute: '/solicitacoes'),
+          title: Text('Solicitação #$shortId'),
+          actions: const [CommunicationActions()],
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CitizenError(
@@ -128,6 +133,7 @@ class SolicitacaoDetalhesScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

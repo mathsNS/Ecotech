@@ -44,10 +44,11 @@ class _NotificacoesScreenState extends ConsumerState<NotificacoesScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(notificacoesProvider);
     final userType = ref.watch(authControllerProvider).valueOrNull?.tipo;
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Notificações'),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Notificações'),
         actions: [
           if ((state.valueOrNull?.naoLidas ?? 0) > 0)
             TextButton(
@@ -85,6 +86,7 @@ class _NotificacoesScreenState extends ConsumerState<NotificacoesScreen> {
       bottomNavigationBar: userType == 'cidadao'
           ? const CitizenNavigation(selectedIndex: 3)
           : null,
+      ),
     );
   }
 

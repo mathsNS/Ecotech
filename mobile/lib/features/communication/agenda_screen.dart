@@ -25,11 +25,12 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(agendaProvider(widget.solicitacaoId));
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Agenda da coleta'),
-      ),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Agenda da coleta'),
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -77,6 +78,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

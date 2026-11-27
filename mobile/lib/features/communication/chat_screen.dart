@@ -65,9 +65,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final id = widget.solicitacaoId.length > 8
         ? widget.solicitacaoId.substring(0, 8)
         : widget.solicitacaoId;
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: AppBar(
+    return AppBackScope(
+      fallbackRoute: '/conversas',
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: AppBar(
         backgroundColor: AppColors.surfaceSubtle,
         toolbarHeight: 32 + MediaQuery.textScalerOf(context).scale(25),
         shape: const Border(bottom: BorderSide(color: operationsBorder)),
@@ -144,6 +146,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             onEnviar: _enviar,
           ),
         ],
+      ),
       ),
     );
   }

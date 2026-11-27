@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/communication/communication_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../citizen/widgets/citizen_navigation.dart';
 import '../company/widgets/company_navigation.dart';
@@ -46,9 +47,13 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
     final state = ref.watch(conversasProvider);
     final usuario = ref.watch(authControllerProvider).valueOrNull;
     final userType = usuario?.tipo;
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: EcoTechDashboardHeader(name: usuario?.nome ?? 'EcoTech'),
+    return AppBackScope(
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: EcoTechDashboardHeader(
+          name: usuario?.nome ?? 'EcoTech',
+          showBackButton: userType == 'administrador',
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -238,6 +243,7 @@ class _ConversasScreenState extends ConsumerState<ConversasScreen> {
         'cidadao' => const CitizenNavigation(selectedIndex: 4),
         _ => null,
       },
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/company/company_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import 'company_controller.dart';
 import 'widgets/company_navigation.dart';
 import 'widgets/company_states.dart';
@@ -17,8 +18,12 @@ class PontosEmpresaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(pontosEmpresaProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pontos de coleta')),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Pontos de coleta'),
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -55,6 +60,7 @@ class PontosEmpresaScreen extends ConsumerWidget {
         label: const Text('Novo ponto'),
       ),
       bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
+      ),
     );
   }
 

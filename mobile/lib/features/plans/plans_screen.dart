@@ -5,6 +5,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/plans/plans_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../communication/widgets/communication_actions.dart';
 import '../company/widgets/company_navigation.dart';
 import '../company/widgets/company_states.dart';
@@ -23,11 +24,13 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(plansControllerProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Planos EcoTech'),
-        actions: const [CommunicationActions()],
-      ),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Planos EcoTech'),
+          actions: const [CommunicationActions()],
+        ),
       bottomNavigationBar: const CompanyNavigation(selectedIndex: 4),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -70,6 +73,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

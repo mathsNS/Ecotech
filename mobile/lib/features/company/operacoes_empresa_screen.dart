@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters/app_formatters.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_header.dart';
 import '../operations/operations_widgets.dart';
@@ -29,10 +30,16 @@ class _OperacoesEmpresaScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(operacoesEmpresaProvider(_consulta));
-    final name = ref.watch(authControllerProvider).valueOrNull?.nome ?? 'EcoTech';
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: EcoTechDashboardHeader(name: name),
+    final usuario = ref.watch(authControllerProvider).valueOrNull;
+    final name = usuario?.nome ?? 'EcoTech';
+    final isAdmin = usuario?.tipo == 'administrador';
+    return AppBackScope(
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: EcoTechDashboardHeader(
+          name: name,
+          showBackButton: isAdmin,
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -116,7 +123,10 @@ class _OperacoesEmpresaScreenState
           ),
         ),
       ),
-      bottomNavigationBar: const CompanyNavigation(selectedIndex: 1),
+      bottomNavigationBar: isAdmin
+          ? null
+          : const CompanyNavigation(selectedIndex: 1),
+      ),
     );
   }
 }

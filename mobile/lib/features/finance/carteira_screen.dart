@@ -23,10 +23,11 @@ class CarteiraScreen extends ConsumerWidget {
       16.0,
       double.infinity,
     );
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Carteira'),
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: const Text('Carteira'),
         backgroundColor: AppColors.surfaceSubtle,
         actions: const [CommunicationActions()],
       ),
@@ -82,6 +83,7 @@ class CarteiraScreen extends ConsumerWidget {
         ),
       ),
       bottomNavigationBar: const CitizenNavigation(selectedIndex: 2),
+      ),
     );
   }
 }

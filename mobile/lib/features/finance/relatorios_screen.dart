@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/formatters/app_formatters.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/finance/finance_data.dart';
+import '../../shared/widgets/app_back_button.dart';
 import '../auth/auth_controller.dart';
 import '../company/widgets/company_navigation.dart';
 import '../company/widgets/company_states.dart';
@@ -39,9 +40,14 @@ class _RelatoriosScreenState extends ConsumerState<RelatoriosScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(relatorioProvider(_periodo));
     final usuario = ref.watch(authControllerProvider).valueOrNull;
-    return Scaffold(
-      backgroundColor: operationsBackground,
-      appBar: EcoTechDashboardHeader(name: usuario?.nome ?? 'EcoTech'),
+    final isAdmin = usuario?.tipo == 'administrador';
+    return AppBackScope(
+      child: Scaffold(
+        backgroundColor: operationsBackground,
+        appBar: EcoTechDashboardHeader(
+          name: usuario?.nome ?? 'EcoTech',
+          showBackButton: isAdmin,
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -188,6 +194,7 @@ class _RelatoriosScreenState extends ConsumerState<RelatoriosScreen> {
       bottomNavigationBar: usuario?.tipo == 'empresa'
           ? const CompanyNavigation(selectedIndex: 2)
           : null,
+      ),
     );
   }
 

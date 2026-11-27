@@ -23,12 +23,15 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(operacaoDetalhesProvider(id));
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(fallbackRoute: '/empresa/operacoes'),
-        title: Text('Operacao #${id.substring(0, 8)}'),
-        actions: const [CommunicationActions()],
-      ),
+    final shortId = id.length > 8 ? id.substring(0, 8) : id;
+    return AppBackScope(
+      fallbackRoute: '/empresa/operacoes',
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(fallbackRoute: '/empresa/operacoes'),
+          title: Text('Operacao #$shortId'),
+          actions: const [CommunicationActions()],
+        ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => CompanyError(
@@ -87,6 +90,7 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
