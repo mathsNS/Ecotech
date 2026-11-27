@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/company/company_data.dart';
 import '../../data/company/company_repository.dart';
 import '../../data/company/operation_data.dart';
 import '../../data/company/operation_repository.dart';
 
 final companyRepositoryProvider = Provider<CompanyRepository>(
-  (ref) => CompanyRepository(),
+  (ref) => CompanyRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 final pontosEmpresaProvider = FutureProvider<List<PontoEmpresaData>>(
@@ -22,7 +23,7 @@ final oportunidadesEmpresaProvider = FutureProvider<List<OportunidadeData>>(
 );
 
 final operationRepositoryProvider = Provider<OperationRepository>(
-  (ref) => OperationRepository(),
+  (ref) => OperationRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 typedef OperacoesConsulta = ({String estado, String busca, int pagina});

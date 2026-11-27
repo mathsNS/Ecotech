@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/models/usuario.dart';
 import '../../features/admin/despacho_admin_screen.dart';
 import '../../features/admin/overrides_admin_screen.dart';
 import '../../features/admin/precos_admin_screen.dart';
 import '../../features/admin/usuarios_admin_screen.dart';
+import '../../features/auth/auth_controller.dart';
 import '../../features/auth/cadastro_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/citizen/entregas_screen.dart';
@@ -27,9 +31,112 @@ import '../../features/profile/perfil_screen.dart';
 import '../../features/plans/plans_screen.dart';
 import '../../features/splash/splash_screen.dart';
 
-final appRouter = GoRouter(
-  initialLocation: '/',
-  routes: [
+const _rotasPublicas = {'/login', '/cadastro'};
+
+final initialRouteProvider = Provider<String>((ref) => '/');
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen<AsyncValue<Usuario?>>(authControllerProvider, (_, _) {
+    refresh.value++;
+  });
+  ref.onDispose(refresh.dispose);
+
+  final router = GoRouter(
+    initialLocation: ref.watch(initialRouteProvider),
+    refreshListenable: refresh,
+    redirect: (context, state) => redirecionarRota(
+      location: state.uri.path,
+      authState: ref.read(authControllerProvider),
+    ),
+    routes: appRoutes,
+  );
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+String? redirecionarRota({
+  required String location,
+  required AsyncValue<Usuario?> authState,
+}) {
+  final caminho = location.isEmpty ? '/' : location;
+  final emSplash = caminho == '/';
+  final emRotaPublica = _rotasPublicas.contains(caminho);
+
+  if (authState.isLoading) {
+    return (emSplash || emRotaPublica) ? null : '/';
+  }
+
+  if (authState.hasError) {
+    return (emSplash || emRotaPublica) ? null : '/login';
+  }
+
+  final usuario = authState.valueOrNull;
+  if (usuario == null) {
+    return emRotaPublica ? null : '/login';
+  }
+
+  if (emSplash || emRotaPublica) {
+    return '/home';
+  }
+
+  if (!rotaPermitidaParaPerfil(caminho, usuario.tipo)) {
+    return '/home';
+  }
+
+  return null;
+}
+
+bool rotaPermitidaParaPerfil(String path, String tipo) {
+  final limpo = path.length > 1 && path.endsWith('/')
+      ? path.substring(0, path.length - 1)
+      : path;
+
+  if (limpo == '/home' ||
+      limpo == '/perfil' ||
+      limpo == '/notificacoes' ||
+      limpo == '/conversas' ||
+      limpo.startsWith('/conversas/')) {
+    return true;
+  }
+
+  if (_ehRotaAgenda(limpo)) {
+    return true;
+  }
+
+  if (limpo.startsWith('/admin/')) {
+    return tipo == 'administrador';
+  }
+
+  if (limpo == '/relatorios' ||
+      limpo == '/empresa/operacoes' ||
+      limpo.startsWith('/empresa/operacoes/')) {
+    return tipo == 'empresa' || tipo == 'administrador';
+  }
+
+  if (limpo == '/planos' || limpo.startsWith('/empresa/')) {
+    return tipo == 'empresa';
+  }
+
+  if (limpo == '/carteira' ||
+      limpo == '/pontos' ||
+      limpo == '/entregas' ||
+      limpo == '/solicitacoes' ||
+      limpo.startsWith('/solicitacoes/')) {
+    return tipo == 'cidadao';
+  }
+
+  return false;
+}
+
+bool _ehRotaAgenda(String caminho) {
+  final segmentos = caminho.split('/').where((s) => s.isNotEmpty).toList();
+  return segmentos.length == 3 &&
+      segmentos[0] == 'solicitacoes' &&
+      segmentos[2] == 'agenda';
+}
+
+final List<RouteBase> appRoutes = [
     GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
@@ -126,5 +233,4 @@ final appRouter = GoRouter(
       path: '/admin/precos',
       builder: (context, state) => const PrecosAdminScreen(),
     ),
-  ],
-);
+];

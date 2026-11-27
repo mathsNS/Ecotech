@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/plans/plans_data.dart';
 import '../../data/plans/plans_repository.dart';
 import '../dashboard/dashboard_controller.dart';
 
 final plansRepositoryProvider = Provider<PlansRepository>(
-  (ref) => PlansRepository(),
+  (ref) => PlansRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 class PlansController extends AsyncNotifier<PlansData> {

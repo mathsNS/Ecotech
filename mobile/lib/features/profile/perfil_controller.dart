@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/profile/perfil_data.dart';
 import '../../data/profile/perfil_repository.dart';
 
 final perfilRepositoryProvider = Provider<PerfilRepository>(
-  (ref) => PerfilRepository(),
+  (ref) => PerfilRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 class PerfilController extends AsyncNotifier<PerfilData> {

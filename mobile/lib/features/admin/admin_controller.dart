@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/admin/admin_data.dart';
 import '../../data/admin/admin_repository.dart';
 
 final adminRepositoryProvider = Provider<AdminRepository>(
-  (ref) => AdminRepository(),
+  (ref) => AdminRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 class FiltroUsuariosAdmin {

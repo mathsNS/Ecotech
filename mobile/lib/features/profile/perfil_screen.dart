@@ -181,8 +181,6 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
 
   Future<void> _logout() async {
     await ref.read(authControllerProvider.notifier).logout();
-    ref.invalidate(dashboardControllerProvider);
-    ref.invalidate(perfilControllerProvider);
     if (mounted) context.go('/login');
   }
 }

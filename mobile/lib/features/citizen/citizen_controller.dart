@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/citizen/citizen_data.dart';
 import '../../data/citizen/citizen_repository.dart';
 
 final citizenRepositoryProvider = Provider<CitizenRepository>(
-  (ref) => CitizenRepository(),
+  (ref) => CitizenRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 final pontosColetaProvider = FutureProvider<List<PontoColetaData>>(

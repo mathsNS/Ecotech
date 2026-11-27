@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/finance/finance_data.dart';
 import '../../data/finance/finance_repository.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>(
-  (ref) => FinanceRepository(),
+  (ref) => FinanceRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 final carteiraProvider = FutureProvider<CarteiraData>(

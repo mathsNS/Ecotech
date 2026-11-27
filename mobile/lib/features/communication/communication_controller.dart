@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
 import '../../data/communication/communication_data.dart';
 import '../../data/communication/communication_repository.dart';
 
 final communicationRepositoryProvider = Provider<CommunicationRepository>(
-  (ref) => CommunicationRepository(),
+  (ref) => CommunicationRepository(apiClient: ref.watch(apiClientProvider)),
 );
 
 final agendaProvider = FutureProvider.family<AgendaData, String>(
