@@ -207,6 +207,11 @@ void main() {
     expect(greeting.style?.fontWeight, FontWeight.w700);
     expect(greeting.style?.letterSpacing, isNull);
 
+    final finishedPill = tester.widget<Text>(find.text('12 Finalizadas'));
+    expect(finishedPill.style?.color?.a, greaterThanOrEqualTo(0.85));
+    final activePill = tester.widget<Text>(find.text('3 Operações ativas'));
+    expect(activePill.style?.color?.a, greaterThanOrEqualTo(0.85));
+
     await tester.scrollUntilVisible(
       find.text('Ações rápidas'),
       400,
@@ -215,6 +220,14 @@ void main() {
     expect(find.text('Ações rápidas'), findsOneWidget);
     expect(find.text('Pontos de Coleta'), findsOneWidget);
     expect(find.text('Seu plano'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Links Rápidos'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Criar Conta'), findsNothing);
+    expect(find.text('ECOTECH'), findsNothing);
   });
 
   testWidgets('administrador visualiza panorama do sistema', (tester) async {

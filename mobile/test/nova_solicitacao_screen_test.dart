@@ -317,6 +317,7 @@ void main() {
       await tester.pump();
       expect(repository.requests, hasLength(1));
       final data = repository.requests.single.campos;
+      expect(data['subcategoria'], 'smartphone_basico');
       expect(data['quantidade'], 3);
       expect(data['logradouro'], 'Rua Um');
       expect(data['nome_contato'], 'Maria');
@@ -425,11 +426,11 @@ void main() {
       find.byType(DropdownButtonFormField<String>).first,
     );
     await tapVisible(tester, find.text('Computador').last);
-    expect(find.text('Notebook'), findsOneWidget);
+    expect(find.text('Notebook Básico'), findsOneWidget);
     await tapVisible(tester, find.text('Próximo'));
     await tapVisible(tester, find.text('Anterior'));
     expect(tester.widget<TextField>(field('Quantidade')).controller!.text, '3');
-    expect(find.text('Notebook'), findsOneWidget);
+    expect(find.text('Notebook Básico'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

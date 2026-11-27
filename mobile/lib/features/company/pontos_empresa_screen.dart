@@ -207,7 +207,7 @@ class _EntregaTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => ListTile(
     contentPadding: EdgeInsets.zero,
-    onTap: () => context.push('/solicitacoes/${entrega.id}'),
+    onTap: () => context.push('/empresa/operacoes/${entrega.id}'),
     title: Text(entrega.cidadao),
     subtitle: Text(
       '${AppFormatters.dataHoraTexto(entrega.dataAgendamento ?? '')}\n'

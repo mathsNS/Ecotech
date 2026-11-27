@@ -338,8 +338,11 @@ class _SummaryPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: strong ? .055 : .025),
+      color: Colors.white.withValues(alpha: strong ? .20 : .14),
       borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: strong ? .32 : .20),
+      ),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -347,14 +350,15 @@ class _SummaryPill extends StatelessWidget {
         Icon(
           icon,
           size: 14,
-          color: Colors.white.withValues(alpha: strong ? .35 : .10),
+          color: Colors.white.withValues(alpha: strong ? .98 : .90),
         ),
         const SizedBox(width: 6),
         Text(
           text,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: strong ? .34 : .10),
+            color: Colors.white.withValues(alpha: strong ? .98 : .90),
             fontSize: 11.5,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -905,17 +909,16 @@ class _CompanyFooter extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'ECOTECH',
-              style: TextStyle(
-                color: Color(0xFF2D805B),
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
+            Image.asset(
+              'assets/images/ecotech navbar.png',
+              width: 120,
+              color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
+              semanticLabel: 'EcoTech',
             ),
             const SizedBox(height: 18),
             const Text(
-              '85% dos brasileiros guardam aparelhos sem uso. A EcoTech dá um destino correto, e você ainda é recompensado.',
+              'Conectamos sua empresa a descartes responsáveis, com rastreabilidade operacional e relatórios ambientais.',
               style: TextStyle(
                 color: Color(0xFFD7D9DA),
                 fontSize: 13.5,
@@ -932,19 +935,22 @@ class _CompanyFooter extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 7),
-            _FooterLink(label: 'Início', onTap: () => context.go('/home')),
+            _FooterLink(
+              label: 'Operações',
+              onTap: () => context.go('/empresa/operacoes'),
+            ),
             _FooterLink(
               label: 'Pontos de Coleta',
-              onTap: () => context.go('/empresa/pontos'),
+              onTap: () => context.push('/empresa/pontos'),
             ),
             _FooterLink(
-              label: 'Criar Conta',
-              onTap: () => context.go('/cadastro'),
+              label: 'Relatórios',
+              onTap: () => context.go('/relatorios'),
             ),
             const SizedBox(height: 21),
-            const Text(
-              '© 2026 EcoTech. Todos os direitos reservados.',
-              style: TextStyle(color: Color(0xFF9DA1A4), fontSize: 11.5),
+            Text(
+              '© ${DateTime.now().year} EcoTech. Todos os direitos reservados.',
+              style: const TextStyle(color: Color(0xFF9DA1A4), fontSize: 11.5),
             ),
           ],
         ),

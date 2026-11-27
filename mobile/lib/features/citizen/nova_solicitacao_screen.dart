@@ -53,7 +53,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   int _etapa = 0;
   bool get _entregaPresencial => widget.tipoInicial == 'entrega_ponto';
   String _tipoDispositivo = 'celular';
-  String _subcategoria = 'Smartphone';
+  String _subcategoria = 'smartphone_basico';
   int _ano = 2020;
   int get _quantidade => int.tryParse(_quantidadeInput.text) ?? 0;
   bool _pesoDesconhecido = true;
@@ -66,16 +66,35 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
   bool _consultandoCep = false;
   bool _enviando = false;
 
-  static const _subcategorias = {
-    'celular': ['Smartphone', 'Tablet', 'Acessório móvel'],
-    'computador': ['Notebook', 'Desktop', 'Monitor', 'Periférico'],
+  static const _subcategorias = <String, List<(String, String)>>{
+    'celular': [
+      ('smartphone_basico', 'Smartphone Básico'),
+      ('smartphone_medio', 'Smartphone Médio'),
+      ('smartphone_premium', 'Smartphone Premium'),
+      ('iphone', 'iPhone'),
+    ],
+    'computador': [
+      ('notebook_basico', 'Notebook Básico'),
+      ('notebook_gamer', 'Notebook Gamer'),
+      ('desktop', 'Desktop'),
+    ],
     'eletrodomestico': [
-      'Televisor',
-      'Geladeira',
-      'Micro-ondas',
-      'Eletroportátil',
+      ('geladeira', 'Geladeira'),
+      ('lavadora', 'Lavadora'),
+      ('ar_condicionado', 'Ar-condicionado'),
+      ('micro_ondas', 'Micro-ondas'),
+      ('tv', 'TV'),
     ],
   };
+
+  static String _rotuloSubcategoria(String chave) {
+    for (final lista in _subcategorias.values) {
+      for (final item in lista) {
+        if (item.$1 == chave) return item.$2;
+      }
+    }
+    return chave;
+  }
 
   @override
   void initState() {
@@ -289,7 +308,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
             ],
             onChanged: (value) => setState(() {
               _tipoDispositivo = value!;
-              _subcategoria = _subcategorias[value]!.first;
+              _subcategoria = _subcategorias[value]!.first.$1;
             }),
           ),
         ),
@@ -301,7 +320,12 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
             isExpanded: true,
             initialValue: _subcategoria,
             items: _subcategorias[_tipoDispositivo]!
-                .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item.$1,
+                    child: Text(item.$2),
+                  ),
+                )
                 .toList(),
             onChanged: (value) => _subcategoria = value!,
           ),
@@ -709,7 +733,7 @@ class _NovaSolicitacaoScreenState extends ConsumerState<NovaSolicitacaoScreen> {
         Text('Resumo', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         _ResumoLinha('Produto', '${_quantidade}x ${_nome.text}'),
-        _ResumoLinha('Categoria', _subcategoria),
+        _ResumoLinha('Categoria', _rotuloSubcategoria(_subcategoria)),
         _ResumoLinha(
           'Peso',
           _pesoDesconhecido
