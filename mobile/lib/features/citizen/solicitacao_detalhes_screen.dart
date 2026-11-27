@@ -310,8 +310,42 @@ class _FotoProtegida extends ConsumerWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: snapshot.hasData
-          ? Image.memory(snapshot.data!, fit: BoxFit.cover)
+          ? Image.memory(
+              snapshot.data!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const _FotoErro(),
+            )
+          : snapshot.hasError ||
+                snapshot.connectionState == ConnectionState.done
+          ? const _FotoErro()
           : const Center(child: CircularProgressIndicator()),
+    ),
+  );
+}
+
+class _FotoErro extends StatelessWidget {
+  const _FotoErro();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 28,
+            color: AppColors.textLight,
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Foto indisponível',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.textLight),
+          ),
+        ],
+      ),
     ),
   );
 }

@@ -29,7 +29,7 @@ class OperacaoDetalhesScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           leading: const AppBackButton(fallbackRoute: '/empresa/operacoes'),
-          title: Text('Operacao #$shortId'),
+          title: Text('Operação #$shortId'),
           actions: const [CommunicationActions()],
         ),
       body: state.when(
@@ -143,7 +143,7 @@ class _PesoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Secao(
-    titulo: 'Conferencia de peso',
+    titulo: 'Conferência de peso',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -168,7 +168,7 @@ class _PesoCard extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: _Metrica(
-                label: 'Diferenca',
+                label: 'Diferença',
                 valor: dados.diferencaPesoPercentual == null
                     ? 'Pendente'
                     : '${dados.diferencaPesoPercentual! > 0 ? '+' : ''}'
@@ -189,7 +189,7 @@ class _PesoCard extends StatelessWidget {
         if (dados.diferencaPesoRelevante) ...[
           const SizedBox(height: 11),
           const Text(
-            'A diferenca em relacao a estimativa e superior a 20%. Confira o material antes de prosseguir.',
+            'A diferença em relação à estimativa é superior a 20%. Confira o material antes de prosseguir.',
             style: TextStyle(
               color: AppColors.error,
               fontWeight: FontWeight.w600,
@@ -254,15 +254,15 @@ class _ProdutoTile extends StatelessWidget {
       _Dado('Tipo', item.tipo),
       _Dado(
         'Modelo',
-        item.modelo?.isNotEmpty == true ? item.modelo! : 'Nao informado',
+        item.modelo?.isNotEmpty == true ? item.modelo! : 'Não informado',
       ),
-      _Dado('Ano', item.anoFabricacao?.toString() ?? 'Nao informado'),
+      _Dado('Ano', item.anoFabricacao?.toString() ?? 'Não informado'),
       _Dado(
-        'Peso unitario',
+        'Peso unitário',
         '${AppFormatters.numero(item.pesoUnitarioKg, casas: 2)} kg',
       ),
       if (item.observacoes?.isNotEmpty == true)
-        _Dado('Observacoes', item.observacoes!),
+        _Dado('Observações', item.observacoes!),
       if (item.precos != null) ...[
         const Divider(),
         _Dado('Funcionando', AppFormatters.moeda(item.precos!.funcionando)),
@@ -299,10 +299,44 @@ class _Fotos extends ConsumerWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: snapshot.hasData
-                ? Image.memory(snapshot.data!, fit: BoxFit.cover)
+                ? Image.memory(
+                    snapshot.data!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const _FotoIndisponivel(),
+                  )
+                : snapshot.hasError ||
+                      snapshot.connectionState == ConnectionState.done
+                ? const _FotoIndisponivel()
                 : const Center(child: CircularProgressIndicator()),
           ),
         ),
+      ),
+    ),
+  );
+}
+
+class _FotoIndisponivel extends StatelessWidget {
+  const _FotoIndisponivel();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 28,
+            color: AppColors.textLight,
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Foto indisponível',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.textLight),
+          ),
+        ],
       ),
     ),
   );
@@ -314,23 +348,23 @@ class _Logistica extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Secao(
-    titulo: 'Coleta e atribuicao',
+    titulo: 'Coleta e atribuição',
     child: Column(
       children: [
-        _Dado('Empresa', dados.empresa ?? 'Nao definida'),
-        _Dado('Base', dados.base?['nome'] as String? ?? 'Nao definida'),
+        _Dado('Empresa', dados.empresa ?? 'Não definida'),
+        _Dado('Base', dados.base?['nome'] as String? ?? 'Não definida'),
         _Dado('Ponto', dados.pontoColeta ?? 'Coleta domiciliar'),
-        _Dado('Endereco', dados.enderecoColeta ?? 'Nao informado'),
-        _Dado('Contato', dados.nomeContato ?? 'Nao informado'),
+        _Dado('Endereço', dados.enderecoColeta ?? 'Não informado'),
+        _Dado('Contato', dados.nomeContato ?? 'Não informado'),
         _Dado(
           'Agendamento',
-          AppFormatters.dataHoraTexto(dados.dataAgendamento ?? 'Nao definido'),
+          AppFormatters.dataHoraTexto(dados.dataAgendamento ?? 'Não definido'),
         ),
         _Dado(
-          'Atribuida em',
-          AppFormatters.dataHoraTexto(dados.atribuidaEm ?? 'Nao informado'),
+          'Atribuída em',
+          AppFormatters.dataHoraTexto(dados.atribuidaEm ?? 'Não informado'),
         ),
-        _Dado('Tratamento', dados.metodoTratamento ?? 'Ainda nao definido'),
+        _Dado('Tratamento', dados.metodoTratamento ?? 'Ainda não definido'),
       ],
     ),
   );
@@ -342,7 +376,7 @@ class _AvaliacaoAtual extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Secao(
-    titulo: 'Avaliacao registrada',
+    titulo: 'Avaliação registrada',
     child: Column(
       children: [
         _Dado('Estado do produto', _rotulo(avaliacao['estado_produto'])),
@@ -358,7 +392,7 @@ class _AvaliacaoAtual extends StatelessWidget {
   );
 
   static String _rotulo(dynamic valor) =>
-      (valor?.toString() ?? 'Nao informado').replaceAll('_', ' ');
+      (valor?.toString() ?? 'Não informado').replaceAll('_', ' ');
 }
 
 class _Historico extends StatelessWidget {
@@ -367,7 +401,7 @@ class _Historico extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Secao(
-    titulo: 'Historico operacional',
+    titulo: 'Histórico operacional',
     child: itens.isEmpty
         ? const Text('Nenhum evento operacional registrado.')
         : Column(
@@ -445,7 +479,7 @@ class _AcoesState extends ConsumerState<_Acoes> {
       ref.invalidate(operacoesEmpresaProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Operacao atualizada com sucesso.')),
+          const SnackBar(content: Text('Operação atualizada com sucesso.')),
         );
       }
     } catch (error) {
@@ -487,7 +521,7 @@ class _AcoesState extends ConsumerState<_Acoes> {
         content: Text(
           error is ApiException
               ? error.mensagem
-              : 'Nao foi possivel concluir a operacao.',
+              : 'Não foi possível concluir a operação.',
         ),
         backgroundColor: AppColors.error,
       ),
@@ -497,7 +531,7 @@ class _AcoesState extends ConsumerState<_Acoes> {
   static String _rotuloAvanco(OperacaoDetalhesData dados) {
     if (dados.exigePeso) return 'Confirmar recebimento e peso';
     if (dados.exigeAvaliacao) return 'Avaliar e finalizar';
-    return 'Avancar operacao';
+    return 'Avançar operação';
   }
 }
 
@@ -631,7 +665,7 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Valor por item (opcional)',
-              helperText: 'Em branco usa a tabela de precos',
+              helperText: 'Em branco usa a tabela de preços',
             ),
           ),
           const SizedBox(height: 12),
@@ -659,7 +693,7 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
     final textoValor = _valor.text.trim().replaceAll(',', '.');
     final valor = textoValor.isEmpty ? null : double.tryParse(textoValor);
     if (textoValor.isNotEmpty && (valor == null || valor < 0)) {
-      setState(() => _erro = 'Informe um valor valido');
+      setState(() => _erro = 'Informe um valor válido');
       return;
     }
     Navigator.pop(

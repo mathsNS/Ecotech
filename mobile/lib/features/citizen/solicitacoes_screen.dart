@@ -90,7 +90,10 @@ class _SolicitacoesScreenState extends ConsumerState<SolicitacoesScreen> {
                         context.push('/solicitacoes/${request.id}'),
                     onSchedule: () =>
                         context.push('/solicitacoes/${request.id}/agenda'),
-                    onChat: () => context.push('/conversas/${request.id}'),
+                    onChat: request.empresa == null ||
+                            request.empresa!.trim().isEmpty
+                        ? null
+                        : () => context.push('/conversas/${request.id}'),
                   ),
                 ),
             ],

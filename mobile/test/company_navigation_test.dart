@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ecotech_mobile/data/communication/communication_data.dart';
 import 'package:ecotech_mobile/data/company/company_data.dart';
+import 'package:ecotech_mobile/features/communication/communication_controller.dart';
 import 'package:ecotech_mobile/features/company/company_controller.dart';
 import 'package:ecotech_mobile/features/company/widgets/company_navigation.dart';
 
@@ -31,6 +33,13 @@ void main() {
           oportunidadesEmpresaProvider.overrideWith(
             (ref) async => oportunidades,
           ),
+          badgesProvider.overrideWith(
+            (ref) async => const BadgesData(
+              notificacoes: 0,
+              mensagens: 5,
+              oportunidades: 3,
+            ),
+          ),
         ],
         child: const MaterialApp(
           home: Scaffold(
@@ -42,6 +51,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('3'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Operações'), findsOneWidget);
     expect(find.text('Relatórios'), findsOneWidget);

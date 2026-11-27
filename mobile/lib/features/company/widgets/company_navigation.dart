@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../communication/communication_controller.dart';
 import '../company_controller.dart';
 
 class CompanyNavigation extends ConsumerStatefulWidget {
@@ -24,7 +25,10 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
     super.initState();
     _timer = Timer.periodic(
       const Duration(seconds: 30),
-      (_) => ref.invalidate(oportunidadesEmpresaProvider),
+      (_) {
+        ref.invalidate(oportunidadesEmpresaProvider);
+        ref.invalidate(badgesProvider);
+      },
     );
   }
 
@@ -38,6 +42,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
   Widget build(BuildContext context) {
     final opportunities =
         ref.watch(oportunidadesEmpresaProvider).valueOrNull?.length ?? 0;
+    final unreadMessages = ref.watch(badgesProvider).valueOrNull?.mensagens ?? 0;
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -71,6 +76,7 @@ class _CompanyNavigationState extends ConsumerState<CompanyNavigation> {
                 icon: Icons.chat_bubble_outline_rounded,
                 label: 'Conversas',
                 selected: widget.selectedIndex == 3,
+                badge: unreadMessages,
                 onTap: () => context.go('/conversas'),
               ),
               _NavigationItem(

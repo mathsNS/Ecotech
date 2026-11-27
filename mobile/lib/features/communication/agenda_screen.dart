@@ -327,6 +327,15 @@ class _AcoesAgenda extends StatelessWidget {
   );
 }
 
+String rotuloEventoAgenda(String acao) => switch (acao.trim().toUpperCase()) {
+  'PROPOSTA' => 'Novo horário proposto',
+  'ACEITA' || 'ACEITE' => 'Horário aceito',
+  'REJEITADA' || 'RECUSA' => 'Proposta recusada',
+  'JANELA_SOLICITADA' => 'Janela solicitada',
+  'CRIACAO' => 'Agenda criada',
+  _ => acao.replaceAll('_', ' ').toLowerCase(),
+};
+
 class _EventoAgenda extends StatelessWidget {
   const _EventoAgenda(this.evento);
 
@@ -337,7 +346,7 @@ class _EventoAgenda extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 8),
     child: ListTile(
       leading: const Icon(Icons.history),
-      title: Text(_acao(evento.acao)),
+      title: Text(rotuloEventoAgenda(evento.acao)),
       subtitle: Text(
         '${evento.autorNome} (${_tipo(evento.autorTipo)})\n'
         '${AppFormatters.dataHoraTexto(evento.criadoEm)}'
@@ -346,14 +355,6 @@ class _EventoAgenda extends StatelessWidget {
       isThreeLine: evento.inicio != null,
     ),
   );
-
-  static String _acao(String acao) => switch (acao) {
-    'PROPOSTA' => 'Novo horário proposto',
-    'ACEITE' => 'Horário aceito',
-    'RECUSA' => 'Proposta recusada',
-    'CRIACAO' => 'Agenda criada',
-    _ => acao.replaceAll('_', ' ').toLowerCase(),
-  };
 
   static String _tipo(String tipo) => switch (tipo) {
     'cidadao' => 'cidadão',

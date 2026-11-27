@@ -145,6 +145,60 @@ void main() {
     );
     expect(find.text('Solicitação #8ed47b81'), findsOneWidget);
     expect(find.text('TechLixo Soluções'), findsOneWidget);
+    expect(find.bySemanticsLabel('Abrir conversa'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('cidadão não vê botão de conversa antes de empresa ser atribuída', (
+    tester,
+  ) async {
+    final request = SolicitacaoData(
+      id: 'aa11bb22-abcd',
+      estado: 'Buscando Empresa',
+      pesoEstimadoKg: 3.0,
+      pesoConfirmadoKg: null,
+      pesoOrigem: 'estimado',
+      quantidadeItens: 1,
+      empresa: null,
+      dataCriacao: DateTime(2026, 9, 1),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_CitizenAuthController.new),
+          solicitacoesProvider.overrideWith(
+            (ref, state) async => SolicitacoesPagina(
+              itens: [request],
+              pagina: 1,
+              totalPaginas: 1,
+              total: 1,
+              estatisticas: _stats,
+            ),
+          ),
+          badgesProvider.overrideWith(
+            (ref) async => const BadgesData(
+              notificacoes: 0,
+              mensagens: 0,
+              oportunidades: 0,
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const SolicitacoesScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Solicitação #aa11bb22'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Empresa ainda não definida'), findsOneWidget);
+    expect(find.bySemanticsLabel('Abrir conversa'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
   });
